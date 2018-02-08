@@ -33,11 +33,15 @@ Status BackwardsConstAnalysis(const Graph& g,
   const std::unordered_multimap<string, string> compile_time_const_inputs = {
       {"All", "reduction_indices"},
       {"Any", "reduction_indices"},
+      {"ArgMin", "dimension"},
       {"ArgMax", "dimension"},
       {"AvgPoolGrad", "orig_input_shape"},
+      {"AvgPool3DGrad", "orig_input_shape"},
       {"BatchToSpace", "crops"},
       {"BatchToSpaceND", "block_shape"},
       {"BatchToSpaceND", "crops"},
+      {"BroadcastArgs", "s0"},
+      {"BroadcastArgs", "s1"},
       {"BroadcastGradientArgs", "s0"},
       {"BroadcastGradientArgs", "s1"},
       {"Concat", "concat_dim"},
@@ -48,9 +52,14 @@ Status BackwardsConstAnalysis(const Graph& g,
       {"Conv2DBackpropInput", "input_sizes"},
       {"Conv3DBackpropFilterV2", "filter_sizes"},
       {"Conv3DBackpropInputV2", "input_sizes"},
+      {"Cumprod", "axis"},
+      {"Cumsum", "axis"},
+      {"DepthwiseConv2dNativeBackpropFilter", "filter_sizes"},
+      {"DepthwiseConv2dNativeBackpropInput", "input_sizes"},
       {"DynamicStitch", "indices"},
       {"ExpandDims", "dim"},
       {"Fill", "dims"},
+      {"GatherV2", "axis"},
       {"InvertPermutation", "x"},
       {"LinSpace", "start"},
       {"LinSpace", "stop"},
@@ -60,6 +69,9 @@ Status BackwardsConstAnalysis(const Graph& g,
       {"Min", "reduction_indices"},
       {"OneHot", "depth"},
       {"Pad", "paddings"},
+      {"PadV2", "paddings"},
+      {"MirrorPad", "paddings"},
+      {"Multinomial", "num_samples"},
       {"Prod", "reduction_indices"},
       {"RandomStandardNormal", "shape"},
       {"RandomUniform", "shape"},
@@ -68,6 +80,10 @@ Status BackwardsConstAnalysis(const Graph& g,
       {"Range", "limit"},
       {"Range", "delta"},
       {"Reshape", "shape"},
+      {"ResizeBilinear", "size"},
+      {"ResourceStridedSliceAssign", "begin"},
+      {"ResourceStridedSliceAssign", "end"},
+      {"ResourceStridedSliceAssign", "strides"},
       {"Reverse", "dims"},
       {"ReverseV2", "axis"},
       {"Slice", "begin"},
@@ -78,6 +94,7 @@ Status BackwardsConstAnalysis(const Graph& g,
       {"Split", "split_dim"},
       {"SplitV", "split_dim"},
       {"SplitV", "size_splits"},
+      {"StackV2", "max_size"},
       {"StridedSlice", "begin"},
       {"StridedSlice", "end"},
       {"StridedSlice", "strides"},
@@ -86,6 +103,8 @@ Status BackwardsConstAnalysis(const Graph& g,
       {"StridedSliceGrad", "end"},
       {"StridedSliceGrad", "strides"},
       {"Sum", "reduction_indices"},
+      {"TensorArrayV3", "size"},
+      {"TensorArraySplitV3", "lengths"},
       {"Tile", "multiples"},
       {"Transpose", "perm"}};
 
@@ -108,7 +127,7 @@ Status BackwardsConstAnalysis(const Graph& g,
     if (must_be_const.find(node) != must_be_const.end()) {
       if (node->type_string() == "_Arg") {
         int index;
-        status = GetNodeAttr(node->def(), "index", &index);
+        status = GetNodeAttr(node->attrs(), "index", &index);
         if (!status.ok()) return;
         compile_time_const_args->at(index) = true;
         return;
@@ -124,8 +143,8 @@ Status BackwardsConstAnalysis(const Graph& g,
     if (range.first == range.second) return;
 
     NameRangeMap input_name_ranges;
-    status = NameRangesForNode(node->def(), node->op_def(), &input_name_ranges,
-                               nullptr);
+    status =
+        NameRangesForNode(*node, node->op_def(), &input_name_ranges, nullptr);
     if (!status.ok()) return;
 
     for (auto it = range.first; it != range.second; ++it) {

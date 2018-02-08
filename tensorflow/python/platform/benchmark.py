@@ -43,8 +43,6 @@ GLOBAL_BENCHMARK_REGISTRY = set()
 # See also tensorflow/core/util/reporter.h TestReporter::kTestReporterEnv.
 TEST_REPORTER_TEST_ENV = "TEST_REPORT_FILE_PREFIX"
 
-_benchmark_tests_can_log_memory = app._benchmark_tests_can_log_memory  # pylint: disable=protected-access
-
 
 def _global_report_benchmark(
     name, iters=None, cpu_time=None, wall_time=None,
@@ -73,11 +71,6 @@ def _global_report_benchmark(
                  cpu_time is not None else -1, throughput if
                  throughput is not None else -1, str(extras) if extras else "")
 
-  test_env = os.environ.get(TEST_REPORTER_TEST_ENV, None)
-  if test_env is None:
-    # Reporting was not requested
-    return
-
   entries = test_log_pb2.BenchmarkEntries()
   entry = entries.entry.add()
   entry.name = name
@@ -95,6 +88,12 @@ def _global_report_benchmark(
         entry.extras[k].double_value = v
       else:
         entry.extras[k].string_value = str(v)
+
+  test_env = os.environ.get(TEST_REPORTER_TEST_ENV, None)
+  if test_env is None:
+    # Reporting was not requested, just print the proto
+    print(str(entries))
+    return
 
   serialized_entry = entries.SerializeToString()
 
@@ -168,8 +167,8 @@ class Benchmark(six.with_metaclass(_BenchmarkRegistrar, object)):
 
     Args:
       iters: (optional) How many iterations were run
-      cpu_time: (optional) Total cpu time in seconds
-      wall_time: (optional) Total wall time in seconds
+      cpu_time: (optional) median or mean cpu time in seconds.
+      wall_time: (optional) median or mean wall time in seconds.
       throughput: (optional) Throughput (in MB/s)
       extras: (optional) Dict mapping string keys to additional benchmark info.
         Values may be either floats or values that are convertible to strings.
@@ -215,9 +214,8 @@ class TensorFlowBenchmark(Benchmark):
         store the trace of iteration in the benchmark report.
         The trace will be stored as a string in Google Chrome trace format
         in the extras field "full_trace_chrome_format".
-      store_memory_usage: Boolean, whether to run an extra
-        untimed iteration, calculate memory usage, and store that in extras
-        fields.
+      store_memory_usage: Boolean, whether to run an extra untimed iteration,
+        calculate memory usage, and store that in extras fields.
       name: (optional) Override the BenchmarkEntry name with `name`.
         Otherwise it is inferred from the top-level method name.
       extras: (optional) Dict mapping string keys to additional benchmark info.
@@ -229,8 +227,6 @@ class TensorFlowBenchmark(Benchmark):
       A `dict` containing the key-value pairs that were passed to
       `report_benchmark`.
     """
-    store_memory_usage &= _benchmark_tests_can_log_memory()
-
     for _ in range(burn_iters):
       sess.run(op_or_tensor, feed_dict=feed_dict)
 

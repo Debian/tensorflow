@@ -20,6 +20,8 @@ limitations under the License.
 #include <set>
 #include <vector>
 
+#include "tensorflow/compiler/xla/literal_util.h"
+#include "tensorflow/compiler/xla/service/shaped_buffer.h"
 #include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
@@ -46,6 +48,8 @@ class TransferManager {
   // executor. device_shape is the shape, including layout, of the data on the
   // device, while literal_shape will be the shape for the literal. device_shape
   // and literal_shape must be compatible, but need not have the same layout.
+  // TODO(b/66694934): Remove TransferLiteral* methods which accept bare
+  // DeviceMemoryBase.
   virtual Status TransferLiteralFromDevice(
       perftools::gputools::StreamExecutor* executor,
       const perftools::gputools::DeviceMemoryBase& region,
@@ -58,11 +62,44 @@ class TransferManager {
       perftools::gputools::StreamExecutor* executor, const Literal& literal,
       perftools::gputools::DeviceMemoryBase* region) = 0;
 
+  // Returns the shape of the on-device representation for the given shape on
+  // the host. This is intended for use with ShapedBuffer where buffers are
+  // pre-allocated by the host, e.g. TransferLiteralToDevice, without the user
+  // needing to consider device-specific behaviors.
+  virtual Shape HostShapeToDeviceShape(const Shape& host_shape) const {
+    return host_shape;
+  }
+
+  // Transfers the data held in the given ShapedBuffer into the provided literal
+  // using the provided executor. literal_shape will be the shape for the
+  // literal. The shape of the ShapedBuffer and DeviceShape(literal_shape) must
+  // be compatible, but need not have the same layout.
+  virtual StatusOr<std::unique_ptr<Literal>> TransferLiteralFromDevice(
+      perftools::gputools::StreamExecutor* executor,
+      const ShapedBuffer& device_buffer) = 0;
+
+  // Transfers the given literal into the previously allocated device memory
+  // represented by the given ShapedBuffer using the given executor.
+  virtual Status TransferLiteralToDevice(
+      perftools::gputools::StreamExecutor* executor, const Literal& literal,
+      const ShapedBuffer& device_buffer) = 0;
+
   // Transfers the given literal into the Infeed interface of the device,
   // using the given executor.
   virtual Status TransferLiteralToInfeed(
       perftools::gputools::StreamExecutor* executor,
       const Literal& literal) = 0;
+
+  // Transfer a memory block of the given size from 'source' buffer to the
+  // Infeed interface of the device using the given executor.
+  //
+  // size is the size to transfer from source in bytes.
+  //
+  // source is the source data that must be in the target-dependent layout that
+  // the Infeed HLO used in the computation expects.
+  virtual Status TransferBufferToInfeed(
+      perftools::gputools::StreamExecutor* executor, int64 size,
+      const void* source) = 0;
 
   // Transfers the given literal from the Outfeed interface of the device,
   // using the given executor.
@@ -85,6 +122,12 @@ class TransferManager {
       const perftools::gputools::DeviceMemoryBase& source,
       const Shape& shape) = 0;
 
+  // Given an allocated ShapedBuffer, constructs the tuple index table(s) in
+  // each buffer of the given ShapedBuffer corresponding to tuple shapes. If the
+  // ShapedBuffer is array-shaped this method does nothing.
+  Status WriteTupleIndexTables(perftools::gputools::StreamExecutor* executor,
+                               const ShapedBuffer& device_buffer);
+
   // Returns all buffer pointers that the tuple `source` refers to. Unlike
   // ShallowCopyTupleFromDevice, this function gather buffer pointers in nested
   // tuples as well. Also, the returned DeviceMemoryBase objects are
@@ -97,26 +140,9 @@ class TransferManager {
   // Determines the byte size requirement for the given shape on the underlying
   // architecture. This will be used to allocate an appropriately sized memory
   // region for a host-to-device transfer.
-  virtual int64 GetByteSizeRequirement(const Shape& shape) = 0;
+  virtual int64 GetByteSizeRequirement(const Shape& shape) const = 0;
 
-  // Transfer a memory block of the given size from the device source into the
-  // 'destination' buffer.
-  //
-  // size is the size to transfer to destination in bytes.
-  virtual Status TransferBufferFromDevice(
-      perftools::gputools::StreamExecutor* executor,
-      const perftools::gputools::DeviceMemoryBase& source, int64 size,
-      void* destination);
-
-  // Transfer a memory block of the given size from 'source' buffer to the given
-  // destination of the device.
-  //
-  // size is the size to transfer from source in bytes.
-  virtual Status TransferBufferToDevice(
-      perftools::gputools::StreamExecutor* executor, int64 size,
-      const void* source, perftools::gputools::DeviceMemoryBase* destination);
-
-  typedef TransferManager* (*TransferManagerCreationFunction)();
+  typedef std::unique_ptr<TransferManager> (*TransferManagerCreationFunction)();
 
   /////
   // The TransferManager class also serves as a point to register objects for
@@ -135,18 +161,43 @@ class TransferManager {
   static StatusOr<TransferManager*> GetForPlatform(
       const perftools::gputools::Platform* platform);
 
+ protected:
+  // Transfer a memory block of the given size from the device source into the
+  // 'destination' buffer.
+  //
+  // size is the size to transfer to destination in bytes.
+  virtual Status TransferBufferFromDevice(
+      perftools::gputools::StreamExecutor* executor,
+      const perftools::gputools::DeviceMemoryBase& source, int64 size,
+      void* destination);
+
+  // Transfer a memory block of the given size from 'source' buffer to the given
+  // destination of the device.
+  //
+  // size is the size to transfer from source in bytes.
+  virtual Status TransferBufferToDevice(
+      perftools::gputools::StreamExecutor* executor, int64 size,
+      const void* source, perftools::gputools::DeviceMemoryBase* destination);
+
+  // Writes the given device-memory pointers in 'elements' to the given region
+  // to construct a tuple in the platform-specific tuple representation. This
+  // can handle nested tuples as well. In the nested case, the element
+  // DeviceMemoryBase points to another array of pointers on the device.
+  virtual Status WriteTuplePointersToDevice(
+      perftools::gputools::StreamExecutor* executor,
+      tensorflow::gtl::ArraySlice<perftools::gputools::DeviceMemoryBase>
+          elements,
+      const Shape& shape, perftools::gputools::DeviceMemoryBase* region) = 0;
+
  private:
-  // Routine that returns the mutex that guards the
-  // platform-to-transfer manager map.  Done as a routine to
-  // ensure correct initialization ordering, since RegisterTransferManager
-  // can be called during program initialization time.
-  static tensorflow::mutex* platform_transfer_manager_mutex();
+  // The mutex that guards the platform-to-transfer manager map.
+  static tensorflow::mutex platform_transfer_manager_mutex_;
 
   // State kept for each kind of TransferManager.  Registration functions
   // set up creation_function, and then we use that to lazily create
   // "manager" the first time GetForPlatform is invoked for a particular id.
   struct State {
-    TransferManager* manager = nullptr;
+    std::unique_ptr<TransferManager> manager;
     TransferManagerCreationFunction creation_function = nullptr;
   };
 

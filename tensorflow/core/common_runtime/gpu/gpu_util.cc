@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/gpu/process_state.h"
 #include "tensorflow/core/common_runtime/gpu_device_context.h"
 #include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/framework/tensor.pb.h"
 #include "tensorflow/core/framework/tensor_reference.h"
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -55,7 +56,6 @@ const tensorflow::int64 FLAGS_brain_gpu_util_debug_string_maxlen = 128;
 extern bool FLAGS_brain_gpu_record_mem_types;
 
 using perftools::gputools::DeviceMemoryBase;
-using perftools::gputools::DeviceMemory;
 using perftools::gputools::Stream;
 
 namespace tensorflow {
@@ -352,11 +352,7 @@ Status GPUUtil::Sync(Device* gpu_device) {
   if (!dev_info) {
     return errors::Internal("Failed to find dest device GPUDeviceInfo");
   }
-  dev_info->stream->BlockHostUntilDone();
-  if (!dev_info->stream->ok()) {
-    LOG(FATAL) << "GPU sync failed";
-  }
-  return Status::OK();
+  return dev_info->stream->BlockHostUntilDone();
 }
 
 Status GPUUtil::SyncAll(Device* gpu_device) {
@@ -367,7 +363,7 @@ Status GPUUtil::SyncAll(Device* gpu_device) {
   }
   if (!dev_info->stream->parent()->SynchronizeAllActivity() ||
       !dev_info->stream->ok()) {
-    LOG(FATAL) << "GPU sync failed";
+    return errors::Internal("GPU sync failed");
   }
   return Status::OK();
 }
