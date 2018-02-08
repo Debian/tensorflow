@@ -74,8 +74,8 @@ class Executor {
   //
   // RunAsync() uses "cancellation_manager", if not nullptr, to
   // register callbacks that should be called if the graph computation
-  // is cancelled. Note that the callbacks merely unblock any
-  // long-running computation, and a cancelled step will terminate by
+  // is canceled. Note that the callbacks merely unblock any
+  // long-running computation, and a canceled step will terminate by
   // returning/calling the DoneCallback as usual.
   //
   // RunAsync() dispatches closures to "runner". Typically, "runner"
@@ -84,7 +84,7 @@ class Executor {
     int64 step_id = 0;
     Rendezvous* rendezvous = nullptr;
     StepStatsCollector* stats_collector = nullptr;
-    FunctionCallFrame* call_frame = nullptr;
+    CallFrameInterface* call_frame = nullptr;
     CancellationManager* cancellation_manager = nullptr;
     SessionState* session_state = nullptr;
     TensorStore* tensor_store = nullptr;

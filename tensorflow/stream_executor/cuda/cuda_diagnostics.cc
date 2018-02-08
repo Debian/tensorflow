@@ -76,10 +76,10 @@ string DriverVersionStatusToString(port::StatusOr<DriverVersion> version) {
 
 port::StatusOr<DriverVersion> StringToDriverVersion(const string &value) {
   std::vector<string> pieces = port::Split(value, '.');
-  if (pieces.size() != 2 && pieces.size() != 3) {
+  if (pieces.size() < 2 || pieces.size() > 4) {
     return port::Status{
         port::error::INVALID_ARGUMENT,
-        port::Printf("expected %%d.%%d or %%d.%%d.%%d form for driver version; got \"%s\"",
+        port::Printf("expected %%d.%%d, %%d.%%d.%%d, or %%d.%%d.%%d.%%d form for driver version; got \"%s\"",
                      value.c_str())};
   }
 
@@ -170,7 +170,7 @@ void Diagnostician::LogDiagnosticInformation() {
     VLOG(1) << "LD_LIBRARY_PATH is: \"" << library_path << "\"";
 
     std::vector<string> pieces = port::Split(library_path, ':');
-    for (auto piece : pieces) {
+    for (const auto &piece : pieces) {
       if (piece.empty()) {
         continue;
       }
@@ -232,7 +232,7 @@ port::StatusOr<DriverVersion> Diagnostician::FindDsoVersion() {
       result = StringToDriverVersion(version);
     }
 #else
-#if !defined(PLATFORM_WINDOWS)
+#if !defined(PLATFORM_WINDOWS) && !defined(NVIDIA_TEGRA)
   // Callback used when iterating through DSOs. Looks for the driver-interfacing
   // DSO and yields its version number into the callback data, when found.
   auto iterate_phdr =
@@ -369,7 +369,7 @@ port::StatusOr<DriverVersion> Diagnostician::FindKernelDriverVersion() {
     LOG(INFO) << "driver version file contents: \"\"\"" << contents.begin()
               << "\"\"\"";
     fclose(driver_version_file);
-    return FindKernelModuleVersion(string{contents.begin()});
+    return FindKernelModuleVersion(contents.begin());
   }
 
   auto status =

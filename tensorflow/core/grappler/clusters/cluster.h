@@ -64,9 +64,19 @@ class Cluster {
   // before Provision().
   void SetNumWarmupSteps(int num_steps);
 
+  // Returns the number of warmup steps.
+  int NumWarmupSteps() const;
+
   // Disable the collection of detailed statistics. Must be called
   // before Provision().
   void DisableDetailedStats(bool disable);
+
+  // Returns true iff the collection of detailed statistics is enabled.
+  bool DetailedStatsEnabled() const;
+
+  // Disable the TensorFlow optimizer. This ensures that the graph that TF
+  // executes is similar to the input graph. Must be called before Provision().
+  void DisableOptimizer(bool disable);
 
   // Return the list of TensorFlow devices that are available to execute a
   // graph. This is empty until provision() is called.

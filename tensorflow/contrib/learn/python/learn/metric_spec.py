@@ -42,10 +42,8 @@ def _args(fn):
   """
   if hasattr(fn, 'func') and hasattr(fn, 'keywords'):
     # Handle functools.partial and similar objects.
-    return tuple([
-        arg for arg in tf_inspect.getargspec(fn.func).args
-        if arg not in set(fn.keywords.keys())
-    ])
+    return tuple(
+        [arg for arg in _args(fn.func) if arg not in set(fn.keywords.keys())])
   # Handle function.
   return tuple(tf_inspect.getargspec(fn).args)
 
@@ -233,7 +231,7 @@ class MetricSpec(object):
   `Estimator` then knows which predictions, labels, and weight to use to call a
   given metric function.
 
-  When building the ops to run in evaluation, `Estimator` will call
+  When building the ops to run in evaluation, an `Estimator` will call
   `create_metric_ops`, which will connect the given `metric_fn` to the model
   as detailed in the docstring for `create_metric_ops`, and return the metric.
 
@@ -401,7 +399,9 @@ class MetricSpec(object):
         if not isinstance(dict_or_tensor, dict):
           raise ValueError('MetricSpec with ' + name + '_key specified'
                            ' requires ' +
-                           name + 's dict, got %s' % dict_or_tensor)
+                           name + 's dict, got %s.\n' % dict_or_tensor +
+                           'You must not provide a %s_key if you ' % name +
+                           'only have a single Tensor as %ss.' % name)
         if key not in dict_or_tensor:
           raise KeyError(
               'Key \'%s\' missing from %s.' % (key, dict_or_tensor.keys()))

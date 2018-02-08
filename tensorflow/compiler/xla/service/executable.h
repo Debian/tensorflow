@@ -19,16 +19,19 @@ limitations under the License.
 #include <memory>
 #include <utility>
 
+#include "tensorflow/compiler/xla/legacy_flags/debug_options_flags.h"
 #include "tensorflow/compiler/xla/service/computation_layout.h"
 #include "tensorflow/compiler/xla/service/device_memory_allocator.h"
+#include "tensorflow/compiler/xla/service/hlo_cost_analysis.h"
 #include "tensorflow/compiler/xla/service/hlo_execution_profile.h"
+#include "tensorflow/compiler/xla/service/hlo_graph_dumper.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
-#include "tensorflow/compiler/xla/service/hlo_module_config.h"
 #include "tensorflow/compiler/xla/service/service_executable_run_options.h"
 #include "tensorflow/compiler/xla/service/session.pb.h"
 #include "tensorflow/compiler/xla/service/shaped_buffer.h"
 #include "tensorflow/compiler/xla/service/versioned_computation_handle.h"
 #include "tensorflow/compiler/xla/statusor.h"
+#include "tensorflow/compiler/xla/util.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
 #include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/mutex.h"
@@ -41,10 +44,15 @@ namespace xla {
 // interface that is used for launching compiled programs across platforms.
 class Executable {
  public:
-  explicit Executable(std::unique_ptr<HloModule> hlo_module,
-                      std::unique_ptr<HloModuleConfig> module_config)
+  explicit Executable(std::unique_ptr<const HloModule> hlo_module,
+                      std::unique_ptr<HloProfilePrinter> hlo_profile_printer,
+                      std::unique_ptr<HloProfileIndexMap> hlo_profile_index_map)
       : hlo_module_(std::move(hlo_module)),
-        module_config_(std::move(module_config)) {}
+        hlo_profile_printer_(std::move(hlo_profile_printer)),
+        hlo_profile_index_map_(std::move(hlo_profile_index_map)) {
+    CHECK_EQ(hlo_profile_printer_.get() == nullptr,
+             hlo_profile_index_map_.get() == nullptr);
+  }
   virtual ~Executable() {}
 
   // Enqueues the compilation result on the provided stream, passing the given
@@ -87,6 +95,26 @@ class Executable {
           tensorflow::gtl::ArraySlice<perftools::gputools::DeviceMemoryBase>>
           arguments);
 
+  // Populates `hlo_execution_profile` from `executor`. This is implicit in any
+  // Execute* API call that takes a hlo_execution_profile argument, but must be
+  // called explicitly for other (async, for example) variants after the stream
+  // has completed.
+  virtual Status PopulateExecutionProfile(
+      HloExecutionProfile* hlo_execution_profile,
+      perftools::gputools::StreamExecutor* executor) {
+    return Status::OK();
+  }
+
+  // Convenience wrapper for calling Executable::ExecuteOnStream. Sets up a
+  // timer for the execution, sets up HLO profiling if enabled, and fills in the
+  // given ExecutionProfile if non-null.  The ExecuteOnStream overloads have
+  // different argument types and return types, so this method is templated on
+  // argument type and return type of the execute function.
+  template <typename ReturnT, typename ArgT>
+  StatusOr<ReturnT> ExecuteOnStreamWrapper(
+      const ServiceExecutableRunOptions* run_options, ExecutionProfile* profile,
+      const ArgT& arguments);
+
   // Returns the ExecutionProfile from executing on the device. This includes
   // the number of cycles taken for the computation or the compilation time.
   ExecutionProfile execution_profile() const {
@@ -94,19 +122,34 @@ class Executable {
     return execution_profile_;
   }
 
+  // Returns Status::ok() if the two executables are equal to each other.
+  //
+  // An error status is returned otherwise.
+  virtual const Status EqualOrFail(const Executable& executable) {
+    return Unimplemented(
+        "Equality test on this executable is not implemented.");
+  }
+
+  const HloProfilePrinter& hlo_profile_printer() const {
+    CHECK(hlo_profiling_enabled());
+    return *hlo_profile_printer_;
+  }
+
+  const HloProfileIndexMap& hlo_profile_index_map() const {
+    CHECK(hlo_profiling_enabled());
+    return *hlo_profile_index_map_;
+  }
+
   // Returns whether this executable was compiled with HLO profilings support
   // enabled. If not, the caller should not expect an hlo_execution_profile
   // passed to ExecuteOnStream above to be populated during execution.
-  bool hlo_profiling_enabled() const {
-    return module_config_->hlo_profiling_enabled();
-  }
+  bool hlo_profiling_enabled() const { return hlo_profile_printer_ != nullptr; }
 
   const HloModule& module() const { return *hlo_module_; }
 
-  const HloModuleConfig& module_config() const { return *module_config_; }
+  const bool has_module() const { return hlo_module_ != nullptr; }
 
-  // Returns whether this executable has an associated HloModuleConfig.
-  bool has_module_config() const { return module_config_ != nullptr; }
+  const HloModuleConfig& module_config() const { return hlo_module_->config(); }
 
   // Returns the versioned computation handle of the computation computed by
   // this executable.
@@ -117,7 +160,7 @@ class Executable {
   // The shape (including layout) that results from this execution. This is the
   // shape of the DeviceMemoryBase result value in ExecuteOnStream above.
   const Shape& result_shape() const {
-    return module_config_->entry_computation_layout().result_shape();
+    return hlo_module_->config().entry_computation_layout().result_shape();
   }
 
   // Dumping helpers.
@@ -141,11 +184,7 @@ class Executable {
   // HloModule this was compiled from. BufferAssignment keeps pointers to
   // HloInstructions owned by the HloModule so we need to keep the HloModule
   // around.
-  std::unique_ptr<HloModule> hlo_module_;
-
-  // The configuration used to build this executable (parameter layouts, result
-  // layout, profiling enabled, etc).
-  std::unique_ptr<HloModuleConfig> module_config_;
+  const std::unique_ptr<const HloModule> hlo_module_;
 
   // SessionModule this was compiled from. Null if not dumping executions.
   std::unique_ptr<SessionModule> session_module_;
@@ -153,7 +192,75 @@ class Executable {
   // Execution count, used to generate a unique filename for each dumped
   // execution.
   int64 execution_count_ = 0;
+
+  std::unique_ptr<HloProfilePrinter> hlo_profile_printer_;
+  std::unique_ptr<HloProfileIndexMap> hlo_profile_index_map_;
 };
+
+template <typename ReturnT, typename ArgT>
+StatusOr<ReturnT> Executable::ExecuteOnStreamWrapper(
+    const ServiceExecutableRunOptions* run_options, ExecutionProfile* profile,
+    const ArgT& arguments) {
+  perftools::gputools::Stream* stream = run_options->stream();
+  std::unique_ptr<perftools::gputools::Timer> timer;
+  if (profile != nullptr) {
+    timer.reset(new perftools::gputools::Timer(stream->parent()));
+    stream->InitTimer(timer.get()).ThenStartTimer(timer.get());
+  }
+
+  VLOG(1) << "enqueueing executable on stream...";
+  // If the profiling flag isn't enabled, we pass nullptr as the profile to
+  // indicate profiling is not requested.
+  std::unique_ptr<HloExecutionProfile> profile_ptr =
+      module_config().debug_options().xla_hlo_profile() &&
+              hlo_profiling_enabled()
+          ? MakeUnique<HloExecutionProfile>(&hlo_profile_printer(),
+                                            &hlo_profile_index_map())
+          : nullptr;
+
+  auto return_value =
+      ExecuteOnStream(run_options, arguments, profile_ptr.get());
+
+  if (profile != nullptr) {
+    VLOG(1) << "enqueueing 'stop timer' and blocking host until done...";
+    stream->ThenStopTimer(timer.get());
+    SE_CHECK_OK(stream->BlockHostUntilDone());
+    VLOG(1) << "done with block-host-until-done";
+
+    // Merge in run-time profile information from execution_profile.
+    profile->MergeFrom(execution_profile());
+
+    // Overall execution time (in nanoseconds) from the executor timer.
+    if (stream->ok()) {
+      // Don't read timer->Nanoseconds() if the stream isn't OK -- that's
+      // illegal.
+      profile->set_compute_and_transfer_time_ns(timer->Nanoseconds());
+    }
+
+    // TODO(b/28123297): On GPU we end up including transfer time in
+    // the compute time this way. Instead, we should get the correct
+    // value by measuring it. Setting the field here at least lets
+    // benchmarks provide *some* value for GPU computations.
+    //
+    // TODO(b/28447609): The value in compute_and_transfer_time_ns is actually
+    // the compute time without the transfer time, so this way we get the
+    // correct compute time. We should instead have the correct value for
+    // compute_and_transfer_time and set compute_time to the compute time.
+    if (profile->compute_time_ns() == 0) {
+      profile->set_compute_time_ns(profile->compute_and_transfer_time_ns());
+    }
+  }
+
+  if (profile_ptr != nullptr) {
+    XLA_LOG_LINES(
+        tensorflow::INFO,
+        profile_ptr->ToString(stream->parent()->GetDeviceDescription()));
+    hlo_graph_dumper::MaybeDumpHloModule(module(), "Service::Execute",
+                                         profile_ptr.get());
+  }
+
+  return return_value;
+}
 
 }  // namespace xla
 

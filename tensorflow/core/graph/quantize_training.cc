@@ -41,8 +41,8 @@ const uint32 kAllowedInputs = 2;
 const float kEMADecay = 0.999;
 
 // Node types to rewrite. Insert quantize_and_dequantize op for their inputs.
-const std::unordered_set<string, StringPiece::Hasher> nodes_to_rewrite{
-    "MatMul", "Conv2D"};
+const auto* nodes_to_rewrite =
+    new std::unordered_set<string, StringPieceHasher>{"MatMul", "Conv2D"};
 
 // Contains necessary parameters to convert an edge.
 struct EdgeToConvert {
@@ -139,7 +139,7 @@ bool FindType(const Graph* graph, const Node* node, bool* signed_input,
 Status FindSaveOp(const Graph* graph, Node** save_op,
                   std::vector<const Edge*>* in_edges, bool* found) {
   *found = false;
-  for (Node* node : graph->nodes()) {
+  for (Node* node : graph->op_nodes()) {
     if (node->type_string() == "SaveV2") {
       // We found multiple save ops.
       if (*found) {
@@ -154,7 +154,7 @@ Status FindSaveOp(const Graph* graph, Node** save_op,
 }
 
 Node* FindRestoreAllOp(const Graph* graph, StringPiece save_prefix) {
-  for (Node* node : graph->nodes()) {
+  for (Node* node : graph->op_nodes()) {
     // The restore_all op should have the same prefix of the save_op.
     if (node->name() == strings::StrCat(save_prefix, "/restore_all")) {
       return node;
@@ -192,9 +192,9 @@ Status ConnectVariablesToSaveOp(Graph* graph, Node* save_op,
   Tensor tensor_names;
   Tensor shape_and_slices;
   TF_RETURN_IF_ERROR(
-      GetNodeAttr(AttrSlice(tensor_names_op->def()), "value", &tensor_names));
-  TF_RETURN_IF_ERROR(GetNodeAttr(AttrSlice(shape_and_slices_op->def()), "value",
-                                 &shape_and_slices));
+      GetNodeAttr(tensor_names_op->attrs(), "value", &tensor_names));
+  TF_RETURN_IF_ERROR(
+      GetNodeAttr(shape_and_slices_op->attrs(), "value", &shape_and_slices));
 
   int tn_size = tensor_names.NumElements();
   int var_size = added_variables.size();
@@ -226,9 +226,7 @@ Status ConnectVariablesToSaveOp(Graph* graph, Node* save_op,
   }
   save_op_builder = save_op_builder.Input(var_nodeouts);
 
-  // Clear the old attr for the two constants and add the new ones.
-  tensor_names_op->ClearAttr("value");
-  shape_and_slices_op->ClearAttr("value");
+  // Update the attrs.
   tensor_names_op->AddAttr("value", new_tensor_names);
   shape_and_slices_op->AddAttr("value", new_shape_and_slices);
 
@@ -565,7 +563,7 @@ Status ProcessTargetEdges(Graph* graph, const string& quant_op_type,
                           const std::vector<EdgeToConvert>& target_edges) {
   // Remember previously converted ops to avoid duplicated conversion on the
   // same input.
-  std::unordered_map<string, Node*, StringPiece::Hasher> name_index;
+  std::unordered_map<string, Node*, StringPieceHasher> name_index;
   std::vector<Node*> added_variables;
   for (const EdgeToConvert edge : target_edges) {
     Node* convert_node;
@@ -604,7 +602,8 @@ Status DoQuantizeTraining(int32 num_bits, const string& quant_op_type,
   int potential_input = 0;
   std::vector<EdgeToConvert> target_edges;
   for (Node* node : graph->nodes()) {
-    if (nodes_to_rewrite.find(node->type_string()) != nodes_to_rewrite.end() &&
+    if (nodes_to_rewrite->find(node->type_string()) !=
+            nodes_to_rewrite->end() &&
         !IsGradientNode(graph, node)) {
       // Find out which types are the inputs and convert them accordingly.
       // 1. Const/Variable OP: This is quantized as signed tensors with no given
@@ -655,28 +654,38 @@ Status DoQuantizeTraining(int32 num_bits, const string& quant_op_type,
   return Status::OK();
 }
 
-Status DoQuantizeTrainingOnSerializedGraphDef(const string& input_graph,
-                                              int32 num_bits,
-                                              const string& quant_op_type,
-                                              string* result_graph) {
-  // First create the graph from the GraphDef.
+Status DoQuantizeTrainingOnGraphDef(const GraphDef& input_graphdef,
+                                    int32 num_bits, const string& quant_op_type,
+                                    GraphDef* result_graphdef) {
   Graph graph(OpRegistry::Global());
   GraphConstructorOptions opts;
-  GraphDef input_graphdef;
-  if (!ParseProtoUnlimited(&input_graphdef, input_graph)) {
-    return errors::InvalidArgument("Invalid input graph");
-  }
   TF_RETURN_IF_ERROR(ConvertGraphDefToGraph(opts, input_graphdef, &graph));
 
   // Call the rewriter on the graph.
   TF_RETURN_IF_ERROR(DoQuantizeTraining(num_bits, quant_op_type, &graph));
 
   // Convert the result graph back to a GraphDef.
-  GraphDef output_graphdef;
-  graph.ToGraphDef(&output_graphdef);
+  graph.ToGraphDef(result_graphdef);
+  return Status::OK();
+}
 
-  if (!output_graphdef.SerializeToString(result_graph)) {
-    return errors::InvalidArgument("Invalid output graph");
+Status DoQuantizeTrainingOnSerializedGraphDef(const string& input_graph_string,
+                                              int32 num_bits,
+                                              const string& quant_op_type,
+                                              string* result_graph_string) {
+  // First create the graph from the GraphDef.
+  GraphDef input_graphdef;
+  if (!ParseProtoUnlimited(&input_graphdef, input_graph_string)) {
+    return errors::InvalidArgument(
+        "input_graph_string is not a serialized GraphDef protocol buffer");
+  }
+  GraphDef output_graphdef;
+  TF_RETURN_IF_ERROR(DoQuantizeTrainingOnGraphDef(
+      input_graphdef, num_bits, quant_op_type, &output_graphdef));
+
+  if (!output_graphdef.SerializeToString(result_graph_string)) {
+    return errors::Internal(
+        "quantize training transformation resulted in invalid GraphDef");
   }
   return Status::OK();
 }

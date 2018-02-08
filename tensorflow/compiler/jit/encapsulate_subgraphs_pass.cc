@@ -25,15 +25,14 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/dump_graph.h"
 #include "tensorflow/core/common_runtime/function.h"
 #include "tensorflow/core/common_runtime/optimization_registry.h"
-#include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/function.h"
-#include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/graph_def_util.h"
 #include "tensorflow/core/framework/node_def_builder.h"
 #include "tensorflow/core/framework/node_def_util.h"
 #include "tensorflow/core/graph/algorithm.h"
 #include "tensorflow/core/graph/graph.h"
 #include "tensorflow/core/graph/tensor_id.h"
+#include "tensorflow/core/lib/gtl/flatset.h"
 #include "tensorflow/core/lib/gtl/map_util.h"
 #include "tensorflow/core/lib/hash/hash.h"
 #include "tensorflow/core/lib/strings/str_util.h"
@@ -49,6 +48,52 @@ const char* const kXlaNumConstantArgsAttr = "_XlaNumConstantArgs";
 const char* const kXlaNumResourceArgsAttr = "_XlaNumResourceArgs";
 
 namespace {
+
+bool AreAllParentsConst(const Node& n,
+                        const gtl::FlatSet<const Node*>& runtime_const_nodes) {
+  if (n.type_string() == "GuaranteeConst" || n.type_string() == "Const") {
+    // If the current node is itself a cast-to-const, no need
+    // to look at the incoming edges.
+    return true;
+  }
+
+  bool all_parents_const = true;
+  bool atleast_one_non_control_edge = false;
+  for (const Edge* in : n.in_edges()) {
+    atleast_one_non_control_edge =
+        atleast_one_non_control_edge || !in->IsControlEdge();
+    if (!in->IsControlEdge() && runtime_const_nodes.count(in->src()) == 0) {
+      all_parents_const = false;
+      break;
+    }
+  }
+  return all_parents_const && atleast_one_non_control_edge;
+}
+
+void MarkGuaranteedConstants(
+    const Graph& graph,
+    const std::vector<std::pair<Node*, Node*>>& src_arg_pairs) {
+  gtl::FlatSet<const Node*> guaranteed_const_nodes;
+  std::vector<Node*> srcs;
+  srcs.reserve(src_arg_pairs.size());
+  for (const auto& src_arg : src_arg_pairs) {
+    srcs.push_back(src_arg.first);
+  }
+  ReverseDFSFrom(graph, srcs, /*enter=*/nullptr,
+                 /*leave=*/[&guaranteed_const_nodes](Node* n) {
+                   // TODO(vinuraja): Doesn't work in the presence of loops.
+                   if (AreAllParentsConst(*n, guaranteed_const_nodes)) {
+                     guaranteed_const_nodes.insert(n);
+                   }
+                 });
+
+  for (auto& src_arg : src_arg_pairs) {
+    if (guaranteed_const_nodes.count(src_arg.first) != 0) {
+      VLOG(1) << "Guaranteed const found: " << src_arg.first->DebugString();
+      src_arg.second->AddAttr("_is_guaranteed_constant", true);
+    }
+  }
+}
 
 // A node/slot pair.
 // TODO(phawkins): is there a common definition of this?
@@ -113,8 +158,8 @@ class Encapsulator {
     // returned by _Retval nodes.
     std::unique_ptr<Graph> graph;
 
-    // Which device are these nodes on? Used both to check that all nodes
-    // are assigned to the same device, and to assign a device to the call node.
+    // Which device are these nodes on? Used to assign a device to the call
+    // node.
     string device;
 
     // NodeDef for the function call node.
@@ -165,7 +210,7 @@ static const char* const kRetValOp = "_Retval";
 // none.
 string Encapsulator::GetFunctionNameAttr(Node const* node) const {
   string attr;
-  if (!GetNodeAttr(node->def(), group_attribute_, &attr).ok()) {
+  if (!GetNodeAttr(node->attrs(), group_attribute_, &attr).ok()) {
     attr.clear();
   }
   return attr;
@@ -177,10 +222,11 @@ Status Encapsulator::SplitIntoSubgraphs() {
   // Map from input graph nodes to subgraph nodes.
   std::unordered_map<Node*, Node*> node_images;
 
+  std::vector<std::pair<Node*, Node*>> src_arg_pairs;
   // Copy all marked nodes to a subgraph. Do nothing for unmarked nodes.
-  for (Node* node : graph_in_->nodes()) {
-    if (node->IsSource() || node->IsSink()) continue;
+  for (Node* node : graph_in_->op_nodes()) {
     string func_id = GetFunctionNameAttr(node);
+
     if (func_id.empty()) continue;
 
     Subgraph& subgraph = subgraphs_[func_id];
@@ -193,16 +239,10 @@ Status Encapsulator::SplitIntoSubgraphs() {
     image->ClearAttr(group_attribute_);
     node_images[node] = image;
 
-    // Check the device matches any existing device.
-    string device = node->assigned_device_name().empty()
-                        ? node->def().device()
-                        : node->assigned_device_name();
-
     if (subgraph.device.empty()) {
-      subgraph.device = device;
-    } else if (subgraph.device != device) {
-      s.Update(errors::InvalidArgument(
-          "Mismatched devices for nodes to be grouped by Encapsulator"));
+      subgraph.device = node->assigned_device_name().empty()
+                            ? node->requested_device()
+                            : node->assigned_device_name();
     }
   }
 
@@ -285,11 +325,13 @@ Status Encapsulator::SplitIntoSubgraphs() {
                                kArgOp);
         builder.Attr("T", dtype);
         builder.Attr("index", arg_index);
+
         s = builder.Finalize(&arg_def);
         if (!s.ok()) return s;
 
         Node* arg = dst_subgraph.graph->AddNode(arg_def, &s);
         if (!s.ok()) return s;
+        src_arg_pairs.push_back({edge->src(), arg});
 
         dst_subgraph.args.push_back(arg);
       }
@@ -300,6 +342,8 @@ Status Encapsulator::SplitIntoSubgraphs() {
                                   edge->dst_input());
     }
   }
+
+  MarkGuaranteedConstants(*graph_in_, src_arg_pairs);
 
   for (auto& entry : subgraphs_) {
     FixupSourceAndSinkEdges(entry.second.graph.get());
@@ -445,8 +489,7 @@ Status Encapsulator::BuildOutputGraph(bool parallel_checking,
   std::unordered_map<const Node*, Node*> node_images;
 
   // Copy all unmarked nodes to the output graph.
-  for (Node* node : graph_in_->nodes()) {
-    if (node->IsSource() || node->IsSink()) continue;
+  for (Node* node : graph_in_->op_nodes()) {
     string func_id = GetFunctionNameAttr(node);
 
     // Don't copy nodes that going to be encapsulated, unless parallel checking
@@ -590,10 +633,10 @@ Status EncapsulateSubgraphsInFunctions(
 
 // Finds the types of the _Arg nodes, indexed by position.
 static Status GetArgTypes(const Graph& graph, DataTypeVector* types) {
-  for (Node* n : graph.nodes()) {
+  for (Node* n : graph.op_nodes()) {
     if (n->type_string() == kArgOp) {
       int index;
-      TF_RETURN_IF_ERROR(GetNodeAttr(n->def(), "index", &index));
+      TF_RETURN_IF_ERROR(GetNodeAttr(n->attrs(), "index", &index));
       if (index < 0 || index >= types->size()) {
         return errors::InvalidArgument("Invalid argument number");
       }
@@ -607,10 +650,10 @@ static Status GetArgTypes(const Graph& graph, DataTypeVector* types) {
 // 'permutation' that maps old indices to new indices.
 static Status RenumberArguments(Graph* graph,
                                 const std::vector<int>& permutation) {
-  for (Node* n : graph->nodes()) {
+  for (Node* n : graph->op_nodes()) {
     if (n->type_string() == kArgOp) {
       int index;
-      TF_RETURN_IF_ERROR(GetNodeAttr(n->def(), "index", &index));
+      TF_RETURN_IF_ERROR(GetNodeAttr(n->attrs(), "index", &index));
       if (index < 0 || index >= permutation.size()) {
         return errors::InvalidArgument("Invalid argument number");
       }
@@ -634,15 +677,18 @@ Status EncapsulateSubgraphsPass::Run(
   FunctionLibraryDefinition* const library = options.flib_def;
 
   OptimizerOptions opts;
-  std::unique_ptr<FunctionLibraryRuntime> flr(
-      NewFunctionLibraryRuntime(nullptr, options.session_options->env, nullptr,
-                                TF_GRAPH_DEF_VERSION, library, opts));
+  std::unique_ptr<ProcessFunctionLibraryRuntime> pflr(
+      new ProcessFunctionLibraryRuntime(nullptr, options.session_options->env,
+                                        TF_GRAPH_DEF_VERSION, library, opts));
+  FunctionLibraryRuntime* flr =
+      pflr->GetFLR(ProcessFunctionLibraryRuntime::kDefaultFLRDevice);
 
-  auto rewrite_subgraph = [&flr](
-      std::unique_ptr<Graph>* subgraph, std::vector<int>* input_permutation,
-      std::vector<int>* output_permutation, NodeDef* node) {
+  auto rewrite_subgraph = [flr](std::unique_ptr<Graph>* subgraph,
+                                std::vector<int>* input_permutation,
+                                std::vector<int>* output_permutation,
+                                NodeDef* node) {
     // Optimize the subgraph.
-    OptimizeGraph(flr.get(), subgraph);
+    OptimizeGraph(flr, subgraph);
 
     const int num_args = input_permutation->size();
     std::vector<bool> const_args(num_args);
@@ -713,7 +759,7 @@ Status EncapsulateSubgraphsPass::Run(
 bool IsXlaCompiledKernel(const Node& node) {
   bool is_compiled = false;
   bool has_compilation_attr =
-      GetNodeAttr(node.def(), kXlaCompiledKernelAttr, &is_compiled).ok() &&
+      GetNodeAttr(node.attrs(), kXlaCompiledKernelAttr, &is_compiled).ok() &&
       is_compiled;
   return has_compilation_attr ? is_compiled : false;
 }
