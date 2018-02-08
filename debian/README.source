@@ -1,0 +1,13 @@
+Generating and importing upstream tarball
+===
+
+* Clone upstream git repo
+
+  git clone https://github.com/tensorflow/tensorflow.git
+
+* Select a stable branch and create tarball with git archive, for example
+
+  git fetch origin +r1.2:r1.2                       # pull remote branch "r1.2"
+  git archive v1.2.1 | gzip > ../tensorflow_1.2.1.orig.tar.gz
+
+* gbp import-orig --pristine-tar ../tensorflow_1.2.1.orig.tar.gz
