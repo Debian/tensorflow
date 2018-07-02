@@ -67,9 +67,11 @@ class HloCostAnalysis : public ConstDfsHloVisitor {
   Status HandleCopy(const HloInstruction* copy) override;
   Status HandleDot(const HloInstruction* dot) override;
   Status HandleConvolution(const HloInstruction* convolution) override;
+  Status HandleFft(const HloInstruction* fft) override;
   Status HandleCrossReplicaSum(const HloInstruction* crs) override;
   Status HandleInfeed(const HloInstruction* infeed) override;
   Status HandleOutfeed(const HloInstruction* outfeed) override;
+  Status HandleHostCompute(const HloInstruction* host_compute) override;
   Status HandleRng(const HloInstruction* random) override;
   Status HandleReverse(const HloInstruction* reverse) override;
   Status HandleSort(const HloInstruction* sort) override;
@@ -93,11 +95,13 @@ class HloCostAnalysis : public ConstDfsHloVisitor {
   Status HandleSelectAndScatter(const HloInstruction* instruction) override;
   Status HandleBitcast(const HloInstruction* bitcast) override;
   Status HandleBroadcast(const HloInstruction* broadcast) override;
+  Status HandleBroadcastDimOne(const HloInstruction* broadcastDimOne) override;
   Status HandlePad(const HloInstruction* pad) override;
   Status HandleReshape(const HloInstruction* reshape) override;
   Status HandleTranspose(const HloInstruction* transpose) override;
   Status HandleWhile(const HloInstruction* xla_while) override;
   Status HandleConditional(const HloInstruction* conditional) override;
+  Status HandleGather(const HloInstruction* gather) override;
   Status FinishVisit(const HloInstruction* root) override;
 
   Status Preprocess(const HloInstruction* hlo) override;

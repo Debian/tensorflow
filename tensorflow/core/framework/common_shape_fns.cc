@@ -49,7 +49,11 @@ Status GetWindowedOutputSizeVerboseV2(int64 input_size, int64 filter_size,
       break;
   }
   if (*output_size < 0) {
-    return errors::InvalidArgument("computed output size would be negative");
+    return errors::InvalidArgument(
+        "Computed output size would be negative: ", *output_size,
+        " [input_size: ", input_size,
+        ", effective_filter_size: ", effective_filter_size,
+        ", stride: ", stride, "]");
   }
   return Status::OK();
 }
@@ -500,8 +504,8 @@ Status Conv3DShape(shape_inference::InferenceContext* c) {
     input_shape =
         c->MakeShape({{dim('N'), dim('0'), dim('1'), dim('2'), dim('C')}});
     stride_planes = strides[2];
-    stride_cols = strides[3];
-    stride_rows = strides[4];
+    stride_rows = strides[3];
+    stride_cols = strides[4];
   } else {
     stride_planes = strides[1];
     stride_rows = strides[2];
@@ -1206,7 +1210,7 @@ Status ConcatV2Shape(InferenceContext* c) {
                            c->num_inputs() - 1 /* dim_index */);
 }
 
-Status BroadcastBinaryOpShapeFn(InferenceContext* c) {
+Status BroadcastBinaryOpOutputShapeFn(InferenceContext* c, int output_index) {
   ShapeHandle shape_x = c->input(0);
   ShapeHandle shape_y = c->input(1);
   if (!c->RankKnown(shape_x) || !c->RankKnown(shape_y)) {
@@ -1268,7 +1272,7 @@ Status BroadcastBinaryOpShapeFn(InferenceContext* c) {
     }
   }
 
-  c->set_output(0, c->MakeShape(dims));
+  c->set_output(output_index, c->MakeShape(dims));
   return Status::OK();
 }
 
@@ -1356,10 +1360,11 @@ Status ScatterNdUpdateShape(InferenceContext* c) {
       Status s = c->Merge(prefix_indices, prefix_updates, &unused);
       if (!s.ok()) {
         return errors::InvalidArgument(
-            "The outer ", num_outer_dims, " dimensions of indices.shape=",
-            c->DebugString(indices_shape), " must match the outer ",
-            num_outer_dims, " dimensions of updates.shape=",
-            c->DebugString(updates_shape), ": ", s.error_message());
+            "The outer ", num_outer_dims,
+            " dimensions of indices.shape=", c->DebugString(indices_shape),
+            " must match the outer ", num_outer_dims,
+            " dimensions of updates.shape=", c->DebugString(updates_shape),
+            ": ", s.error_message());
       }
 
       ShapeHandle input_suffix;

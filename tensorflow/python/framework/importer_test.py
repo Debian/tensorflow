@@ -34,10 +34,12 @@ from tensorflow.python.framework import test_ops  # pylint: disable=unused-impor
 from tensorflow.python.framework import test_util
 from tensorflow.python.framework import versions
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import gradients_impl
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import random_ops
+from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.ops import variables
 import tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
 from tensorflow.python.platform import test
@@ -153,6 +155,25 @@ class ImportGraphDefTest(test.TestCase):
       self.assertEqual(b3.name, "A_3/B")
       self.assertEqual(list(b3.inputs), [a3.outputs[0]])
 
+      # Import with an already-used name but with a '/' to indicate an
+      # "absolute" name scope (see the Graph.name_scope docstring).
+      a_a, a_b = importer.import_graph_def(
+          graph_def,
+          return_elements=["A", "B"],
+          name="A/")
+      self.assertEqual(a_a.name, "A/A")
+      self.assertEqual(a_b.name, "A/B")
+      self.assertEqual(list(a_b.inputs), [a_a.outputs[0]])
+
+      # Repeat the same import.
+      a_a1, a_b1 = importer.import_graph_def(
+          graph_def,
+          return_elements=["A", "B"],
+          name="A/")
+      self.assertEqual(a_a1.name, "A/A_1")
+      self.assertEqual(a_b1.name, "A/B_1")
+      self.assertEqual(list(a_b1.inputs), [a_a1.outputs[0]])
+
       # Import with existing de-duped node names
       a1_1, b1_1 = importer.import_graph_def(
           self._MakeGraphDef("""
@@ -197,6 +218,23 @@ class ImportGraphDefTest(test.TestCase):
       self.assertEqual(new_c.name, "c")
       self.assertEqual(outer_inner.name, "outer/inner_1")
       self.assertEqual(outer_inner_c.name, "outer/inner/c_1")
+
+  def testEmptyNameScope(self):
+    with ops.Graph().as_default():
+      # Create name scope but don't create any ops with it
+      with ops.name_scope("foo"):
+        pass
+
+      # Import graph def that uses name scope name
+      op, = importer.import_graph_def(
+          self._MakeGraphDef("node { name: 'foo' op: 'IntOutput' }"),
+          return_elements=["foo"],
+          name="")
+
+      if ops._USE_C_API:
+        self.assertEqual(op.name, "foo")
+      else:
+        self.assertEqual(op.name, "foo_1")
 
   def testInputMap(self):
     with ops.Graph().as_default():
@@ -331,29 +369,60 @@ class ImportGraphDefTest(test.TestCase):
       self.assertEqual(d.inputs[1], b.outputs[0])
 
       self.assertEqual(a.outputs[0].dtype, dtypes.int32_ref)
-      self.assertEqual(c._input_dtypes, [dtypes.int32, dtypes.int32])
+      self.assertEqual(c._input_types, [dtypes.int32, dtypes.int32])
       self.assertEqual(c.outputs, [])
-      self.assertEqual(d._input_dtypes, [dtypes.int32_ref, dtypes.int32])
+      self.assertEqual(d._input_types, [dtypes.int32_ref, dtypes.int32])
       self.assertEqual(d.outputs, [])
 
-  def testCyclic(self):
-    # Importing cycles not supported with C API enabled (this test will
-    # eventually be deleted).
-    # TODO(skyewm): write while loop test
-    if ops._USE_C_API: return
+  def testResources(self):
+    # Produce GraphDef containing a ops producing and consuming resources.
+    graph = ops.Graph()
+    with graph.as_default():
+      var = resource_variable_ops.ResourceVariable(1.0)
+      var_assign = var.assign(2.0)
+      # Use an op that requires handle shape to be set.
+      var_shape = resource_variable_ops.variable_shape(var.handle)
+      init = variables.global_variables_initializer()
+    graph_def = graph.as_graph_def()
 
+    # Import the GraphDef.
     with ops.Graph().as_default():
-      a, b = importer.import_graph_def(
-          self._MakeGraphDef("""
-          node { name: 'A' op: 'Unary'
-                 attr { key: 'T' value { type: DT_INT32 } } input: 'B:0' }
-          node { name: 'B' op: 'Unary'
-                 attr { key: 'T' value { type: DT_INT32 } } input: 'A:0' }
-          """),
-          return_elements=["A", "B"])
+      # pylint: disable=unused-variable
+      imported_var, imported_assign, imported_shape, imported_init = (
+          importer.import_graph_def(
+              graph_def,
+              return_elements=[var.name, var_assign.name, var_shape.name,
+                               init.name]))
 
-      self.assertEqual(a.inputs[0], b.outputs[0])
-      self.assertEqual(b.inputs[0], a.outputs[0])
+      # Make sure the handle shape is set on the imported variable.
+      new_var_shape = resource_variable_ops.variable_shape(imported_var)
+      # pylint: enable=unused-variable
+
+      # Run the imported graph.
+      # TODO(b/76173421): make this work (currently DCHECKS)
+      # with self.test_session() as sess:
+      #   sess.run(imported_init)
+      #   self.assertEqual(sess.run(imported_var), 1.0)
+      #   self.assertEqual(sess.run(imported_assign), 2.0)
+      #   self.assertEqual(list(sess.run(imported_shape)), [])
+      #   self.assertEqual(list(sess.run(new_var_shape)), [])
+
+  def testWhileLoop(self):
+    # Produce GraphDef containing while loop.
+    graph = ops.Graph()
+    with graph.as_default():
+      r = control_flow_ops.while_loop(lambda i: i < 10, lambda i: i + 1, [0])
+      # Add an op that consumes the while loop output.
+      math_ops.add(r, 1)
+    graph_def = graph.as_graph_def()
+
+    # Import the GraphDef and make sure it runs.
+    with ops.Graph().as_default():
+      imported_r, = importer.import_graph_def(graph_def,
+                                              return_elements=[r.name])
+      self.assertEqual(imported_r.name, "import/" + r.name)
+      with self.test_session() as sess:
+        self.assertEqual(sess.run(imported_r), 10)
 
   def testTypeMismatchInGraphDef(self):
     if ops._USE_C_API:
@@ -661,6 +730,49 @@ class ImportGraphDefTest(test.TestCase):
       self.assertProtoEquals(
           "list { s: 'loc:@imported_graph/A' }",
           b.node_def.attr["_class"])
+
+  def testColocationAndDevice(self):
+    # A and B are colocated, device set on A.
+    original_graph_def = self._MakeGraphDef("""
+          node { name: 'A' op: 'None' device: '/device:CPU:0' attr {
+            key: '_class'
+            value { list { s: 'loc:@A' } }
+          } }
+          node { name: 'B' op: 'None'  attr {
+            key: '_class'
+            value { list { s: 'loc:@A' } }
+          } }""")
+
+    with ops.Graph().as_default():
+      a, b = importer.import_graph_def(original_graph_def,
+                                       return_elements=["A", "B"],
+                                       name="")
+      self.assertEqual(a.device, "/device:CPU:0")
+      self.assertEqual(b.device, "/device:CPU:0")
+      self.assertEqual(a.colocation_groups(), [b"loc:@A"])
+      self.assertEqual(b.colocation_groups(), [b"loc:@A"])
+
+    # A and B are colocated, device set on B.
+    original_graph_def = self._MakeGraphDef("""
+          node { name: 'A' op: 'None' attr {
+            key: '_class'
+            value { list { s: 'loc:@A' } }
+          } }
+          node { name: 'B' op: 'None' device: '/device:CPU:0' attr {
+            key: '_class'
+            value { list { s: 'loc:@A' } }
+          } }""")
+
+    with ops.Graph().as_default():
+      a, b = importer.import_graph_def(original_graph_def,
+                                       return_elements=["A", "B"],
+                                       name="")
+      # TODO(skyewm): this behavior seems inconsistent with the above. Why is
+      # B's device ignored?
+      self.assertEqual(a.device, "")
+      self.assertEqual(b.device, "")
+      self.assertEqual(a.colocation_groups(), [b"loc:@A"])
+      self.assertEqual(b.colocation_groups(), [b"loc:@A"])
 
   def testColocationWithDeviceFn(self):
     original_graph_def = self._MakeGraphDef("""

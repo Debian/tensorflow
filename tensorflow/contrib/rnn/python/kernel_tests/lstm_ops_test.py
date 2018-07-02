@@ -54,7 +54,7 @@ def blocks_match(sess, use_peephole):
   initializer = init_ops.random_uniform_initializer(-0.01, 0.01, seed=19890212)
 
   with variable_scope.variable_scope("test", initializer=initializer):
-    # magic naming so that the cells pick up these variables and resuse them
+    # magic naming so that the cells pick up these variables and reuse them
     if use_peephole:
       wci = variable_scope.get_variable(
           "rnn/lstm_cell/w_i_diag", shape=[cell_size], dtype=dtypes.float32)
@@ -98,7 +98,8 @@ def blocks_match(sess, use_peephole):
           cell_clip=0)
 
     fused_cell = lstm_ops.LSTMBlockFusedCell(
-        cell_size, cell_clip=0, use_peephole=use_peephole, reuse=True)
+        cell_size, cell_clip=0, use_peephole=use_peephole, reuse=True,
+        name="rnn/lstm_cell")
     fused_outputs_op, fused_state_op = fused_cell(
         stacked_inputs, dtype=dtypes.float32)
 
@@ -368,8 +369,7 @@ class LSTMBlockCellTest(test.TestCase):
       initializer = init_ops.random_uniform_initializer(
           -0.01, 0.01, seed=19890213)
 
-      with variable_scope.variable_scope(
-          "rnn/lstm_cell", initializer=initializer):
+      with variable_scope.variable_scope("lstm_cell", initializer=initializer):
         # magic naming so that the cells pick up these variables and reuse them
         variable_scope.get_variable(
             "kernel",
@@ -383,7 +383,8 @@ class LSTMBlockCellTest(test.TestCase):
             initializer=init_ops.zeros_initializer())
 
       cell = lstm_ops.LSTMBlockFusedCell(
-          cell_size, cell_clip=0, use_peephole=False, reuse=True)
+          cell_size, cell_clip=0, use_peephole=False, reuse=True,
+          name="lstm_cell")
 
       fused_outputs_op, fused_state_op = cell(
           cell_inputs, dtype=dtypes.float32, sequence_length=seq_lengths)

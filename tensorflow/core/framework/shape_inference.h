@@ -12,8 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#ifndef THIRD_PARTY_TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_
-#define THIRD_PARTY_TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_
+#ifndef TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_
+#define TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_
 
 #include <vector>
 
@@ -32,7 +32,7 @@ class ShapeRefinerTest;
 namespace grappler {
 class GraphProperties;
 class SymbolicShapeManager;
-}
+}  // namespace grappler
 
 namespace shape_inference {
 
@@ -317,6 +317,7 @@ class InferenceContext {
     input_tensors_as_shapes_ = input_tensors_as_shapes;
   }
 
+  ShapeHandle output(int64 idx) const { return outputs_[idx]; }
   void set_output(int idx, ShapeHandle shape) { outputs_[idx] = shape; }
   Status set_output(StringPiece output_name,
                     const std::vector<ShapeHandle>& shapes);
@@ -461,6 +462,12 @@ class InferenceContext {
   // <input_idx>. The tensor must be a 1-dimensional int32 or int64 tensor.  If
   // the input tensor is NULL, then an unknown shape is returned.
   Status MakeShapeFromShapeTensor(int input_idx, ShapeHandle* out);
+
+  // Like the function above, but treats scalar values as unknown
+  // shapes.  **NOTE** If the scalar is statically known, its value
+  // must be -1 or an error is returned.
+  Status MakeShapeFromShapeTensorTreatScalarAsUnknownShape(int input_idx,
+                                                           ShapeHandle* out);
 
   // Returns in <out> a new shape corresponding to <proto>.
   Status MakeShapeFromShapeProto(const TensorShapeProto& proto,
@@ -707,6 +714,11 @@ class InferenceContext {
     merged_dims_.clear();
   }
 
+  // Helper method for MakeShapeFromTensor and MakeShapeFromShapeTensor.
+  Status InternalMakeShapeFromTensor(
+      bool treat_unknown_scalar_tensor_as_unknown_shape, const Tensor* t,
+      ShapeHandle tensor_shape, ShapeHandle* out);
+
   ShapeManager shape_manager_;
 
   // inputs_, outputs_, and input_tensors_as_shapes_ refer to values from
@@ -787,4 +799,4 @@ Status InferenceContext::GetAttr(StringPiece attr_name, T* value) const {
 }  // namespace shape_inference
 }  // namespace tensorflow
 
-#endif  // THIRD_PARTY_TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_
+#endif  // TENSORFLOW_CORE_FRAMEWORK_SHAPE_INFERENCE_H_

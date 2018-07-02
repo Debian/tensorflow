@@ -19,12 +19,14 @@ from __future__ import division
 from __future__ import print_function
 
 import re
+import sys
 import time
 
 import numpy as np
 
 from tensorflow.core.framework import function_pb2
 from tensorflow.core.protobuf import config_pb2
+from tensorflow.core.protobuf import rewriter_config_pb2
 from tensorflow.python.client import session
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
@@ -35,7 +37,6 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import clip_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import functional_ops
 from tensorflow.python.ops import gen_logging_ops
@@ -56,12 +57,32 @@ def _OptimizerOptions():
   for cse in [False, True]:
     for inline in [False, True]:
       for cfold in [False, True]:
-        yield config_pb2.ConfigProto(graph_options=config_pb2.GraphOptions(
-            optimizer_options=config_pb2.OptimizerOptions(
-                opt_level=config_pb2.OptimizerOptions.L0,
-                do_common_subexpression_elimination=cse,
-                do_function_inlining=inline,
-                do_constant_folding=cfold)))
+        cfg = config_pb2.ConfigProto(
+            graph_options=config_pb2.GraphOptions(
+                optimizer_options=config_pb2.OptimizerOptions(
+                    opt_level=config_pb2.OptimizerOptions.L0,
+                    do_common_subexpression_elimination=cse,
+                    do_function_inlining=inline,
+                    do_constant_folding=cfold)))
+        if cse:
+          cfg.graph_options.rewrite_options.arithmetic_optimization = (
+              rewriter_config_pb2.RewriterConfig.ON)
+        else:
+          cfg.graph_options.rewrite_options.arithmetic_optimization = (
+              rewriter_config_pb2.RewriterConfig.OFF)
+        if inline:
+          cfg.graph_options.rewrite_options.function_optimization = (
+              rewriter_config_pb2.RewriterConfig.ON)
+        else:
+          cfg.graph_options.rewrite_options.function_optimization = (
+              rewriter_config_pb2.RewriterConfig.OFF)
+        if cfold:
+          cfg.graph_options.rewrite_options.constant_folding = (
+              rewriter_config_pb2.RewriterConfig.ON)
+        else:
+          cfg.graph_options.rewrite_options.constant_folding = (
+              rewriter_config_pb2.RewriterConfig.OFF)
+        yield cfg
 
 
 @test_util.with_c_api
@@ -83,6 +104,21 @@ class FunctionTest(test.TestCase):
       self.assertEqual("MyIdentity", call.op.name)
       with session.Session() as sess:
         self.assertAllEqual([18.0], sess.run(call))
+
+  def testIdentityImplicitDeref(self):
+
+    @function.Defun(dtypes.float32, func_name="MyIdentity")
+    def MyIdentityFunc(a):
+      return a
+
+    with ops.Graph().as_default():
+      var = variables.Variable([18.0])
+      call = MyIdentityFunc(var._ref())  # pylint: disable=protected-access
+      self.assertEqual("MyIdentity", call.op.name)
+      for cfg in _OptimizerOptions():
+        with session.Session(config=cfg) as sess:
+          sess.run(var.initializer)
+          self.assertAllEqual([18.0], sess.run(call))
 
   def testIdentityOutputName(self):
 
@@ -176,7 +212,7 @@ class FunctionTest(test.TestCase):
 
     @function.Defun(dtypes.float32, dtypes.float32)
     def XSquarePlusOneGrad(x, dy):
-      dx = functional_ops._symbolic_gradient(
+      dx = functional_ops.symbolic_gradient(
           input=[x, dy], Tout=[dtypes.float32], f="XSquarePlusOneFn", name="dx")
       return dx
 
@@ -278,7 +314,7 @@ class FunctionTest(test.TestCase):
       # gradient function is (x, y, dz) -> (dx, dy).  dx's shape
       # should be the same as x's; and dy's shape should be the same
       # as y's.
-      dx, dy = functional_ops._symbolic_gradient(
+      dx, dy = functional_ops.symbolic_gradient(
           input=[x, y, dz], Tout=[dtypes.float32] * 2, f="Foo")
       self.assertEqual(x.get_shape(), dx.get_shape())
       self.assertEqual(y.get_shape(), dy.get_shape())
@@ -450,13 +486,17 @@ class FunctionTest(test.TestCase):
                                          lambda y: AssertFail(y), [x])
       # pylint: enable=unnecessary-lambda
 
+    rewriter_config = rewriter_config_pb2.RewriterConfig(
+        dependency_optimization=rewriter_config_pb2.RewriterConfig.OFF)
     # Enables inlining.
-    config = config_pb2.ConfigProto(graph_options=config_pb2.GraphOptions(
-        optimizer_options=config_pb2.OptimizerOptions(
-            opt_level=config_pb2.OptimizerOptions.L0,
-            do_common_subexpression_elimination=True,
-            do_function_inlining=True,
-            do_constant_folding=True)))
+    config = config_pb2.ConfigProto(
+        graph_options=config_pb2.GraphOptions(
+            optimizer_options=config_pb2.OptimizerOptions(
+                opt_level=config_pb2.OptimizerOptions.L0,
+                do_common_subexpression_elimination=True,
+                do_function_inlining=True,
+                do_constant_folding=True),
+            rewrite_options=rewriter_config))
 
     with session.Session(config=config) as sess:
       # Since the 'False' branch is not taken, the assertion should not fire.
@@ -704,9 +744,16 @@ class FunctionTest(test.TestCase):
 
       y = Foo(constant_op.constant([[10.]]))
 
+      @function.Defun()
+      def Bar():
+        return w
+
+      z = Bar()
+
     with self.test_session(graph=g):
       variables.global_variables_initializer().run()
       self.assertAllEqual(y.eval(), [[12.0]])
+      self.assertAllEqual(z.eval(), [[1.0]])
 
   def testCaptureControls(self):
     g = ops.Graph()
@@ -765,8 +812,12 @@ class FunctionTest(test.TestCase):
     # We added more randomness to function names in C API.
     # TODO(iga): Remove this if statement when we switch to C API.
     if ops._USE_C_API:  # pylint: disable=protected-access
-      self.assertEqual("Foo_aCYSbwBkR5A",
-                       Foo.instantiate([dtypes.float32] * 3).name)
+      if sys.byteorder == "big":
+        self.assertEqual("Foo_kEdkAG8SJvg",
+                         Foo.instantiate([dtypes.float32] * 3).name)
+      else:
+        self.assertEqual("Foo_aCYSbwBkR5A",
+                         Foo.instantiate([dtypes.float32] * 3).name)
     else:
       self.assertEqual("Foo_d643acf7",
                        Foo.instantiate([dtypes.float32] * 3).name)
@@ -983,6 +1034,25 @@ class FunctionTest(test.TestCase):
         self.assertFalse(all(val3 == val1))
         self.assertFalse(all(val4 == val2))
 
+  def testSameFunctionOnTwoDevices(self):
+
+    @function.Defun(dtypes.float32)
+    def AddOne(x):
+      return x + 1.0
+
+    with ops.device("/cpu:0"):
+      f_0 = AddOne(41.0)
+
+    with ops.device("/cpu:1"):
+      f_1 = AddOne(43.0)
+
+    for config in _OptimizerOptions():
+      config.device_count["CPU"] = 2
+      with session.Session(config=config) as sess:
+        self.assertEqual(42.0, sess.run(f_0))
+        self.assertEqual(44.0, sess.run(f_1))
+        self.assertEqual((42.0, 44.0), sess.run((f_0, f_1)))
+
 
 @test_util.with_c_api
 class FunctionsFromProtos(test.TestCase):
@@ -1176,6 +1246,15 @@ class FunctionsFromProtos(test.TestCase):
         ValueError, "FunctionDefLibrary contains cyclic gradient functions!"):
       function._from_library(library)
 
+  def testExperimentalAttrs(self):
+
+    @function.Defun(dtypes.int32, experimental_tag="tag_value")
+    def FunctionWithAttr(i):
+      return array_ops.identity(i)
+    self.assertTrue("experimental_tag" in FunctionWithAttr.definition.attr)
+    self.assertEqual(
+        FunctionWithAttr.definition.attr["experimental_tag"].s, b"tag_value")
+
 
 @test_util.with_c_api
 class FunctionOverloadTest(test.TestCase):
@@ -1282,7 +1361,7 @@ class UnrollLSTMTest(test.TestCase):
         value=math_ops.matmul(xm, weights), num_or_size_splits=4, axis=1)
     new_c = math_ops.sigmoid(f_g) * cprev + math_ops.sigmoid(
         i_g) * math_ops.tanh(i_i)
-    new_c = clip_ops.clip_by_value(new_c, -50.0, 50.0)
+    new_c = math_ops.maximum(math_ops.minimum(new_c, 50.0), -50.0)
     new_m = math_ops.sigmoid(o_g) * math_ops.tanh(new_c)
     return new_m, new_c
 
@@ -1414,7 +1493,7 @@ class FunctionInlineControlTest(test.TestCase):
       def Cell(v):
         # If v is a vector [n, 1], x is a big square matrix.
         x = math_ops.tanh(v + array_ops.transpose(v, [1, 0]))
-        return math_ops.reduce_sum(x, 1, keep_dims=True)
+        return math_ops.reduce_sum(x, 1, keepdims=True)
 
       @function.Defun(dtype)
       def Forward(x):
