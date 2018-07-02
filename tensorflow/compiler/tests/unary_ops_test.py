@@ -67,8 +67,10 @@ class UnaryOpsTest(XLATestCase):
         output = op(pinp)
       result = session.run(output, {pinp: inp})
       if equality_test is None:
-        equality_test = self.assertAllCloseAccordingToType
-      equality_test(result, expected, rtol=rtol, atol=atol)
+        self.assertAllCloseAccordingToType(
+            result, expected, rtol=rtol, atol=atol, bfloat16_rtol=0.03)
+      else:
+        equality_test(result, expected, rtol=rtol, atol=atol)
 
   def ListsAreClose(self, result, expected, rtol, atol):
     """Tests closeness of two lists of floats."""
@@ -152,6 +154,24 @@ class UnaryOpsTest(XLATestCase):
 
   def testFloatOps(self):
     for dtype in self.float_types:
+      # TODO(b/77694432): Half test failed on CPU, last ran on 04-06-2018.
+      if dtype == np.float16 and self.device == "XLA_CPU":
+        continue
+      x = np.arange(-0.90, 0.90, 0.25)
+      self._assertOpOutputMatchesExpected(
+          math_ops.acos,
+          x.astype(dtype),
+          expected=np.arccos(x).astype(dtype))
+      self._assertOpOutputMatchesExpected(
+          math_ops.asin,
+          x.astype(dtype),
+          expected=np.arcsin(x).astype(dtype))
+      x = np.arange(-3, 3).reshape(1, 3, 2)
+      self._assertOpOutputMatchesExpected(
+          math_ops.atan,
+          x.astype(dtype),
+          expected=np.arctan(x).astype(dtype))
+
       self._assertOpOutputMatchesExpected(
           math_ops.acosh,
           np.array([1, 2, 3, 4], dtype=dtype),
@@ -363,26 +383,23 @@ class UnaryOpsTest(XLATestCase):
   def testComplexOps(self):
     for dtype in self.complex_types:
 
-      # TODO(b/65408531): Wider support for log (needs atan2).
-      atan2_supported = self.device == "XLA_GPU"
-      if atan2_supported:
-        self._assertOpOutputMatchesExpected(
-            math_ops.acosh,
-            np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
-            expected=np.arccosh(
-                np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.acosh,
+          np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
+          expected=np.arccosh(
+              np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
 
-        self._assertOpOutputMatchesExpected(
-            math_ops.asinh,
-            np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
-            expected=np.arcsinh(
-                np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.asinh,
+          np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
+          expected=np.arcsinh(
+              np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
 
-        self._assertOpOutputMatchesExpected(
-            math_ops.atanh,
-            np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
-            expected=np.arctanh(
-                np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.atanh,
+          np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype),
+          expected=np.arctanh(
+              np.array([0.1, 0.2j, 0.3 - 0.1j, 0.4 + 0.5j], dtype=dtype)))
 
       self._assertOpOutputMatchesExpected(
           math_ops.cosh,
@@ -409,11 +426,10 @@ class UnaryOpsTest(XLATestCase):
           np.array([[1, 2j, 2 + 3j]], dtype=dtype),
           expected=1.0 / np.array([[1, 2j, 2 + 3j]], dtype=dtype))
 
-      if atan2_supported:
-        self._assertOpOutputMatchesExpected(
-            math_ops.log,
-            np.array([[5j, 3 - 2j]], dtype=dtype),
-            expected=np.log(np.array([[5j, 3 - 2j]], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.log,
+          np.array([[5j, 3 - 2j]], dtype=dtype),
+          expected=np.log(np.array([[5j, 3 - 2j]], dtype=dtype)))
 
       self._assertOpOutputMatchesExpected(
           math_ops.sin,
@@ -427,27 +443,26 @@ class UnaryOpsTest(XLATestCase):
 
       # TODO(b/34703906): improve log1p implementation and make tolerance
       # tighter.
-      if atan2_supported:  # TODO(b/34703906): log support
-        self._assertOpOutputMatchesExpected(
-            math_ops.log1p,
-            np.array([[1e-14, 1e-15j, 0.6 - 0.3j]], dtype=dtype),
-            expected=np.log1p(
-                np.array([[1e-14, 1e-15j, 0.6 - 0.3j]], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.log1p,
+          np.array([[1e-14, 1e-15j, 0.6 - 0.3j]], dtype=dtype),
+          expected=np.log1p(
+              np.array([[1e-14, 1e-15j, 0.6 - 0.3j]], dtype=dtype)))
 
-        val = np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype)
-        self._assertOpOutputMatchesExpected(
-            math_ops.rsqrt, val, expected=1 / np.sqrt(val))
+      val = np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype)
+      self._assertOpOutputMatchesExpected(
+          math_ops.rsqrt, val, expected=1 / np.sqrt(val))
 
-        self._assertOpOutputMatchesExpected(
-            math_ops.sigmoid, val, expected=1 / (1 + np.exp(-val)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.sigmoid, val, expected=1 / (1 + np.exp(-val)))
 
-        self._assertOpOutputMatchesExpected(
-            math_ops.sqrt, val, expected=np.sqrt(val))
+      self._assertOpOutputMatchesExpected(
+          math_ops.sqrt, val, expected=np.sqrt(val))
 
-        self._assertOpOutputMatchesExpected(
-            math_ops.tanh,
-            np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype),
-            expected=np.tanh(np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.tanh,
+          np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype),
+          expected=np.tanh(np.array([1, 2j, 2 - 3j, 4 + 5j], dtype=dtype)))
 
       self._assertOpOutputMatchesExpected(
           math_ops.tan,
@@ -480,12 +495,10 @@ class UnaryOpsTest(XLATestCase):
           np.array([[-4j, 3 + 2j], [2, -1j]], dtype=dtype),
           expected=np.array([[1, 1], [1, 1]], dtype=dtype))
 
-      if atan2_supported:  # TODO(b/34703906): atan2 support
-        self._assertOpOutputMatchesExpected(
-            math_ops.angle,
-            np.array([1 + 3j, -4 + 7j, 2.7, -3j], dtype=dtype),
-            expected=np.angle(
-                np.array([1 + 3j, -4 + 7j, 2.7, -3j], dtype=dtype)))
+      self._assertOpOutputMatchesExpected(
+          math_ops.angle,
+          np.array([1 + 3j, -4 + 7j, 2.7, -3j], dtype=dtype),
+          expected=np.angle(np.array([1 + 3j, -4 + 7j, 2.7, -3j], dtype=dtype)))
 
       self._assertOpOutputMatchesExpected(
           math_ops.conj,
@@ -589,6 +602,20 @@ class UnaryOpsTest(XLATestCase):
               lambda x, dst_type=dst_type: math_ops.cast(x, dst_type),
               src,
               expected=dst)
+
+  def testBitcast(self):
+    self._assertOpOutputMatchesExpected(
+        lambda x: array_ops.bitcast(x, dtypes.int32),
+        np.array([1, 0x3f800000], np.int32),
+        expected=np.array([1, 0x3f800000], np.int32))
+    self._assertOpOutputMatchesExpected(
+        lambda x: array_ops.bitcast(x, dtypes.float32),
+        np.array([1, 0x3f800000], np.int32),
+        expected=np.array([1e-45, 1.0], np.float32))
+    self._assertOpOutputMatchesExpected(
+        lambda x: array_ops.bitcast(x, dtypes.int32),
+        np.array([1e-45, 1.0], np.float32),
+        expected=np.array([1, 0x3f800000], np.int32))
 
   def testInvertPermutation(self):
     self._assertOpOutputMatchesExpected(
@@ -769,7 +796,10 @@ class UnaryOpsTest(XLATestCase):
       self._assertSoftplusMatchesExpected([[-2, 0, 8]], dtype)
       self._assertSoftplusMatchesExpected(
           [[-9, 7, -5, 3, -1], [1, -3, 5, -7, 9]], dtype)
-      log_eps = np.log(np.finfo(dtype).eps)
+      if dtype == dtypes.bfloat16.as_numpy_dtype:
+        log_eps = np.log(np.finfo(np.float32).eps)
+      else:
+        log_eps = np.log(np.finfo(dtype).eps)
       one = dtype(1)
       ten = dtype(10)
       self._assertSoftplusMatchesExpected([

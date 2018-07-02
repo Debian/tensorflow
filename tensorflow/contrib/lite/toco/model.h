@@ -12,9 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#ifndef THIRD_PARTY_TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_
-#define THIRD_PARTY_TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_
+#ifndef TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_
+#define TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_
 
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <string>
@@ -28,11 +29,15 @@ limitations under the License.
 
 namespace toco {
 
+using tflite::QuantizationParams;
+
 enum class OperatorType {
   kNone,
   // General-purpose neural network operators.
   kAdd,
+  kAddN,
   kAveragePool,
+  kBatchMatMul,
   kBatchNormalization,
   kConv,
   kConcatenation,
@@ -41,6 +46,7 @@ enum class OperatorType {
   kSpaceToDepth,
   kDequantize,
   kDiv,
+  kExp,
   kExpandDims,
   kFill,
   kFloorDiv,
@@ -50,16 +56,20 @@ enum class OperatorType {
   kL2Pool,
   kLstmCell,
   kLocalResponseNormalization,
+  kLog,
   kLogistic,
   kMaxPool,
   kFakeQuant,
   kMul,
+  kRandomUniform,
   kRange,
   kRank,
   kRelu,
   kRelu1,
   kRelu6,
+  kPRelu,
   kSoftmax,
+  kLogSoftmax,
   kSub,
   kTanh,
   kTransposeConv,
@@ -75,6 +85,7 @@ enum class OperatorType {
   kSlice,
   kSqueeze,
   kMean,
+  kArgMax,
   // The SVDF Op is a decomposition of a densely connected Op into
   // low rank filters. For details:
   // https://research.google.com/pubs/pub43813.html
@@ -97,6 +108,7 @@ enum class OperatorType {
   kTensorFlowMinimum,
   kTensorFlowMatMul,
   kTensorFlowMerge,
+  kNeg,
   kTensorFlowReshape,
   kTensorFlowRsqrt,
   kTensorFlowShape,
@@ -107,6 +119,9 @@ enum class OperatorType {
   kTensorFlowSwitch,
   kTensorFlowTile,
   kTranspose,
+  kTopK_V2,
+  kDynamicPartition,
+  kDynamicStitch,
   // An unsupported TF operation. It's only needed to be able to represent TF
   // graph internally and is expected to be dropped by graph transformations.
   kTensorFlowUnsupported,
@@ -151,7 +166,20 @@ enum class AxesOrder {
 // because we'll be dropping the array anyway (e.g. some exotic array types
 // may be involved only in debug-only subgraphs that we may not be interested
 // in actually supporting).
-enum class ArrayDataType { kNone, kBool, kFloat, kUint8, kInt32, kInt64 };
+enum class ArrayDataType {
+  kNone,  // 0
+  kBool,
+  kFloat,
+  kInt8,
+  kUint8,
+  kInt16,  // 5
+  kUint16,
+  kInt32,
+  kUint32,
+  kInt64,
+  kUint64,  // 10
+  kString
+};
 
 // Compile-time logic to map ArrayDataType to the corresponding C++ scalar type
 template <ArrayDataType A>
@@ -169,16 +197,40 @@ struct DataTypeImpl<ArrayDataType::kFloat> {
   typedef float Type;
 };
 template <>
+struct DataTypeImpl<ArrayDataType::kInt8> {
+  typedef int8 Type;
+};
+template <>
 struct DataTypeImpl<ArrayDataType::kUint8> {
   typedef uint8 Type;
+};
+template <>
+struct DataTypeImpl<ArrayDataType::kInt16> {
+  typedef int16 Type;
+};
+template <>
+struct DataTypeImpl<ArrayDataType::kUint16> {
+  typedef uint16 Type;
 };
 template <>
 struct DataTypeImpl<ArrayDataType::kInt32> {
   typedef int32 Type;
 };
 template <>
+struct DataTypeImpl<ArrayDataType::kUint32> {
+  typedef uint32 Type;
+};
+template <>
 struct DataTypeImpl<ArrayDataType::kInt64> {
   typedef int64 Type;
+};
+template <>
+struct DataTypeImpl<ArrayDataType::kUint64> {
+  typedef uint64 Type;
+};
+template <>
+struct DataTypeImpl<ArrayDataType::kString> {
+  typedef string Type;
 };
 
 template <ArrayDataType A>
@@ -199,6 +251,8 @@ struct GenericBuffer {
   // in containers and have the containers call the right subclass destructor.
   virtual ~GenericBuffer() {}
 
+  virtual int Length() const = 0;
+
   const ArrayDataType type;
 
  protected:
@@ -210,6 +264,8 @@ struct GenericBuffer {
 template <ArrayDataType A>
 struct Buffer : GenericBuffer {
   Buffer() : GenericBuffer(A) {}
+
+  int Length() const override { return data.size(); }
 
   std::vector<DataType<A>> data;
 };
@@ -314,7 +370,8 @@ struct ConvOperator : Operator {
   // A dilation_rate of 0 is invalid and this field is an optional attribute.
   // Thus initializing it to 1 to allow default conv behavior when the
   // attribute is not present.
-  int dilation_rate = 1;
+  int dilation_width_factor = 1;
+  int dilation_height_factor = 1;
 };
 
 // Depthwise-separable convolution operator.
@@ -512,6 +569,18 @@ struct Relu6Operator : Operator {
   Relu6Operator() : Operator(OperatorType::kRelu6) {}
 };
 
+// PRelu
+//   f(x) = alpha * x for x < 0, f(x) = x for x >= 0.
+//
+// Inputs:
+//   inputs[0]: required: the input array
+//   inputs[1]: required: the alpha array
+//
+// Equivalent to keras.layers.PReLU.
+struct PReluOperator : Operator {
+  PReluOperator() : Operator(OperatorType::kPRelu) {}
+};
+
 // Element-wise Logistic operator:
 //   x -> Logistic(x) = 1 / (1 + exp(-x))
 //
@@ -521,6 +590,17 @@ struct Relu6Operator : Operator {
 // TensorFlow equivalent: Sigmoid
 struct LogisticOperator : Operator {
   LogisticOperator() : Operator(OperatorType::kLogistic) {}
+};
+
+// Element-wise natural log operator:
+//   x -> ln(x)
+//
+// Inputs:
+//   inputs[0]: required: the input array
+//
+// TensorFlow equivalent: Log
+struct LogOperator : Operator {
+  LogOperator() : Operator(OperatorType::kLog) {}
 };
 
 // Element-wise Tanh operator:
@@ -543,6 +623,16 @@ struct TanhOperator : Operator {
 // TensorFlow equivalent: Add
 struct AddOperator : Operator {
   AddOperator() : Operator(OperatorType::kAdd) {}
+};
+
+// Element-wise addition operator for N inputs.
+//
+// Inputs:
+//   inputs[i]: The i-th array to add together to form the output.
+//
+// TensorFlow equivalent: AddN
+struct AddNOperator : Operator {
+  AddNOperator() : Operator(OperatorType::kAddN) {}
 };
 
 // Concatenation operator: concatenates its inputs
@@ -686,6 +776,19 @@ struct TensorFlowIdentityOperator : Operator {
   TensorFlowIdentityOperator() : Operator(OperatorType::kTensorFlowIdentity) {}
 };
 
+// Batch matrix multiplication operator. This comes from the (deprecated)
+// tf.batch_matmul or a tf.matmul that has rank 3. dims(0) is the batch count
+// and it can be trivially unrolled into a series of matmuls on each element.
+//
+// Inputs:
+//   inputs[0]: required: the left-hand side matrix
+//   inputs[1]: required: the right-hand side matrix
+//
+// TensorFlow equivalent: MatMul
+struct BatchMatMulOperator : Operator {
+  BatchMatMulOperator() : Operator(OperatorType::kBatchMatMul) {}
+};
+
 // General matrix multiplication operator. We don't want to support general
 // matrix multiplication at inference time, so we resolve it during tooling
 // to more specific operator types, namely, FullyConnected.
@@ -724,6 +827,9 @@ struct PadOperator : Operator {
 //
 // Inputs:
 //   inputs[0]: required: the input array
+//   inputs[1]: required: the begin array
+//   inputs[2]: required: the end array
+//   inputs[3]: optional: the strides array
 //
 // TensorFlow equivalent: StridedSlice
 struct StridedSliceOperator : Operator {
@@ -768,19 +874,40 @@ struct SqueezeOperator : Operator {
 };
 
 // Inputs:
-//   inputs[0]: required: the input activations array
-//   inputs[1]: required: the Conv weights
-//   channel.
+//   inputs[0]: required: the output shape
+//   inputs[1]: required: the weights
+//   inputs[2]: required: the input activations array
+//   NOTE: The input activations is NOT the first input.
+//
 //
 // Outputs:
 //   outputs[0]: required: the output activations array
 //
 // TensorFlow equivalent: Conv2DBackpropInput
 struct TransposeConvOperator : Operator {
+  enum Inputs {
+    OUTPUT_SHAPE = 0,
+    WEIGHTS = 1,
+    DATA_INPUT = 2,
+  };
+
   TransposeConvOperator() : Operator(OperatorType::kTransposeConv) {}
   Padding padding;
   int stride_width = 0;
   int stride_height = 0;
+  // Dilation is possible with transpose convolution, but Tensorflow does not
+  // currently support it, so we omit it.
+};
+
+// Given a tensor input, this operation calculates element-wise exponential
+// (y = e^x).
+//
+// Inputs:
+//   inputs[0]: required: input tensor
+//
+// TensorFlow equivalent: Exp
+struct ExpOperator : Operator {
+  ExpOperator() : Operator(OperatorType::kExp) {}
 };
 
 // Given a tensor input, this operation inserts a dimension of 1 at the
@@ -832,6 +959,13 @@ struct FloorModOperator : Operator {
   FloorModOperator() : Operator(OperatorType::kFloorMod) {}
 };
 
+struct RandomUniformOperator : Operator {
+  RandomUniformOperator() : Operator(OperatorType::kRandomUniform) {}
+  ArrayDataType dtype = ArrayDataType::kNone;
+  int64 seed;
+  int64 seed2;
+};
+
 // Creates a sequence of numbers that begins at start and extends by increments
 // of delta up to but not including limit.
 //
@@ -861,6 +995,16 @@ struct RangeOperator : Operator {
 // and not int64.  The output type could be stored herein.
 struct RankOperator : Operator {
   RankOperator() : Operator(OperatorType::kRank) {}
+};
+
+// Element-wise negation (-x) operator.
+//
+// Inputs:
+//   inputs[0]: required: the input array
+//
+// TensorFlow equivalent: Neg
+struct NegOperator : Operator {
+  NegOperator() : Operator(OperatorType::kNeg) {}
 };
 
 // Element-wise reciprocal-square-root (x^-0.5) operator.
@@ -933,6 +1077,7 @@ struct TensorFlowSquareOperator : Operator {
 // TensorFlow equivalent: Transpose
 struct TransposeOperator : Operator {
   TransposeOperator() : Operator(OperatorType::kTranspose) {}
+  std::vector<int> perm;
 };
 
 // Element-wise subtraction operator.
@@ -1176,6 +1321,16 @@ struct SoftmaxOperator : Operator {
   float beta = 0.f;
 };
 
+// LogSoftmax activation function.
+//
+// Inputs:
+//   inputs[0]: required: the logits input array
+//
+// TensorFlow equivalent: LogSoftmax
+struct LogSoftmaxOperator : Operator {
+  LogSoftmaxOperator() : Operator(OperatorType::kLogSoftmax) {}
+};
+
 // Cast operator.
 //
 // Inputs:
@@ -1208,7 +1363,19 @@ struct FloorOperator : Operator {
 // TensorFlow equivalent: Gather
 struct GatherOperator : Operator {
   GatherOperator() : Operator(OperatorType::kGather) {}
-  int input_rank;
+  int axis = 0;
+  int input_rank = 0;
+};
+
+// ArgMax operator. It returns the index of the maximum value along axis.
+//
+// Inputs:
+//   inputs[0]: required: the input tensor
+//
+// TensorFlow equivalent: ArgMax
+struct ArgMaxOperator : Operator {
+  ArgMaxOperator() : Operator(OperatorType::kArgMax) {}
+  ArrayDataType output_data_type = ArrayDataType::kInt64;
 };
 
 // ResizeBilinear operator. It resizes input images with bilinear interpolation.
@@ -1221,6 +1388,8 @@ struct GatherOperator : Operator {
 // TensorFlow equivalent: ResizeBilinear
 struct ResizeBilinearOperator : Operator {
   ResizeBilinearOperator() : Operator(OperatorType::kResizeBilinear) {}
+
+  bool align_corners = false;
 };
 
 // SpaceToBatchND operator. It divides spatial dimensions into a grid of
@@ -1235,6 +1404,10 @@ struct ResizeBilinearOperator : Operator {
 // TensorFlow equivalent: SpaceToBatchND
 struct SpaceToBatchNDOperator : Operator {
   SpaceToBatchNDOperator() : Operator(OperatorType::kSpaceToBatchND) {}
+
+  std::vector<int> block_shape;
+  std::vector<int> before_paddings;
+  std::vector<int> after_paddings;
 };
 
 // BatchToSpaceND operator. Rearranges data from batch into blocks of
@@ -1249,6 +1422,10 @@ struct SpaceToBatchNDOperator : Operator {
 // TensorFlow equivalent: BatchToSpaceND
 struct BatchToSpaceNDOperator : Operator {
   BatchToSpaceNDOperator() : Operator(OperatorType::kBatchToSpaceND) {}
+
+  std::vector<int> block_shape;
+  std::vector<int> before_crops;
+  std::vector<int> after_crops;
 };
 
 // Mean operator.
@@ -1276,6 +1453,38 @@ struct SvdfOperator : Operator {
   int rank;
 };
 
+// TopKV2 operator.
+//
+// Inputs:
+//    input tensor and top_k scalar.
+struct TopKV2Operator : Operator {
+  TopKV2Operator() : Operator(OperatorType::kTopK_V2) {}
+};
+
+// DynamicPartition operator:
+//
+// Inputs:
+//  inputs[0]: required: data.
+//  inputs[1]: required: partitions.
+//
+// TensorFlow equivalent: DynamicPartition
+struct DynamicPartitionOperator : Operator {
+  DynamicPartitionOperator() : Operator(OperatorType::kDynamicPartition) {}
+  int num_partitions;
+};
+
+// DynamicStitch operator:
+//
+// Inputs:
+//  inputs[0,N): required: indices.
+//  inputs[N,2N): required: data.
+//
+// TensorFlow equivalent: DynamicStitch/ParallelDynamicStitch
+struct DynamicStitchOperator : Operator {
+  DynamicStitchOperator() : Operator(OperatorType::kDynamicStitch) {}
+  int num_partitions;
+};
+
 // Alloc's are used for transient arrays only. An Alloc specifies which interval
 // of the "transient_data" workspace buffer passed to inference functions, is to
 // be used for the transient array at hand. The 'start' and 'end' values are
@@ -1288,22 +1497,6 @@ struct Alloc {
 inline bool operator<(const Alloc& a, const Alloc& b) {
   return a.start < b.start;
 }
-
-// Quantization parameters, determining the mapping of quantized values
-// to real values (i.e. determining how quantized values are mathematically
-// interpreted).
-//
-// The correspondence is as follows:
-//
-//   real_value = scale * (quantized_value - zero_point);
-//
-// In other words, zero_point designates which quantized value corresponds to
-// the real 0 value, and scale designates the difference between the real values
-// corresponding to consecutive quantized values differing by 1.
-struct QuantizationParams {
-  int32 zero_point = 0;
-  double scale = 0.;
-};
 
 class Shape {
  public:
@@ -1326,7 +1519,14 @@ class Shape {
 
   // We still have that one convenience accessor to avoid
   // the awkward double bracket issue:  shape.dims()[i].
-  int dims(int i) const { return dims_[i]; }
+  int dims(int i) const {
+    // Always check for out-of-bounds accesses, even in optimized builds where
+    // standard assertions are disabled. Out-of-bounds access here is a common
+    // occurence.
+    CHECK_GE(i, 0);
+    CHECK_GT(dims_.size(), i);
+    return dims_[i];
+  }
 
   bool operator==(const Shape& comp) const {
     return (this->dims_ == comp.dims());
@@ -1476,29 +1676,54 @@ struct Array {
 
 // Our Model struct, represents an entire model (our "top-level" struct).
 // Owns everything.
-struct Model {
+class Model {
+ public:
+  using ArrayMap = std::unordered_map<string, std::unique_ptr<Array>>;
+
+  bool HasArray(const string& name) const { return arrays.count(name) > 0; }
   Array& GetArray(const string& name) const {
-    DCHECK(arrays.count(name));
+    DCHECK(HasArray(name)) << "Array not found: " << name;
     return *arrays.at(name);
   }
   Array& GetOrCreateArray(const string& name) {
-    if (!arrays.count(name)) {
+    // Make sure name is not used by an optional array
+    DCHECK(!optional_arrays.count(name));
+    if (!HasArray(name)) {
       Array* ptr = new Array;
       arrays[name] = std::unique_ptr<Array>(ptr);
     }
     Array& result = GetArray(name);
     return result;
   }
+  void CreateOptionalArray(const string& name) {
+    DCHECK(!arrays.count(name) && !optional_arrays.count(name));
+    optional_arrays.insert(name);
+  }
+  bool IsOptionalArray(const string& name) const {
+    return optional_arrays.count(name);
+  }
+
+  // Note that this invalidates all array iterators.
+  void EraseArray(const string& name) { arrays.erase(name); }
+  void EraseArrays(std::function<bool(const string&)> discardable) {
+    for (auto it = arrays.begin(); it != arrays.end();) {
+      if (discardable(it->first)) {
+        it = arrays.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+  const ArrayMap& GetArrayMap() const { return arrays; }
+
+  // Optional arrays are used for optional tensors,
+  // these tensors do not have data, but with reserved names as op inputs.
+  std::set<string> optional_arrays;
 
   // The list of operators. Notice how it's a list of unique_ptr's, implying
   // that the Model is what owns Operator's and keeps them alive.
   std::vector<std::unique_ptr<Operator>> operators;
-  // The associative array mapping names to Array's.
-  // Notice how it's a container of unique_ptr's, implying
-  // that the Model is what owns Array's and keeps them alive.
-  // The Operator's refer to these Array's by their name strings, not by their
-  // addresses. See Operator::inputs, Operator::outputs.
-  std::unordered_map<string, std::unique_ptr<Array>> arrays;
+
   // Generic flags, a place where we combine information passed to us via
   // command-line parameters (e.g. --input_width=N) with information that
   // we may or may not find in the input model file.
@@ -1507,7 +1732,15 @@ struct Model {
   std::size_t transient_data_size = 0;
   // For code-generation only: required alignment of the transient_data buffer
   std::size_t transient_data_alignment = 0;
+
+ private:
+  // The associative array mapping names to Array's.
+  // Notice how it's a container of unique_ptr's, implying
+  // that the Model is what owns Array's and keeps them alive.
+  // The Operator's refer to these Array's by their name strings, not by their
+  // addresses. See Operator::inputs, Operator::outputs.
+  std::unordered_map<string, std::unique_ptr<Array>> arrays;
 };
 }  // namespace toco
 
-#endif  // THIRD_PARTY_TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_
+#endif  // TENSORFLOW_CONTRIB_LITE_TOCO_MODEL_H_

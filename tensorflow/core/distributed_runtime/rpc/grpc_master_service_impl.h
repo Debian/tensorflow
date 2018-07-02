@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef THIRD_PARTY_TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_
-#define THIRD_PARTY_TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_
+#ifndef TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_
+#define TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_
 
 #include "grpc++/impl/codegen/async_stream.h"
 #include "grpc++/impl/codegen/async_unary_call.h"
@@ -79,6 +79,15 @@ class MasterService final {
     virtual ::grpc::Status Reset(::grpc::ClientContext* context,
                                  const ResetRequest& request,
                                  ResetResponse* response) = 0;
+    virtual ::grpc::Status MakeCallable(::grpc::ClientContext* context,
+                                        const MakeCallableRequest& request,
+                                        MakeCallableResponse* response) = 0;
+    virtual ::grpc::Status RunCallable(::grpc::ClientContext* context,
+                                       const RunCallableRequest& request,
+                                       RunCallableResponse* response) = 0;
+    virtual ::grpc::Status ReleaseCallable(
+        ::grpc::ClientContext* context, const ReleaseCallableRequest& request,
+        ReleaseCallableResponse* response) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -89,9 +98,9 @@ class MasterService final {
     ::grpc::Status ExtendSession(::grpc::ClientContext* context,
                                  const ExtendSessionRequest& request,
                                  ExtendSessionResponse* response) override;
-    ::grpc::Status PartialRunSetup(
-        ::grpc::ClientContext* context, const PartialRunSetupRequest& request,
-        PartialRunSetupResponse* response) override;
+    ::grpc::Status PartialRunSetup(::grpc::ClientContext* context,
+                                   const PartialRunSetupRequest& request,
+                                   PartialRunSetupResponse* response) override;
     ::grpc::Status RunStep(::grpc::ClientContext* context,
                            const RunStepRequest& request,
                            RunStepResponse* response) override;
@@ -104,6 +113,15 @@ class MasterService final {
     ::grpc::Status Reset(::grpc::ClientContext* context,
                          const ResetRequest& request,
                          ResetResponse* response) override;
+    ::grpc::Status MakeCallable(::grpc::ClientContext* context,
+                                const MakeCallableRequest& request,
+                                MakeCallableResponse* response) override;
+    ::grpc::Status RunCallable(::grpc::ClientContext* context,
+                               const RunCallableRequest& request,
+                               RunCallableResponse* response) override;
+    ::grpc::Status ReleaseCallable(::grpc::ClientContext* context,
+                                   const ReleaseCallableRequest& request,
+                                   ReleaseCallableResponse* response) override;
 
    private:
     std::shared_ptr< ::grpc::ChannelInterface> channel_;
@@ -114,6 +132,9 @@ class MasterService final {
     const ::grpc::internal::RpcMethod rpcmethod_CloseSession_;
     const ::grpc::internal::RpcMethod rpcmethod_ListDevices_;
     const ::grpc::internal::RpcMethod rpcmethod_Reset_;
+    const ::grpc::internal::RpcMethod rpcmethod_MakeCallable_;
+    const ::grpc::internal::RpcMethod rpcmethod_RunCallable_;
+    const ::grpc::internal::RpcMethod rpcmethod_ReleaseCallable_;
   };
   static std::unique_ptr<Stub> NewStub(
       const std::shared_ptr< ::grpc::ChannelInterface>& channel,
@@ -179,6 +200,30 @@ class MasterService final {
       ::grpc::Service::RequestAsyncUnary(6, context, request, response,
                                          new_call_cq, notification_cq, tag);
     }
+    void RequestMakeCallable(
+        ::grpc::ServerContext* context, MakeCallableRequest* request,
+        ::grpc::ServerAsyncResponseWriter<MakeCallableResponse>* response,
+        ::grpc::CompletionQueue* new_call_cq,
+        ::grpc::ServerCompletionQueue* notification_cq, void* tag) {
+      ::grpc::Service::RequestAsyncUnary(7, context, request, response,
+                                         new_call_cq, notification_cq, tag);
+    }
+    void RequestRunCallable(
+        ::grpc::ServerContext* context, RunCallableRequest* request,
+        ::grpc::ServerAsyncResponseWriter<RunCallableResponse>* response,
+        ::grpc::CompletionQueue* new_call_cq,
+        ::grpc::ServerCompletionQueue* notification_cq, void* tag) {
+      ::grpc::Service::RequestAsyncUnary(8, context, request, response,
+                                         new_call_cq, notification_cq, tag);
+    }
+    void RequestReleaseCallable(
+        ::grpc::ServerContext* context, ReleaseCallableRequest* request,
+        ::grpc::ServerAsyncResponseWriter<ReleaseCallableResponse>* response,
+        ::grpc::CompletionQueue* new_call_cq,
+        ::grpc::ServerCompletionQueue* notification_cq, void* tag) {
+      ::grpc::Service::RequestAsyncUnary(9, context, request, response,
+                                         new_call_cq, notification_cq, tag);
+    }
   };
 };
 
@@ -186,4 +231,4 @@ class MasterService final {
 
 }  // namespace tensorflow
 
-#endif  // THIRD_PARTY_TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_
+#endif  // TENSORFLOW_CORE_DISTRIBUTED_RUNTIME_RPC_GRPC_MASTER_SERVICE_IMPL_H_

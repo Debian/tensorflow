@@ -37,6 +37,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/gtl/inlined_vector.h"
 #include "tensorflow/core/lib/strings/scanner.h"
+#include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/public/version.h"
 
@@ -73,7 +74,7 @@ class GraphConstructor {
     Options(const ImportGraphDefOptions& in)  // NOLINT(runtime/explicit)
         : allow_internal_ops(false),
           expect_device_spec(false),
-          prefix(in.prefix.empty() || StringPiece(in.prefix).ends_with("/")
+          prefix(in.prefix.empty() || str_util::EndsWith(in.prefix, "/")
                      ? in.prefix
                      : in.prefix + "/"),
           uniquify_names(in.uniquify_names),
@@ -84,7 +85,8 @@ class GraphConstructor {
           return_tensors(in.return_tensors),
           return_nodes(in.return_nodes),
           importing(true),
-          validate_colocation_constraints(in.validate_colocation_constraints) {}
+          validate_colocation_constraints(in.validate_colocation_constraints),
+          validate_shape(in.validate_shape) {}
 
     bool allow_internal_ops;
     bool expect_device_spec;
@@ -108,6 +110,7 @@ class GraphConstructor {
     // remove this.
     bool importing;
     bool validate_colocation_constraints;
+    bool validate_shape = true;
   };
 
   typedef gtl::ArraySlice<const NodeDef*> NodeDefSlice;
@@ -372,15 +375,8 @@ Status GraphConstructor::EnsureNoNameCollisions() {
       return errors::InvalidArgument("Imported node name prefix '", prefix_,
                                      "' would lead to invalid node names");
     }
-    if (NameExistsInGraph(prefix_no_slash)) {
-      if (opts_.uniquify_prefix) {
-        prefix_ = strings::StrCat(FindUniqueName(prefix_no_slash), "/");
-      } else {
-        return errors::InvalidArgument("Import node name prefix '",
-                                       prefix_no_slash,
-                                       "' conflicts with "
-                                       "name already used in the graph");
-      }
+    if (NameExistsInGraph(prefix_no_slash) && opts_.uniquify_prefix) {
+      prefix_ = strings::StrCat(FindUniqueName(prefix_no_slash), "/");
     }
   }
   return Status::OK();
@@ -441,7 +437,7 @@ Status GraphConstructor::BuildNodeIndex() {
     bool in_control_dependence = false;
     for (int i = 0; i < node_def.input_size(); ++i) {
       StringPiece input_name = node_def.input(i);
-      if (!input_name.empty() && input_name.starts_with("^")) {
+      if (!input_name.empty() && str_util::StartsWith(input_name, "^")) {
         in_control_dependence = true;
       } else if (in_control_dependence) {
         return errors::InvalidArgument(
@@ -489,7 +485,7 @@ Status GraphConstructor::InitFromEdges() {
       bool has_loop_back_edge = false;
       for (int i = 0; i < node_def.input_size(); ++i) {
         StringPiece input_name(node_def.input(i));
-        if (input_name.starts_with("^")) {
+        if (str_util::StartsWith(input_name, "^")) {
           num_control_edges++;
         } else {
           TensorId id(ParseTensorName(input_name));
@@ -539,7 +535,7 @@ Status GraphConstructor::ValidateColocationConstraints(
   if (iter == node_def.attr().end()) return Status::OK();
   for (const string& c : iter->second.list().s()) {
     StringPiece s(c);
-    if (s.Consume(kColocationGroupPrefix) &&
+    if (str_util::ConsumePrefix(&s, kColocationGroupPrefix) &&
         gdef_nodes_.find(s) == gdef_nodes_.end()) {
       return errors::InvalidArgument(
           "Node '", node_def.name(),
@@ -561,7 +557,7 @@ Status GraphConstructor::MakeNode(const NodeDef& node_def, Node** node) {
 }
 
 Status GraphConstructor::ValidateShape(Node* node) {
-  if (!opts_.importing) return Status::OK();
+  if (!opts_.importing || !opts_.validate_shape) return Status::OK();
   TF_RETURN_IF_ERROR(refiner_->AddNode(node));
   // For nodes with the _output_shapes attribute, override the shape.
   std::vector<TensorShapeProto> shape_attrs;
@@ -573,13 +569,22 @@ Status GraphConstructor::ValidateShape(Node* node) {
   auto* ic = refiner_->GetContext(node);
   DCHECK(ic != nullptr)
       << "ShapeRefiner::AddNode() should have created the InferenceContext";
-  if (shape_attrs.size() != node->num_outputs()) {
+  if (shape_attrs.size() < node->num_outputs()) {
     return errors::InvalidArgument(
         "Node '", node->name(), "' has ", node->num_outputs(),
         " outputs but the ", kAttrName, " attribute specifies shapes for ",
         shape_attrs.size(), " outputs");
   }
-  for (int i = 0; i < shape_attrs.size(); ++i) {
+  // NOTE(skyewm): we don't raise an error here because some users depend on
+  // this behavior, even though it's unsafe.
+  // TODO(b/74619486): raise an error.
+  if (shape_attrs.size() > node->num_outputs()) {
+    LOG(WARNING) << "Node '" << node->name() << "' has " << node->num_outputs()
+                 << " outputs but the " << kAttrName
+                 << " attribute specifies shapes for " << shape_attrs.size()
+                 << " outputs. Output shapes may be inaccurate.";
+  }
+  for (int i = 0; i < node->num_outputs(); ++i) {
     const TensorShapeProto& p = shape_attrs[i];
     shape_inference::ShapeHandle h;
     Status s = ic->MakeShapeFromShapeProto(p, &h);
@@ -760,7 +765,7 @@ void GraphConstructor::AddPrefixToNodeDef(
     // Skip remapped inputs (which already exist in g_ and are not being
     // imported).
     if (input_already_exists[i]) continue;
-    if (input.Consume("^")) {
+    if (str_util::ConsumePrefix(&input, "^")) {
       node_def->set_input(i, strings::StrCat("^", prefix_, input));
     } else {
       node_def->set_input(i, strings::StrCat(prefix_, input));
@@ -772,7 +777,7 @@ void GraphConstructor::AddPrefixToNodeDef(
         node_def->mutable_attr()->at(kColocationAttrName).mutable_list();
     for (int i = 0; i < list->s_size(); ++i) {
       StringPiece v(list->s(i));
-      if (v.Consume(kColocationGroupPrefix)) {
+      if (str_util::ConsumePrefix(&v, kColocationGroupPrefix)) {
         list->set_s(i, strings::StrCat(kColocationGroupPrefix, prefix_, v));
       }
     }
@@ -815,7 +820,7 @@ void GraphConstructor::UpdateUniquifiedColocationNames() {
     bool updated = false;
     for (int i = 0; i < coloc_values.size(); ++i) {
       StringPiece val(coloc_values[i]);
-      if (val.Consume(kColocationGroupPrefix)) {
+      if (str_util::ConsumePrefix(&val, kColocationGroupPrefix)) {
         const auto& name_pair = uniquified_names_.find(val.ToString());
         if (name_pair == uniquified_names_.end()) continue;
         updated = true;
@@ -988,7 +993,10 @@ Status GraphConstructor::Convert() {
     if (opts_.importing) {
       if (!prefix_.empty()) {
         AddPrefixToNodeDef(input_already_exists, &imported_node_def);
-      } else if (opts_.uniquify_names) {
+      }
+      // Note: no need to uniquify names if the prefix already guarantees
+      // uniqueness
+      if (opts_.uniquify_names && (prefix_.empty() || !opts_.uniquify_prefix)) {
         UniquifyNames(input_already_exists, &imported_node_def);
       }
       TF_RETURN_IF_ERROR(ModifyNodeDefForImport(&imported_node_def));
@@ -1273,7 +1281,7 @@ void CopyGraph(const Graph& src, Graph* dest) {
   dest->set_versions(src.versions());
 
   // Copy the nodes
-  std::unordered_map<Node*, Node*>
+  std::unordered_map<const Node*, Node*>
       node_map;  // "Node in src" -> "Node in *dest"
   node_map[src.source_node()] = dest->source_node();
   node_map[src.sink_node()] = dest->sink_node();

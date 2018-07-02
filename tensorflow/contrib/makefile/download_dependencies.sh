@@ -34,7 +34,7 @@ PROTOBUF_URL="$(grep -o 'https://mirror.bazel.build/github.com/google/protobuf/.
 RE2_URL="$(grep -o 'https://mirror.bazel.build/github.com/google/re2/.*tar\.gz' "${BZL_FILE_PATH}" | head -n1)"
 FFT2D_URL="$(grep -o 'http.*fft\.tgz' "${BZL_FILE_PATH}" | grep -v mirror.bazel | head -n1)"
 ABSL_URL="$(grep -o 'https://github.com/abseil/abseil-cpp/.*tar.gz' "${BZL_FILE_PATH}" | head -n1)"
-CUB_URL="$(grep -o 'https.*cub/archive.*zip' "${BZL_FILE_PATH}" | grep -v bazel-mirror | head -n1)"
+CUB_URL="$(grep -o 'https.*cub/archive.*zip' "${BZL_FILE_PATH}" | grep -v mirror.bazel | head -n1)"
 
 # TODO(petewarden): Some new code in Eigen triggers a clang bug with iOS arm64,
 #                   so work around it by patching the source.
@@ -63,12 +63,17 @@ download_and_extract() {
   elif [[ "${url}" == *zip ]]; then
     tempdir=$(mktemp -d)
     tempdir2=$(mktemp -d)
-    wget -P ${tempdir} ${url}
-    unzip ${tempdir}/* -d ${tempdir2}
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      # macOS (AKA darwin) doesn't have wget.
+      (cd "${tempdir}"; curl --remote-name --silent --location "${url}")
+    else
+      wget -P "${tempdir}" "${url}"
+    fi
+    unzip "${tempdir}"/* -d "${tempdir2}"
     # unzip has no strip components, so unzip to a temp dir, and move the files
     # we want from the tempdir to destination.
-    cp -R ${tempdir2}/*/* ${dir}/
-    rm -rf ${tempdir2} ${tempdir}
+    cp -R "${tempdir2}"/*/* "${dir}"/
+    rm -rf "${tempdir2}" "${tempdir}"
   fi
 
   # Delete any potential BUILD files, which would interfere with Bazel builds.

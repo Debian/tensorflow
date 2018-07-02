@@ -19,6 +19,7 @@ py_library(
         "python/training/elastic_average_optimizer.py",
         "python/training/external_optimizer.py",
         "python/training/lazy_adam_optimizer.py",
+        "python/training/model_average_optimizer.py",
         "python/training/moving_average_optimizer.py",
         "python/training/multitask_optimizer_wrapper.py",
         "python/training/nadam_optimizer.py",
@@ -51,6 +52,9 @@ py_test(
     name = "external_optimizer_test",
     srcs = ["python/training/external_optimizer_test.py"],
     srcs_version = "PY2AND3",
+    tags = [
+        "no-internal-py3",
+    ],
     deps = [
         ":opt_py",
         "//tensorflow/python:array_ops",
@@ -193,6 +197,27 @@ tf_py_test(
     ],
 )
 
+tf_py_test(
+    name = "model_average_optimizer_test",
+    srcs = ["python/training/model_average_optimizer_test.py"],
+    additional_deps = [
+        ":opt_py",
+        "//tensorflow/python:client",
+        "//tensorflow/python:client_testlib",
+        "//tensorflow/python:array_ops",
+        "//tensorflow/python:variables",
+        "//tensorflow/python:framework",
+        "//tensorflow/python:platform",
+        "//tensorflow/python:training",
+        "//tensorflow/python:ops",
+        "//tensorflow/python:framework_for_generated_wrappers",
+        "//third_party/py/numpy",
+    ],
+    tags = [
+        "notap",  # This test launches local server.
+    ],
+)
+
 py_test(
     name = "sign_decay_test",
     srcs = ["python/training/sign_decay_test.py"],
@@ -239,15 +264,4 @@ py_test(
         "//tensorflow/python:variables",
         "//third_party/py/numpy",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
 )
