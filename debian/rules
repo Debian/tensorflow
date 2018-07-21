@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+
+TMPDIR=tf_cpu_build
+
+%:
+	dh $@ --buildsystem=cmake
+
+$(TMPDIR):
+	mkdir $@
+
+override_dh_auto_configure: $(TMPDIR)
+	set -e; cd $(TMPDIR); \
+		cmake ../tensorflow/contrib/cmake/
+
+override_dh_auto_build: $(TMPDIR)
+	dh_auto_build --builddirectory=$(TMPDIR)
+

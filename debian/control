@@ -1,0 +1,51 @@
+Source: tensorflow
+Section: science
+Priority: optional
+Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
+Uploaders: Mo Zhou <cdluminate@gmail.com>,
+Build-Depends: debhelper (>= 11~),
+               cmake,
+               dh-python,
+Standards-Version: 4.1.5
+Homepage: https://???
+Vcs-Browser: https://???
+Vcs-Git: https://???
+
+Package: tensorflow-cpu
+Section: metapackages
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: FIXME
+ FIXME
+
+Package: libtensorflow-cpu
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: FIXME
+ FIXME
+
+Package: libtensorflow-cpu-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: FIXME
+ FIXME
+
+Package: python3-tensorflow-libs-cpu
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: FIXME
+ FIXME
+
+Package: python3-tensorflow-cpu
+Section: libs
+Architecture: all
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: FIXME
+ FIXME
