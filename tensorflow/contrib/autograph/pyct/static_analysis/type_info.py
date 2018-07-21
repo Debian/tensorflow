@@ -48,6 +48,9 @@ from tensorflow.contrib.autograph.pyct import transformer
 from tensorflow.python.util import tf_inspect
 
 
+# TODO(mdan): Remove the duplication between this and activity.py.
+# In particular, the symbol definitions we track here could as well be tracked
+# there because they follow the same rules for visibility.
 class Scope(object):
   """Tracks symbol value references.
 
@@ -99,20 +102,16 @@ class TypeInfoResolver(transformer.Base):
   def __init__(self, context):
     super(TypeInfoResolver, self).__init__(context)
     self.scope = Scope(None)
-    self.function_level = 0
 
   def visit_FunctionDef(self, node):
     self.scope = Scope(self.scope)
-    self.function_level += 1
-    self.generic_visit(node)
-    self.function_level -= 1
+    node = self.generic_visit(node)
     self.scope = self.scope.parent
     return node
 
   def _visit_block(self, block):
     self.scope = Scope(self.scope)
-    for i, n in enumerate(block):
-      block[i] = self.generic_visit(n)
+    block = self.visit_block(block)
     self.scope = self.scope.parent
     return block
 
@@ -137,14 +136,14 @@ class TypeInfoResolver(transformer.Base):
 
   def _process_function_arg(self, arg_name):
     str_name = str(arg_name)
-    if self.function_level == 1 and str_name in self.context.arg_types:
+    type_holder = arg_name.ast()
+    self.scope.setval(arg_name, type_holder)
+    if len(self.enclosing_entities) == 1 and str_name in self.context.arg_types:
       # Forge a node to hold the type information, so that method calls on
       # it can resolve the type.
-      type_holder = arg_name.ast()
       type_string, type_obj = self.context.arg_types[str_name]
       anno.setanno(type_holder, 'type', type_obj)
       anno.setanno(type_holder, 'type_fqn', tuple(type_string.split('.')))
-      self.scope.setval(arg_name, type_holder)
 
   def visit_arg(self, node):
     self._process_function_arg(anno.getanno(node.arg, anno.Basic.QN))
@@ -168,48 +167,41 @@ class TypeInfoResolver(transformer.Base):
                      anno.getanno(definition, 'element_type'))
     return node
 
-  def _process_tuple_assignment(self, source, t):
-    for i, e in enumerate(t.elts):
-      if isinstance(e, gast.Tuple):
-        self._process_tuple_assignment(source, e)
-      else:
-        self.scope.setval(
-            anno.getanno(e, anno.Basic.QN),
-            gast.Subscript(source, gast.Index(i), ctx=gast.Store()))
-
-  def _process_variable_assignment(self, source, targets):
-    if isinstance(source, gast.Call):
-      func = source.func
+  def _process_variable_assignment(self, target, value):
+    # Constructors
+    if isinstance(value, gast.Call):
+      func = value.func
       if anno.hasanno(func, 'live_val'):
         func_obj = anno.getanno(func, 'live_val')
         if tf_inspect.isclass(func_obj):
-          anno.setanno(source, 'is_constructor', True)
-          anno.setanno(source, 'type', func_obj)
-          anno.setanno(source, 'type_fqn', anno.getanno(func, 'fqn'))
+          anno.setanno(value, 'is_constructor', True)
+          anno.setanno(value, 'type', func_obj)
+          anno.setanno(value, 'type_fqn', anno.getanno(func, 'fqn'))
           # TODO(mdan): Raise an error if constructor has side effects.
           # We can have a whitelist of no-side-effects constructors.
           # We can also step inside the constructor and further analyze.
 
-    for t in targets:
-      if isinstance(t, gast.Tuple):
-        # need to recurse on the case of assigning nested tuples,
-        # ex. a, (b, c) = f()
-        self._process_tuple_assignment(source, t)
-      elif isinstance(t, (gast.Name, gast.Attribute)):
-        self.scope.setval(anno.getanno(t, anno.Basic.QN), source)
-      else:
-        raise ValueError('Dont know how to handle assignment to %s' % t)
+    if isinstance(target, (gast.Name, gast.Attribute)):
+      target_symbol = anno.getanno(target, anno.Basic.QN)
+      self.scope.setval(target_symbol, value)
+    elif isinstance(target, gast.Subscript):
+      pass
+    else:
+      raise ValueError('assignment target has unknown type: %s' % target)
 
   def visit_With(self, node):
-    for wi in node.items:
-      if wi.optional_vars is not None:
-        self._process_variable_assignment(wi.context_expr, (wi.optional_vars,))
+    for item in node.items:
+      if item.optional_vars is not None:
+        self.apply_to_single_assignments((item.optional_vars,),
+                                         item.context_expr,
+                                         self._process_variable_assignment)
     self.generic_visit(node)
     return node
 
   def visit_Assign(self, node):
     self.generic_visit(node)
-    self._process_variable_assignment(node.value, node.targets)
+    self.apply_to_single_assignments(
+        node.targets, node.value, self._process_variable_assignment)
     return node
 
   def visit_Call(self, node):
@@ -218,19 +210,26 @@ class TypeInfoResolver(transformer.Base):
       # type that it specified.
       if (anno.getanno(node.func, 'live_val') is
           self.context.type_annotation_func):
-        # Expecting the actual type to be the second argument.
+
         if len(node.args) != 2:
           raise ValueError('"%s" must have exactly two parameters'
                            % self.context.type_annotation_func)
-        if not anno.hasanno(node.args[0], anno.Basic.QN):
+        target_arg, type_arg = node.args
+        if not anno.hasanno(target_arg, anno.Basic.QN):
           raise ValueError('the first argument of "%s" must by a symbol'
                            % self.context.type_annotation_func)
-        if not anno.hasanno(node.args[1], 'live_val'):
-          raise ValueError(
-              'the second argument of "%s" must be statically resolvable' %
-              self.context.type_annotation_func)
-        target_symbol = anno.getanno(node.args[0], anno.Basic.QN)
-        element_type = anno.getanno(node.args[1], 'live_val')
+        if isinstance(type_arg, gast.Str):
+          element_type = type_arg.s
+        elif isinstance(type_arg, gast.Num):
+          element_type = type_arg.n
+        else:
+          if not anno.hasanno(type_arg, 'live_val'):
+            raise ValueError(
+                'the second argument of "%s" must be statically resolvable' %
+                self.context.type_annotation_func)
+          element_type = anno.getanno(type_arg, 'live_val')
+
+        target_symbol = anno.getanno(target_arg, anno.Basic.QN)
         # Find the definition of this symbol and annotate it with the given
         # data type. That in turn will cause future uses of the symbol
         # to receive the same type annotation.

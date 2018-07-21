@@ -150,10 +150,14 @@ def _loop_with_vec_and_4d():
 def _get_config(layout_optimizer=True):
   if layout_optimizer:
     rewrite_options = rewriter_config_pb2.RewriterConfig(
-        layout_optimizer=rewriter_config_pb2.RewriterConfig.ON)
+        layout_optimizer=rewriter_config_pb2.RewriterConfig.ON,
+        # do not remove duplicated nodes
+        arithmetic_optimization=rewriter_config_pb2.RewriterConfig.OFF)
   else:
     rewrite_options = rewriter_config_pb2.RewriterConfig(
-        layout_optimizer=rewriter_config_pb2.RewriterConfig.OFF)
+        layout_optimizer=rewriter_config_pb2.RewriterConfig.OFF,
+        # do not remove duplicated nodes
+        arithmetic_optimization=rewriter_config_pb2.RewriterConfig.OFF)
   graph_options = config_pb2.GraphOptions(
       rewrite_options=rewrite_options, build_cost_model=1)
   config = config_pb2.ConfigProto(graph_options=graph_options)
@@ -476,7 +480,7 @@ class LayoutOptimizerTest(test.TestCase):
       random_seed.set_random_seed(0)
       x = random_ops.truncated_normal([1, 784], seed=0)
       conv = _two_layer_model(x)
-      reduce_sum = math_ops.reduce_sum(conv, axis=[1, 2], keep_dims=True)
+      reduce_sum = math_ops.reduce_sum(conv, axis=[1, 2], keepdims=True)
       squeeze = array_ops.squeeze(reduce_sum, axis=[1, 2])
       output = array_ops.identity(squeeze)
 
@@ -506,7 +510,7 @@ class LayoutOptimizerTest(test.TestCase):
       random_seed.set_random_seed(0)
       x = random_ops.truncated_normal([1, 784], seed=0)
       conv = _two_layer_model(x)
-      reduce_sum = math_ops.reduce_sum(conv, axis=[0, 1, 2], keep_dims=True)
+      reduce_sum = math_ops.reduce_sum(conv, axis=[0, 1, 2], keepdims=True)
       squeeze = array_ops.squeeze(reduce_sum, axis=[0, 1, 2])
       output = array_ops.identity(squeeze)
 
@@ -623,7 +627,7 @@ class LayoutOptimizerTest(test.TestCase):
       random_seed.set_random_seed(0)
       x = random_ops.truncated_normal([1, 784], seed=0)
       conv = _two_layer_model(x)
-      reduce_sum = math_ops.reduce_sum(conv, axis=[3], keep_dims=True)
+      reduce_sum = math_ops.reduce_sum(conv, axis=[3], keepdims=True)
       output = array_ops.identity(reduce_sum)
 
       with session.Session(config=_get_config(False)) as sess:
@@ -653,7 +657,7 @@ class LayoutOptimizerTest(test.TestCase):
       random_seed.set_random_seed(0)
       x = random_ops.truncated_normal([1, 784], seed=0)
       conv = _two_layer_model(x)
-      reduce_sum = math_ops.reduce_sum(conv, axis=[2], keep_dims=True)
+      reduce_sum = math_ops.reduce_sum(conv, axis=[2], keepdims=True)
       output = array_ops.identity(reduce_sum)
 
       with session.Session(config=_get_config(False)) as sess:
@@ -682,7 +686,7 @@ class LayoutOptimizerTest(test.TestCase):
       random_seed.set_random_seed(0)
       x = random_ops.truncated_normal([1, 784], seed=0)
       conv = _two_layer_model(x)
-      reduce_sum = math_ops.reduce_sum(conv, axis=[2, 3], keep_dims=True)
+      reduce_sum = math_ops.reduce_sum(conv, axis=[2, 3], keepdims=True)
       output = array_ops.identity(reduce_sum)
 
       with session.Session(config=_get_config(False)) as sess:
@@ -1385,7 +1389,7 @@ class LayoutOptimizerTest(test.TestCase):
       expected_num_transposes = 3
       self.assertEqual(expected_num_transposes, num_transposes)
       self._assert_trans_nhwc_to_nchw('map/while/Conv2D-0', nodes)
-      self._assert_trans_nchw_to_nhwc('map/while/Add-0-2', nodes)
+      self._assert_trans_nchw_to_nhwc('map/while/Add_1-0-2', nodes)
       self.assertAllClose(output_val_ref, output_val, atol=1e-3)
 
   def testLoopWithVecAnd4D(self):
@@ -1409,7 +1413,7 @@ class LayoutOptimizerTest(test.TestCase):
       expected_num_transposes = 2
       self.assertEqual(expected_num_transposes, num_transposes)
       self._assert_trans_nhwc_to_nchw('map/while/Conv2D-0', nodes)
-      self._assert_trans_nchw_to_nhwc('map/while/Add-0-2', nodes)
+      self._assert_trans_nchw_to_nhwc('map/while/Add_1-0-2', nodes)
       self.assertAllClose(output_val_ref, output_val, atol=1e-3)
 
   def testBinaryOpSecondPort(self):

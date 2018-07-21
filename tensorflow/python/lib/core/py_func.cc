@@ -17,6 +17,8 @@ limitations under the License.
 
 #include <array>
 
+#include <Python.h>
+
 #include "numpy/arrayobject.h"
 #include "tensorflow/c/eager/c_api.h"
 #include "tensorflow/c/eager/c_api_internal.h"
@@ -32,8 +34,6 @@ limitations under the License.
 #include "tensorflow/python/lib/core/ndarray_tensor_bridge.h"
 #include "tensorflow/python/lib/core/py_util.h"
 #include "tensorflow/python/lib/core/safe_ptr.h"
-
-#include <Python.h>
 
 namespace tensorflow {
 namespace {
@@ -125,6 +125,9 @@ Status NumericNpDTypeToTfDType(const int np, DataType* tf) {
       break;
     case NPY_INT8:
       *tf = DT_INT8;
+      break;
+    case NPY_UINT16:
+      *tf = DT_UINT16;
       break;
     case NPY_INT16:
       *tf = DT_INT16;

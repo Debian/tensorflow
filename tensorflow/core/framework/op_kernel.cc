@@ -283,13 +283,13 @@ OpKernelContext::~OpKernelContext() {
 
 Allocator* OpKernelContext::get_allocator(AllocatorAttributes attr) {
   Allocator* allocator = nullptr;
-  if (attr.scope_id > 0) {
+  if (TF_PREDICT_FALSE(attr.scope_id > 0)) {
     allocator = params_->device->GetScopedAllocator(attr, step_id());
     CHECK(allocator);
   } else {
-    allocator = params_->device->GetStepAllocator(attr, resource_manager());
+    allocator = params_->device->GetAllocator(attr);
   }
-  if (track_allocations()) {
+  if (TF_PREDICT_FALSE(track_allocations())) {
     mutex_lock lock(mu_);
     for (const auto& wrapped : wrapped_allocators_) {
       if (wrapped.first == allocator) {
@@ -923,7 +923,7 @@ void OpKernelContext::clear_recorded_memory() {
 struct KernelRegistration {
   KernelRegistration(const KernelDef& d, StringPiece c,
                      kernel_factory::OpKernelRegistrar::Factory f)
-      : def(d), kernel_class_name(c.ToString()), factory(f) {}
+      : def(d), kernel_class_name(std::string(c)), factory(f) {}
   const KernelDef def;
   const string kernel_class_name;
   const kernel_factory::OpKernelRegistrar::Factory factory;

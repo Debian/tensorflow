@@ -86,8 +86,8 @@ class _BaseDeterministic(distribution.Distribution):
     Raises:
       ValueError:  If `loc` is a scalar.
     """
-    parameters = locals()
-    with ops.name_scope(name, values=[loc, atol, rtol]):
+    parameters = dict(locals())
+    with ops.name_scope(name, values=[loc, atol, rtol]) as name:
       loc = ops.convert_to_tensor(loc, name="loc")
       if is_vector and validate_args:
         msg = "Argument loc must be at least rank 1."

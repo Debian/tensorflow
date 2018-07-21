@@ -30,6 +30,7 @@ namespace {
 
 using tensorflow::StringPiece;
 using tensorflow::gtl::optional;
+using tensorflow::str_util::Join;
 using tensorflow::str_util::Split;
 using tensorflow::str_util::SplitAndParseAsInts;
 using tensorflow::strings::Printf;
@@ -53,7 +54,12 @@ class HloParser {
   std::unique_ptr<HloModule> ConsumeHloModule() { return std::move(module_); }
 
   // Returns the error information.
-  string GetError() const { return tensorflow::str_util::Join(error_, "\n"); }
+  string GetError() const { return Join(error_, "\n"); }
+
+  // Stand alone parsing utils for various aggregate data types.
+  StatusOr<HloSharding> ParseShardingOnly();
+  StatusOr<Window> ParseWindowOnly();
+  StatusOr<ConvolutionDimensionNumbers> ParseConvolutionDimensionNumbersOnly();
 
  private:
   // ParseXXX returns false if an error occurred.
@@ -163,7 +169,9 @@ class HloParser {
   bool ParseComputationName(HloComputation** value);
   // Parses a list of names and finds the corresponding hlo instructions.
   bool ParseInstructionNames(std::vector<HloInstruction*>* instructions);
-  bool ParseWindow(Window* window);
+  // Pass expect_outer_curlies == true when parsing a Window in the context of a
+  // larger computation.  Pass false when parsing a stand-alone Window string.
+  bool ParseWindow(Window* window, bool expect_outer_curlies);
   bool ParseConvolutionDimensionNumbers(ConvolutionDimensionNumbers* dnums);
   bool ParsePaddingConfig(PaddingConfig* padding);
   bool ParseMetadata(OpMetadata* metadata);
@@ -242,10 +250,10 @@ bool HloParser::Error(LocTy loc, StringPiece msg) {
   std::vector<string> error_lines;
   error_lines.push_back(
       StrCat("was parsing ", line, ":", col, ": error: ", msg));
-  error_lines.push_back(lexer_.GetLine(loc).ToString());
+  error_lines.push_back(std::string(lexer_.GetLine(loc)));
   error_lines.push_back(col == 0 ? "" : StrCat(string(col - 1, ' '), "^"));
 
-  error_.push_back(tensorflow::str_util::Join(error_lines, "\n"));
+  error_.push_back(Join(error_lines, "\n"));
   VLOG(1) << "Error: " << error_.back();
   return false;
 }
@@ -303,18 +311,20 @@ bool HloParser::ParseComputations() {
     // set the layouts to what the hlo text says.
     for (int p = 0; p < computation->num_parameters(); p++) {
       const Shape& param_shape = computation->parameter_instruction(p)->shape();
-      if (param_shape.has_layout()) {
-        module_->mutable_entry_computation_layout()
-            ->mutable_parameter_layout(p)
-            ->ResetLayout(param_shape.layout());
-      }
+      TF_CHECK_OK(module_->mutable_host_entry_computation_layout()
+                      ->mutable_parameter_layout(p)
+                      ->CopyLayoutFromShape(param_shape));
+      TF_CHECK_OK(module_->mutable_device_entry_computation_layout()
+                      ->mutable_parameter_layout(p)
+                      ->CopyLayoutFromShape(param_shape));
     }
     const Shape& result_shape = computation->root_instruction()->shape();
-    if (result_shape.has_layout()) {
-      module_->mutable_entry_computation_layout()
-          ->mutable_result_layout()
-          ->ResetLayout(result_shape.layout());
-    }
+    TF_CHECK_OK(module_->mutable_host_entry_computation_layout()
+                    ->mutable_result_layout()
+                    ->CopyLayoutFromShape(result_shape));
+    TF_CHECK_OK(module_->mutable_device_entry_computation_layout()
+                    ->mutable_result_layout()
+                    ->CopyLayoutFromShape(result_shape));
   }
 
   return true;
@@ -381,6 +391,7 @@ bool HloParser::ParseComputation(HloComputation** entry_computation) {
     }
     *entry_computation = computation;
   }
+  instruction_pool_.clear();
 
   return AddComputation(name, computation, name_loc);
 }
@@ -437,6 +448,10 @@ bool HloParser::ParseInstruction(HloComputation::Builder* builder,
   optional<OpMetadata> metadata;
   attrs["metadata"] = {/*required=*/false, AttrTy::kMetadata, &metadata};
 
+  optional<string> backend_config;
+  attrs["backend_config"] = {/*required=*/false, AttrTy::kString,
+                             &backend_config};
+
   HloInstruction* instruction;
   switch (opcode) {
     case HloOpcode::kParameter: {
@@ -470,13 +485,17 @@ bool HloParser::ParseInstruction(HloComputation::Builder* builder,
     case HloOpcode::kRoundNearestAfz:
     case HloOpcode::kBitcast:
     case HloOpcode::kCeil:
+    case HloOpcode::kClz:
     case HloOpcode::kCopy:
     case HloOpcode::kCos:
+    case HloOpcode::kDomain:
     case HloOpcode::kExp:
+    case HloOpcode::kExpm1:
     case HloOpcode::kImag:
     case HloOpcode::kIsFinite:
     case HloOpcode::kFloor:
     case HloOpcode::kLog:
+    case HloOpcode::kLog1p:
     case HloOpcode::kNot:
     case HloOpcode::kNegate:
     case HloOpcode::kReal:
@@ -722,15 +741,6 @@ bool HloParser::ParseInstruction(HloComputation::Builder* builder,
       }
       instruction = builder->AddInstruction(HloInstruction::CreateBroadcast(
           shape, operands[0], *broadcast_dimensions));
-      break;
-    }
-    case HloOpcode::kBroadcastDimOne: {
-      if (!ParseOperands(&operands, /*expected_size=*/1) ||
-          !ParseAttributes(attrs)) {
-        return false;
-      }
-      instruction = builder->AddInstruction(
-          HloInstruction::CreateBroadcastDimOne(shape, operands[0]));
       break;
     }
     case HloOpcode::kConcatenate: {
@@ -1099,8 +1109,7 @@ bool HloParser::ParseInstruction(HloComputation::Builder* builder,
 
   instruction->set_name(name);
 
-  // Add common attrs (sharding, control predecessors) to the instruction, if
-  // they were seen.
+  // Add shared attributes like metadata to the instruction, if they were seen.
   if (sharding) {
     instruction->set_sharding(
         HloSharding::FromProto(sharding.value()).ValueOrDie());
@@ -1116,6 +1125,9 @@ bool HloParser::ParseInstruction(HloComputation::Builder* builder,
   }
   if (metadata) {
     instruction->set_metadata(*metadata);
+  }
+  if (backend_config) {
+    instruction->set_raw_backend_config_string(std::move(*backend_config));
   }
   return AddInstruction(name, instruction, name_loc);
 }  // NOLINT(readability/fn_size)
@@ -1494,11 +1506,10 @@ bool HloParser::ParseDenseLiteral(std::unique_ptr<Literal>* literal,
     std::vector<int64> elems_seen_until_dim(elems_seen_per_dim.begin(),
                                             elems_seen_per_dim.begin() + dim);
     return StrCat("[",
-                  tensorflow::str_util::Join(
-                      elems_seen_until_dim, ",",
-                      [](string* out, const int64& num_elems) {
-                        tensorflow::strings::StrAppend(out, num_elems - 1);
-                      }),
+                  Join(elems_seen_until_dim, ",",
+                       [](string* out, const int64& num_elems) {
+                         tensorflow::strings::StrAppend(out, num_elems - 1);
+                       }),
                   "]");
   };
   do {
@@ -1686,7 +1697,7 @@ bool HloParser::ParseSparseLiteralHelper(std::unique_ptr<Literal>* literal,
         return Error(
             index_loc,
             StrCat("invalid multi-dimension index for shape with rank ", rank,
-                   ": [", tensorflow::str_util::Join(index, ", "), "]"));
+                   ": [", Join(index, ", "), "]"));
       }
     }
     if (!ParseToken(TokKind::kColon,
@@ -1854,7 +1865,19 @@ bool HloParser::ParseAttributeHelper(
   }
   auto attr_it = attrs.find(name);
   if (attr_it == attrs.end()) {
-    return Error(loc, Printf("unexpected attribute %s", name.c_str()));
+    string allowed_attrs;
+    if (attrs.empty()) {
+      allowed_attrs = "No attributes are allowed here.";
+    } else {
+      allowed_attrs = StrCat(
+          "Allowed attributes: ",
+          Join(attrs, ", ",
+               [&](string* out, const std::pair<string, AttrConfig>& kv) {
+                 StrAppend(out, kv.first);
+               }));
+    }
+    return Error(loc, Printf("unexpected attribute \"%s\".  %s", name.c_str(),
+                             allowed_attrs.c_str()));
   }
   AttrTy attr_type = attr_it->second.attr_type;
   void* attr_out_ptr = attr_it->second.result;
@@ -1912,7 +1935,7 @@ bool HloParser::ParseAttributeHelper(
       }
       case AttrTy::kWindow: {
         Window result;
-        if (!ParseWindow(&result)) {
+        if (!ParseWindow(&result, /*expect_outer_curlies=*/true)) {
           return false;
         }
         static_cast<optional<Window>*>(attr_out_ptr)->emplace(result);
@@ -2030,9 +2053,10 @@ bool HloParser::ParseComputationName(HloComputation** value) {
 // ::= '{' size stride? pad? lhs_dilate? rhs_dilate? '}'
 // The subattributes can appear in any order. 'size=' is required, others are
 // optional.
-bool HloParser::ParseWindow(Window* window) {
+bool HloParser::ParseWindow(Window* window, bool expect_outer_curlies) {
   LocTy loc = lexer_.GetLoc();
-  if (!ParseToken(TokKind::kLbrace, "expected '{' to start window attribute")) {
+  if (expect_outer_curlies &&
+      !ParseToken(TokKind::kLbrace, "expected '{' to start window attribute")) {
     return false;
   }
 
@@ -2042,7 +2066,9 @@ bool HloParser::ParseWindow(Window* window) {
   std::vector<int64> lhs_dilate;
   std::vector<int64> rhs_dilate;
   std::vector<int64> rhs_reversal;
-  while (lexer_.GetKind() != TokKind::kRbrace) {
+  const auto end_token =
+      expect_outer_curlies ? TokKind::kRbrace : TokKind::kEof;
+  while (lexer_.GetKind() != end_token) {
     LocTy attr_loc = lexer_.GetLoc();
     string field_name;
     if (!ParseAttributeName(&field_name)) {
@@ -2106,7 +2132,8 @@ bool HloParser::ParseWindow(Window* window) {
     window->mutable_dimensions(i)->set_window_reversal(
         rhs_reversal.empty() ? false : (rhs_reversal[i] == 1));
   }
-  return ParseToken(TokKind::kRbrace, "expected '}' to end window attribute");
+  return !expect_outer_curlies ||
+         ParseToken(TokKind::kRbrace, "expected '}' to end window attribute");
 }
 
 // This is the inverse of HloInstruction::ConvolutionDimensionNumbersToString.
@@ -2659,6 +2686,44 @@ bool HloParser::AddComputation(const string& name, HloComputation* computation,
   return true;
 }
 
+StatusOr<HloSharding> HloParser::ParseShardingOnly() {
+  lexer_.Lex();
+  OpSharding op_sharding;
+  if (!ParseSharding(&op_sharding)) {
+    return InvalidArgument("Syntax error:\n%s", GetError().c_str());
+  }
+  if (lexer_.GetKind() != TokKind::kEof) {
+    return InvalidArgument("Syntax error:\nExtra content after sharding");
+  }
+  return HloSharding::FromProto(op_sharding);
+}
+
+StatusOr<Window> HloParser::ParseWindowOnly() {
+  lexer_.Lex();
+  Window window;
+  if (!ParseWindow(&window, /*expect_outer_curlies=*/false)) {
+    return InvalidArgument("Syntax error:\n%s", GetError().c_str());
+  }
+  if (lexer_.GetKind() != TokKind::kEof) {
+    return InvalidArgument("Syntax error:\nExtra content after window");
+  }
+  return window;
+}
+
+StatusOr<ConvolutionDimensionNumbers>
+HloParser::ParseConvolutionDimensionNumbersOnly() {
+  lexer_.Lex();
+  ConvolutionDimensionNumbers dnums;
+  if (!ParseConvolutionDimensionNumbers(&dnums)) {
+    return InvalidArgument("Syntax error:\n%s", GetError().c_str());
+  }
+  if (lexer_.GetKind() != TokKind::kEof) {
+    return InvalidArgument(
+        "Syntax error:\nExtra content after convolution dnums");
+  }
+  return dnums;
+}
+
 }  // namespace
 
 StatusOr<std::unique_ptr<HloModule>> Parse(StringPiece str,
@@ -2673,6 +2738,25 @@ StatusOr<std::unique_ptr<HloModule>> Parse(StringPiece str,
 StatusOr<std::unique_ptr<HloModule>> Parse(StringPiece str) {
   HloModuleConfig config;
   return Parse(str, config);
+}
+
+StatusOr<HloSharding> ParseSharding(tensorflow::StringPiece str) {
+  HloModuleConfig config;
+  HloParser parser(str, config);
+  return parser.ParseShardingOnly();
+}
+
+StatusOr<Window> ParseWindow(tensorflow::StringPiece str) {
+  HloModuleConfig config;
+  HloParser parser(str, config);
+  return parser.ParseWindowOnly();
+}
+
+StatusOr<ConvolutionDimensionNumbers> ParseConvolutionDimensionNumbers(
+    tensorflow::StringPiece str) {
+  HloModuleConfig config;
+  HloParser parser(str, config);
+  return parser.ParseConvolutionDimensionNumbersOnly();
 }
 
 }  // namespace tools

@@ -119,8 +119,8 @@ class Logistic(distribution.Distribution):
     Raises:
       TypeError: if loc and scale are different dtypes.
     """
-    parameters = locals()
-    with ops.name_scope(name, values=[loc, scale]):
+    parameters = dict(locals())
+    with ops.name_scope(name, values=[loc, scale]) as name:
       with ops.control_dependencies([check_ops.assert_positive(scale)] if
                                     validate_args else []):
         self._loc = array_ops.identity(loc, name="loc")

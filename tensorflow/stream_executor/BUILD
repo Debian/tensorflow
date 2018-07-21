@@ -34,6 +34,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow/core:lib",
+        "//tensorflow/core:ptr_util",
         "@local_config_cuda//cuda:cuda_headers",
     ],
     alwayslink = 1,
@@ -45,6 +46,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//tensorflow/core:lib",
+        "//tensorflow/core:ptr_util",
         "@local_config_cuda//cuda:cuda_headers",
     ] + if_static([":stream_executor_impl"]),
 )

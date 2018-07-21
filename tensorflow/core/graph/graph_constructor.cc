@@ -278,8 +278,9 @@ class GraphConstructor {
   // name, the value is the new unique name.
   std::unordered_map<string, string> uniquified_names_;
 
-  // Index of NodeDefs in node_defs_ with all inputs already converted.
-  std::vector<int> ready_;
+  // Index of NodeDefs in node_defs_ with all inputs already converted. We use a
+  // (sorted) set so nodes are created in the order defined in the GraphDef.
+  std::set<int> ready_;
 
   // Mapping between index within node_defs_ and the number of inputs that
   // still need to be converted.
@@ -489,7 +490,7 @@ Status GraphConstructor::InitFromEdges() {
           num_control_edges++;
         } else {
           TensorId id(ParseTensorName(input_name));
-          if (next_iteration_nodes_.find(id.first.ToString()) !=
+          if (next_iteration_nodes_.find(std::string(id.first)) !=
               next_iteration_nodes_.end()) {
             has_loop_back_edge = true;
           }
@@ -520,7 +521,7 @@ Status GraphConstructor::InitFromEdges() {
       }
     }
     if (pending_count == 0) {
-      ready_.push_back(n);
+      ready_.insert(n);
     }
     pending_count_.push_back(pending_count);
   }
@@ -666,20 +667,17 @@ Status GraphConstructor::ModifyNodeDefForImport(NodeDef* node_def) {
 void RemoveInputs(const std::vector<int>& inputs_to_remove, NodeDef* node_def,
                   std::vector<bool>* input_already_exists) {
   // Remove 'inputs_to_remove' from 'node_def'
-  // TODO(skyewm): is there a better way to do this?
-  std::vector<string> inputs;
-  inputs.reserve(node_def->input_size());
-  for (int i = 0; i < node_def->input_size(); ++i) {
-    inputs.push_back(node_def->input(i));
-  }
-  node_def->clear_input();
-  for (int i = 0, j = 0; i < inputs.size(); ++i) {
+  NodeDef copy;
+  copy.mutable_input()->Reserve(node_def->input_size() -
+                                inputs_to_remove.size());
+  for (int i = 0, j = 0; i < node_def->input_size(); ++i) {
     if (j < inputs_to_remove.size() && i == inputs_to_remove[j]) {
       ++j;
     } else {
-      node_def->add_input(inputs[i]);
+      copy.add_input()->swap(*node_def->mutable_input(i));
     }
   }
+  node_def->mutable_input()->Swap(copy.mutable_input());
   // Remove 'inputs_to_remove' from 'input_already_exists'
   for (int idx : inputs_to_remove) {
     input_already_exists->erase(input_already_exists->begin() + idx);
@@ -745,9 +743,21 @@ void GraphConstructor::AddControlDependencies(
   // dependencies
   for (const string& control_dep : opts_.control_dependencies) {
     string input = TensorId(control_dep, Graph::kControlSlot).ToString();
-    const protobuf::RepeatedPtrField<string>& inputs = node_def->input();
-    if (std::find(inputs.begin(), inputs.end(), input) != inputs.end()) {
-      // Control dependency already exists
+    bool found = false;
+    for (int i = node_def->input_size() - 1; i >= 0; --i) {
+      const string& node_input = node_def->input(i);
+      if (node_input[0] != '^') {
+        // Control inputs are at the end. Break when we reach the non-control
+        // inputs.
+        break;
+      }
+      if (node_input == input) {
+        // Control dependency already exists
+        found = true;
+        break;
+      }
+    }
+    if (found) {
       continue;
     }
     node_def->add_input(input);
@@ -761,10 +771,10 @@ void GraphConstructor::AddPrefixToNodeDef(
   node_def->set_name(strings::StrCat(prefix_, node_def->name()));
   // Update names of input nodes
   for (int i = 0; i < node_def->input_size(); ++i) {
-    StringPiece input(node_def->input(i));
     // Skip remapped inputs (which already exist in g_ and are not being
     // imported).
     if (input_already_exists[i]) continue;
+    StringPiece input(node_def->input(i));
     if (str_util::ConsumePrefix(&input, "^")) {
       node_def->set_input(i, strings::StrCat("^", prefix_, input));
     } else {
@@ -802,7 +812,7 @@ void GraphConstructor::UniquifyNames(
     // We require that UniquifyNames() is called on all NodeDefs in topological
     // order. This guarantees that node_def's inputs will already be uniquified
     // if necessary.
-    auto iter = uniquified_names_.find(id.first.ToString());
+    auto iter = uniquified_names_.find(std::string(id.first));
     if (iter == uniquified_names_.end()) continue;
     id.first = iter->second;
     node_def->set_input(i, id.ToString());
@@ -821,7 +831,7 @@ void GraphConstructor::UpdateUniquifiedColocationNames() {
     for (int i = 0; i < coloc_values.size(); ++i) {
       StringPiece val(coloc_values[i]);
       if (str_util::ConsumePrefix(&val, kColocationGroupPrefix)) {
-        const auto& name_pair = uniquified_names_.find(val.ToString());
+        const auto& name_pair = uniquified_names_.find(std::string(val));
         if (name_pair == uniquified_names_.end()) continue;
         updated = true;
         coloc_values[i] =
@@ -847,7 +857,7 @@ bool GraphConstructor::NameExistsInGraphDef(StringPiece name) {
 }
 
 string GraphConstructor::FindUniqueName(StringPiece original_name) {
-  string name = original_name.ToString();
+  string name = std::string(original_name);
   int count = 0;
   // Check that any generated names don't collide with imported NodeDefs (as
   // well as nodes in g_).
@@ -875,12 +885,12 @@ namespace {
 
 void UpdatePendingCountAndReady(
     const std::vector<gtl::InlinedVector<int, 4>>& outputs, int o,
-    std::vector<int>* pending_count, std::vector<int>* ready) {
+    std::vector<int>* pending_count, std::set<int>* ready) {
   for (size_t i = 0; i < outputs[o].size(); ++i) {
     const int output = outputs[o][i];
     (*pending_count)[output]--;
     if ((*pending_count)[output] == 0) {
-      ready->push_back(output);
+      ready->insert(output);
     }
   }
 }
@@ -904,8 +914,8 @@ Status GraphConstructor::Convert() {
   // inputs, pending_counts_ with the number of inputs for each node and
   // outputs_ with the outputs of each node).
   while (!ready_.empty()) {
-    int o = ready_.back();
-    ready_.pop_back();
+    int o = *ready_.begin();
+    ready_.erase(ready_.begin());
     ++processed;
     inputs.clear();
     bool has_data_back_edge = false;
@@ -933,10 +943,10 @@ Status GraphConstructor::Convert() {
         }
       }
 
-      // TODO(ashankar): The line below means an additional copy of the NodeDef,
-      // which can be expensive if the NodeDef contains large tensors in it.
-      // Might make sense to change the API for ImportGraphDef to take a mutable
-      // GraphDef* and avoid the copying.
+      // TODO(ashankar): The line below means an additional copy of the
+      // NodeDef, which can be expensive if the NodeDef contains large tensors
+      // in it. Might make sense to change the API for ImportGraphDef to take
+      // a mutable GraphDef* and avoid the copying.
       imported_node_def = original_node_def;
       if (!opts_.input_map.empty()) {
         // Note that input_already_exists can shrink here
@@ -980,7 +990,7 @@ Status GraphConstructor::Convert() {
             src_node->num_outputs(), " outputs");
       }
 
-      inputs.push_back(InputInfo(id.first.ToString(), src_node, src_index));
+      inputs.emplace_back(std::string(id.first), src_node, src_index);
     }
 
     if (has_data_back_edge && !IsMerge(*node_def)) {
@@ -1010,8 +1020,7 @@ Status GraphConstructor::Convert() {
       if (inputs[i].node == nullptr) {
         // Record this back edge, which will be added after all nodes
         // are created.
-        back_edges_.push_back(
-            EdgeInfo(inputs[i].name, inputs[i].index, node, i));
+        back_edges_.emplace_back(inputs[i].name, inputs[i].index, node, i);
       } else if (inputs[i].index == Graph::kControlSlot) {
         g_->AddControlEdge(inputs[i].node, node);
       } else {
@@ -1019,12 +1028,7 @@ Status GraphConstructor::Convert() {
       }
     }
 
-    // Function shape inference is supported on an opt-in basis per
-    // ShapeRefiner.
-    if (refiner_->function_shape_inference_supported() ||
-        g_->flib_def().Find(node_def->name()) == nullptr) {
-      TF_RETURN_IF_ERROR(ValidateShape(node));
-    }
+    TF_RETURN_IF_ERROR(ValidateShape(node));
 
     // Update pending_count_ for outputs.
     UpdatePendingCountAndReady(outputs_, o, &pending_count_, &ready_);

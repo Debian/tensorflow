@@ -111,6 +111,14 @@ TEST_F(OperatorTest, SimpleOperators) {
                                           OperatorType::kLogSoftmax);
   CheckSimpleOperator<TensorFlowMaximumOperator>(
       "MAXIMUM", OperatorType::kTensorFlowMaximum);
+  CheckSimpleOperator<TensorFlowMinimumOperator>(
+      "MINIMUM", OperatorType::kTensorFlowMinimum);
+  CheckSimpleOperator<TensorFlowLessOperator>("LESS",
+                                              OperatorType::kTensorFlowLess);
+  CheckSimpleOperator<NegOperator>("NEG", OperatorType::kNeg);
+  CheckSimpleOperator<SelectOperator>("SELECT", OperatorType::kSelect);
+  CheckSimpleOperator<SliceOperator>("SLICE", OperatorType::kSlice);
+  CheckSimpleOperator<SinOperator>("SIN", OperatorType::kSin);
 }
 
 TEST_F(OperatorTest, BuiltinAdd) {
@@ -163,10 +171,12 @@ TEST_F(OperatorTest, CustomFakeQuant) {
   minmax->min = -10;
   minmax->max = 200;
   op.minmax.reset(minmax);
+  op.num_bits = 16;
   auto output_toco_op = SerializeAndDeserialize(
       GetOperator("FAKE_QUANT", OperatorType::kFakeQuant), op);
   EXPECT_EQ(op.minmax->min, output_toco_op->minmax->min);
   EXPECT_EQ(op.minmax->max, output_toco_op->minmax->max);
+  EXPECT_EQ(op.num_bits, output_toco_op->num_bits);
 }
 
 TEST_F(OperatorTest, CustomFullyConnected) {
@@ -389,6 +399,34 @@ TEST_F(OperatorTest, BuiltinTopKV2) {
   auto output_toco_op = SerializeAndDeserialize(
       GetOperator("TOPK_V2", OperatorType::kTopK_V2), op);
   ASSERT_NE(nullptr, output_toco_op.get());
+}
+
+TEST_F(OperatorTest, BuiltinArgMax) {
+  ArgMaxOperator op;
+  auto output_toco_op = SerializeAndDeserialize(
+      GetOperator("ARG_MAX", OperatorType::kArgMax), op);
+  EXPECT_EQ(op.output_data_type, output_toco_op->output_data_type);
+}
+
+TEST_F(OperatorTest, BuiltinTransposeConv) {
+  TransposeConvOperator op;
+  op.stride_width = 123;
+  op.stride_height = 124;
+  op.padding.type = PaddingType::kValid;
+  auto output_toco_op = SerializeAndDeserialize(
+      GetOperator("TRANSPOSE_CONV", OperatorType::kTransposeConv), op);
+  EXPECT_EQ(op.stride_width, output_toco_op->stride_width);
+  EXPECT_EQ(op.stride_height, output_toco_op->stride_height);
+  EXPECT_EQ(op.padding.type, output_toco_op->padding.type);
+}
+
+TEST_F(OperatorTest, BuiltinSparseToDense) {
+  SparseToDenseOperator op;
+  op.validate_indices = false;
+  std::unique_ptr<toco::SparseToDenseOperator> output_toco_op =
+      SerializeAndDeserialize(
+          GetOperator("SPARSE_TO_DENSE", OperatorType::kSparseToDense), op);
+  EXPECT_EQ(op.validate_indices, output_toco_op->validate_indices);
 }
 
 TEST_F(OperatorTest, TensorFlowUnsupported) {

@@ -13,8 +13,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow/compiler/xla/service/hlo_sharding.h"
-
 #include <set>
 #include <unordered_map>
 #include <utility>
@@ -25,6 +23,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/test.h"
 #include "tensorflow/compiler/xla/test_helpers.h"
 #include "tensorflow/compiler/xla/tests/hlo_test_base.h"
+#include "tensorflow/compiler/xla/tools/parser/hlo_parser.h"
 #include "tensorflow/compiler/xla/util.h"
 
 namespace xla {
@@ -88,7 +87,7 @@ TEST_F(HloShardingTest, Tile) {
   }
 
   {
-    // Test should pass.
+    // Test should fail because of more devices used then `num_device`.
     Shape tile_shape = ShapeUtil::MakeShape(U32, {2, 3});
     HloSharding sharding =
         HloSharding::Tile(tile_shape, MakeArray({2, 2}, {0, 1, 2, 3}));
@@ -97,17 +96,8 @@ TEST_F(HloShardingTest, Tile) {
   }
 
   {
-    // Test should fail due to the tile being larger than the input space.
-    Shape tile_shape = ShapeUtil::MakeShape(U32, {2, 3});
-    HloSharding sharding =
-        HloSharding::Tile(tile_shape, MakeArray({2, 2}, {0, 1, 2, 3}));
-    EXPECT_IS_NOT_OK(sharding.Validate(ShapeUtil::MakeShape(F32, {2, 2}),
-                                       /*num_devices=*/4));
-  }
-
-  {
-    // Test should fail due to the tile not dividing the input space into 4
-    // sections (even with padding).
+    // Test should fail because the total tiled size in dimension 0 is 4 but we
+    // have 6 elements along that dimensions.
     Shape tile_shape = ShapeUtil::MakeShape(U32, {2, 3});
     HloSharding sharding =
         HloSharding::Tile(tile_shape, MakeArray({2, 2}, {0, 1, 2, 3}));
@@ -319,6 +309,49 @@ TEST_F(HloShardingTest, OstreamTest) {
   std::ostringstream oss;
   oss << sharding;
   EXPECT_EQ(oss.str(), "{f32[3,5,7,11] devices=[1,1,2,2]0,1,2,3}");
+}
+
+TEST_F(HloShardingTest, Parse) {
+  auto check = [](const HloSharding& sharding) {
+    TF_ASSERT_OK_AND_ASSIGN(auto parsed_sharding,
+                            tools::ParseSharding(sharding.ToString()));
+    EXPECT_EQ(sharding, parsed_sharding);
+  };
+  check(HloSharding::Replicate());
+  check(HloSharding::AssignDevice(2));
+  check(HloSharding::Tile(ShapeUtil::MakeShape(F32, {3, 1, 3, 7}),
+                          Array4D<int64>({{{{0}, {1}}}})));
+  // Empty tuple.
+  check(HloSharding::Tuple(ShapeUtil::MakeTupleShape({}), {}));
+  {
+    // Non-nested tuple.
+    auto tuple_shape =
+        ShapeUtil::MakeTupleShape({ShapeUtil::MakeShape(F32, {3, 1, 5, 7}),
+                                   ShapeUtil::MakeShape(F32, {3, 5, 7}),
+                                   ShapeUtil::MakeShape(F32, {3, 7})});
+    check(HloSharding::Tuple(
+        tuple_shape, {HloSharding::Tile(ShapeUtil::MakeShape(F32, {3, 1, 3, 7}),
+                                        Array4D<int64>({{{{0}, {1}}}})),
+                      HloSharding::Replicate(), HloSharding::AssignDevice(1)}));
+  }
+  {
+    // Nested tuple.
+    auto tuple_shape = ShapeUtil::MakeTupleShape(
+        {ShapeUtil::MakeShape(F32, {3, 1, 5, 7}),
+         ShapeUtil::MakeTupleShape({ShapeUtil::MakeShape(F32, {3, 5, 7}),
+                                    ShapeUtil::MakeShape(F32, {3, 7})})});
+    std::vector<HloSharding> leaf_shardings = {
+        HloSharding::Tile(ShapeUtil::MakeShape(F32, {3, 1, 3, 7}),
+                          Array4D<int64>({{{{0}, {1}}}})),
+        HloSharding::Replicate(), HloSharding::AssignDevice(1)};
+    ShapeTree<HloSharding> sharding_tree(tuple_shape, HloSharding::Replicate());
+    // Assign leaf_shardings to sharding_tree leaves.
+    auto it = leaf_shardings.begin();
+    for (auto& index_to_sharding : sharding_tree.leaves()) {
+      index_to_sharding.second = *it++;
+    }
+    check(HloSharding::Tuple(sharding_tree));
+  }
 }
 
 }  // namespace

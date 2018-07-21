@@ -83,12 +83,12 @@ class Chi2(gamma.Gamma):
         more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
+    parameters = dict(locals())
     # Even though all stats of chi2 are defined for valid parameters, this is
     # not true in the parent class "gamma."  therefore, passing
     # allow_nan_stats=True
     # through to the parent class results in unnecessary asserts.
-    with ops.name_scope(name, values=[df]):
+    with ops.name_scope(name, values=[df]) as name:
       with ops.control_dependencies([
           check_ops.assert_positive(df),
       ] if validate_args else []):
@@ -119,8 +119,8 @@ class Chi2WithAbsDf(Chi2):
                validate_args=False,
                allow_nan_stats=True,
                name="Chi2WithAbsDf"):
-    parameters = locals()
-    with ops.name_scope(name, values=[df]):
+    parameters = dict(locals())
+    with ops.name_scope(name, values=[df]) as name:
       super(Chi2WithAbsDf, self).__init__(
           df=math_ops.floor(
               math_ops.abs(df, name="abs_df"),
