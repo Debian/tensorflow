@@ -1,12 +1,42 @@
 #!/usr/bin/make -f
+#export DH_VERBOSE=1
 
 TMPDIR=tf_cpu_build
+BUILDOPTIONS=-DCMAKE_BUILD_TYPE=Release \
+			 -Dtensorflow_VERBOSE=ON \
+			 -Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
+			 -Dtensorflow_ENABLE_GRPC_SUPPORT=OFF \
+			 -Dtensorflow_ENABLE_HDFS_SUPPORT=OFF \
+			 -Dtensorflow_ENABLE_JEMALLOC_SUPPORT=OFF \
+			 -Dtensorflow_BUILD_CC_EXAMPLE=ON \
+			 -Dtensorflow_BUILD_PYTHON_BINDINGS=ON \
+			 -Dtensorflow_BUILD_ALL_KERNELS=ON \
+			 -Dtensorflow_BUILD_CONTRIB_KERNELS=ON \
+			 -Dtensorflow_BUILD_CC_TESTS=OFF \
+			 -Dtensorflow_BUILD_PYTHON_TESTS=OFF \
+			 -Dtensorflow_BUILD_MORE_PYTHON_TESTS=OFF \
+			 -Dtensorflow_BUILD_SHARED_LIB=ON \
+			 -Dtensorflow_OPTIMIZE_FOR_NATIVE_ARCH=ON \
+			 -Dtensorflow_ENABLE_SNAPPY_SUPPORT=OFF \
+			 -Dtensorflow_DISABLE_EIGEN_FORCEINLINE=OFF \
+			 -Dtensorflow_WIN_CPU_SIMD_OPTIONS=OFF \
+			 -Dtensorflow_ENABLE_MKL_SUPPORT=OFF \
+			 -Dtensorflow_ENABLE_MKLDNN_SUPPORT=OFF \
+			 -Dtensorflow_ENABLE_GPU=OFF \
+			 -Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
+			 -Dsystemlib_ZLIB=ON \
+			 -DPYTHON_EXECUTABLE=/usr/bin/python3
+
 
 %:
 	dh $@ --buildsystem=cmake
 
 $(TMPDIR):
 	mkdir $@
+
+override_dh_auto_clean:
+	-$(RM) -rf $(TMPDIR)
+	-git clean -xdf
 
 override_dh_auto_configure: $(TMPDIR)
 	set -e; cd $(TMPDIR); \
@@ -15,3 +45,5 @@ override_dh_auto_configure: $(TMPDIR)
 override_dh_auto_build: $(TMPDIR)
 	dh_auto_build --builddirectory=$(TMPDIR)
 
+override_dh_auto_test: $(TMPDIR)
+	true
