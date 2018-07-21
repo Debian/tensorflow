@@ -21,6 +21,7 @@ from __future__ import print_function
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
 
+from tensorflow.contrib.framework.python.framework import experimental
 from tensorflow.contrib.tpu.python.ops import tpu_ops
 from tensorflow.contrib.tpu.python.tpu import tpu_function
 
@@ -58,6 +59,7 @@ _NOT_IMPLEMENTED_OPS = set([
 _MAX_WARNING_LINES = 5
 
 _TPU_REPLICATE_ATTR = "_tpu_replicate"
+_TPU_COMPILATION_STATUS_ATTR = "_tpu_compilation_status"
 _OUTSIDE_COMPILATION_ATTR = "_xla_outside_compilation"
 
 
@@ -173,36 +175,18 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
           # gradients, and put the gradient of X in cluster
           # 'root_cluster.gradient_uid'.
           #
-          # When the gradient code adds multiple Ops, it asks them to
-          # be colocated either with the original Op X, or with one of
-          # the preceding Ops that was added to the gradient. In other
-          # words, we want to detect the case where we are colocating
-          # with an Op that is in cluster root_cluster.gradient_uid
-          # and put the new Op in that same cluster if the
-          # gradient_uid is the same (the case that we are in the same
-          # invocation of gradients, and just adding new Ops to the
-          # cluster); and in a different cluster if the gradient_uids
-          # are different (the case that we are in a new invocation of
-          # gradients, taking the gradient of a previously-computed
-          # gradient).
+          # When taking a gradient of a gradient, some ops will be
+          # colocated with Op in the forward pass (e.g., cluster
+          # root_cluster) and some in the backward pass (e.g., cluster
+          # root_cluster.initial_gradient_uid). We need all of the
+          # grad-of-grad ops to be in the same cluster to avoid cyclic
+          # dependencies between clusters. We adopt a heuristic that
+          # puts any op clustered with root_cluster.<xxx> in
+          # root_cluster.gradient_uid, even if xxx was
+          # initial_gradient_uid.
           self._in_gradient_colocation = op
           parts = outside_attr.split(".")
-          if len(parts) > 1:
-            uid = parts[-1]
-            if uid == gradient_uid:
-              # Keep using the same cluster
-              cluster = outside_attr
-            else:
-              # We're taking the gradient of a gradient so make a new
-              # cluster attr, adding a new '.uid' on the end to
-              # preserve the invariant that the gradient_uid is the
-              # suffix after the last '.' in the attr.
-              cluster = outside_attr + "." + gradient_uid
-          else:
-            # We're taking the gradient of an Op in the forward pass, so
-            # make a new cluster combining the Op's cluster and the
-            # gradient id.
-            cluster = outside_attr + "." + gradient_uid
+          cluster = parts[0] + "." + gradient_uid
           self._EnterOutsideCompilationScope(cluster=cluster)
         except ValueError:
           # The attr was not present: do nothing.
@@ -336,16 +320,19 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
     return None
 
 
-def outside_compilation(computation, args=None):
+def outside_compilation(computation, *args, **kwargs):
   """Builds part of a computation outside any current TPU replicate scope.
 
   Args:
     computation: A Python function that builds the computation to
       place on the host.
-    args: Inputs to pass to computation.
+    *args: the positional arguments for the computation.
+    **kwargs: the keyword arguments for the computation.
+
   Returns:
     The Tensors returned by computation.
   """
+  args = [] if args is None else args
   graph = ops.get_default_graph()
 
   # If we are in a TPUReplicateContext, signal that we are now
@@ -357,7 +344,7 @@ def outside_compilation(computation, args=None):
       context._EnterOutsideCompilationScope()  # pylint: disable=protected-access
     context = context.outer_context
 
-  retval = computation(*args)
+  retval = computation(*args, **kwargs)
 
   # If we are in a TPUReplicateContext, signal that we are no longer
   # outside_compilation
@@ -398,6 +385,49 @@ def replicate(computation,
     name: (Deprecated) Does nothing.
   Returns:
     A list of lists of output tensors, indexed by `[replica_num][output_num]`.
+  Raises:
+    ValueError: If all replicas do not have equal numbers of input tensors.
+    ValueError: If the number of inputs per replica does not match
+      the number of formal parameters to `computation`.
+  """
+  return split_compile_and_replicate(computation, inputs, infeed_queue,
+                                     device_assignment, name)[1]
+
+
+def split_compile_and_replicate(computation,
+                                inputs=None,
+                                infeed_queue=None,
+                                device_assignment=None,
+                                name=None,
+                                use_tpu=True):
+  """Builds graph operators that runs compilation and replicated computation.
+
+  This is a lower level interface than replicate that returns a separate compile
+  and execute output tensor. In the generated graph the compile op feeds into
+  the execute op and no additional compilation is incurred when running the
+  compile op before the execute op. The compile op returns additional
+  information about the compilation but does not return the compiled program.
+
+  Args:
+    computation: A Python function that builds the computation to replicate.
+    inputs: A list of lists of input tensors or `None` (equivalent to
+      `[[]]`), indexed by `[replica_num][input_num]`. All replicas must
+      have the same number of inputs.
+    infeed_queue: If not `None`, the `InfeedQueue` from which to append a tuple
+      of arguments as inputs to computation.
+    device_assignment: If not `None`, a `DeviceAssignment` describing the
+      mapping between logical cores in the computation with physical cores in
+      the TPU topology. Uses a default device assignment if `None`. The
+      `DeviceAssignment` may be omitted if each replica of the computation uses
+      only one core, and there is either only one replica, or the number of
+      replicas is equal to the number of cores in the TPU system.
+    name: (Deprecated) Does nothing.
+    use_tpu: When false, the input `computation` is executed on the XLA CPU/GPU
+      backends. Currently, only supports a default placement (computation is
+      placed on GPU if one is available, and on CPU if not).
+  Returns:
+    A list of lists with the first list corresponding to the compile op and the
+    second a list of output tensors, indexed by `[replica_num][output_num]`.
   Raises:
     ValueError: If all replicas do not have equal numbers of input tensors.
     ValueError: If the number of inputs per replica does not match
@@ -474,13 +504,13 @@ def replicate(computation,
     computation_inputs.append(
         tpu_ops.tpu_replicated_input(replicas, name="input{}".format(i)))
 
-  context = TPUReplicateContext(
-      name=graph.unique_name("cluster"), num_replicas=num_replicas)
+  cluster_name = graph.unique_name("cluster")
+  context = TPUReplicateContext(name=cluster_name, num_replicas=num_replicas)
   try:
     context.Enter()
 
     metadata = tpu_ops.tpu_replicate_metadata(
-        num_replicas=num_replicas, **metadata_kwargs)
+        num_replicas=num_replicas, use_tpu=use_tpu, **metadata_kwargs)
 
     with tpu_function.tpu_shard_context(
         num_replicas), ops.control_dependencies([metadata]):
@@ -534,8 +564,7 @@ def replicate(computation,
 
     # Separates the returned Operations and Tensors.
     output_operations = [o for o in outputs if isinstance(o, ops.Operation)]
-    output_tensors = [o for o in outputs
-                      if not isinstance(o, ops.Operation)]
+    output_tensors = [o for o in outputs if not isinstance(o, ops.Operation)]
 
     if outputs != output_tensors + output_operations:
       raise ValueError(
@@ -568,22 +597,36 @@ def replicate(computation,
                                            name="output{}".format(i))
              for i in xrange(output_arity)]
 
+  with ops.control_dependencies([metadata]):
+    if use_tpu:
+      compile_status = tpu_ops.tpu_compilation_result()
+      op = compile_status.op
+      attr_value = attr_value_pb2.AttrValue(s=compat.as_bytes(cluster_name))
+      op._set_attr(_TPU_COMPILATION_STATUS_ATTR, attr_value)  # pylint: disable=protected-access
+    else:
+      compile_status = control_flow_ops.no_op(name="compilation_status")
+
   with ops.control_dependencies(output_operations):
     if output_arity == 0:
       # Returns a list of NoOps dependent on the replication Op, indexed by
       # [replica_num].
       return [
-          control_flow_ops.no_op(name="shard_%d" % i)
-          for i in range(num_replicas)
+          compile_status, [
+              control_flow_ops.no_op(name="shard_%d" % i)
+              for i in range(num_replicas)
+          ]
       ]
     else:
       # Wraps the outputs in identity operators so the names of any possible
       # `fetch` nodes are preserved by the replication rewrite.
       return [
-          [array_ops.identity(outputs[out][replica],
-                              name="output_%d_shard_%d" % (out, replica))
-           for out in xrange(output_arity)]
-          for replica in xrange(num_replicas)
+          compile_status, [[
+              array_ops.identity(
+                  outputs[out][replica],
+                  name="output_%d_shard_%d" % (out, replica))
+              for out in xrange(output_arity)
+          ]
+                           for replica in xrange(num_replicas)]
       ]
 
 
@@ -828,3 +871,152 @@ def rewrite(computation,
       device_assignment=device_assignment,
       name=name)[0]
   # pylint: enable=indexing-exception
+
+  # Operations that indicate some error in the user's inference graph.
+_BLACKLISTED_INFERENCE_OPS = set([
+    "ReadVariableOp",
+    "AssignVariableOp",
+    "AssignAddVariableOp",
+    "AssignSubVariableOp",
+    "VarHandleOp",
+    "Variable",
+    "VariableV2",
+])
+
+
+class _TPUInferenceContext(control_flow_ops.XLAControlFlowContext):
+  """A `ControlFlowContext` for nodes inside a TPU inference computation.
+
+  The primary role of `TPUReplicateContext` is to sanity check operators inside
+  a tpu.rewrite_for_inference() computation.
+  """
+
+  def __init__(self, name):
+    super(_TPUInferenceContext, self).__init__()
+    self._name = name
+
+  def AddOp(self, op):
+    self._AddOpInternal(op)
+
+  def _AddOpInternal(self, op):
+    # pylint: disable=protected-access
+    if op.type in _BLACKLISTED_INFERENCE_OPS:
+      raise NotImplementedError(
+          "Operation of type %s (%s) is not supported on the TPU for inference."
+          " Execution will fail if this op is used in the graph. Make sure your"
+          " variables are using variable_scope." % (op.type, op.name))
+    if self._outer_context:
+      self._outer_context.AddInnerOp(op)
+
+  def AddValue(self, val):
+    result = val
+    if self._outer_context:
+      result = self._outer_context.AddValue(val)
+    return result
+
+  def AddInnerOp(self, op):
+    self._AddOpInternal(op)
+
+  @property
+  def grad_state(self):
+    return None
+
+
+@experimental
+def validate_inference_rewrite_for_variables(graph):
+  """Validates whether rewrite_for_inference() 'worked' for variables.
+
+     The rewrite_for_inference() method is supposed to append
+     GuaranteeConstOps after ReadVariableOps, but this mechanism works only
+     if you are using tf.get_variable() to create and access variables in your
+     tpu computation. This validation method can be called immediately after
+     calling tpu.rewrite_for_inference() to check whether GuaranteeConstOps
+     where added to the graph.
+
+     Typical usages:
+       tpu.validate_inference_rewrite_for_variables(tf.get_default_graph())
+
+       tpu.validate_inference_rewrite_for_variables(sess.graph)
+
+  Args:
+    graph: The graph which needs to be validated.
+  Raises:
+    RuntimeError: if validation failed.
+  """
+  if not any([x.type == "GuaranteeConst" for x in graph.get_operations()]):
+    raise RuntimeError(
+        "No GuaranteeConst ops found in the graph after "
+        "running tpu.rewrite_for_inference(...). Please "
+        "check that you are using tf.get_variable() to "
+        "create and access variables in your tpu "
+        "computation.")
+
+
+@experimental
+def rewrite_for_inference(computation,
+                          inputs=None,
+                          infeed_queue=None,
+                          device_assignment=None,
+                          name=None):
+  """Rewrites `computation` for inference on a TPU system.
+
+     Other than 'rewriting' the computation to run on a TPU, if using variables
+     in your computation, it moves the ReadVariableOps outside the TPU
+     computation, and adds GuaranteeConst ops just after the ReadVariableOps.
+     This mechanism works only if you are using tf.get_variable() to create and
+     access variables in your tpu computation. You can validate whether
+     this worked, by calling validate_inference_rewrite_for_variables() method
+     immediately after this method to check whether GuaranteeConstOps where
+     added to the graph.
+
+  Args:
+    computation: A Python function that builds a computation to apply
+      to the input. If the function takes n inputs, 'inputs' should be
+      a list of n tensors. If the function returns m outputs, rewrite
+      will return a list of m tensors.
+    inputs: A list of input tensors or `None` (equivalent to an empty list).
+    infeed_queue: If not `None`, the `InfeedQueue` from which to append a tuple
+      of arguments as inputs to `computation`.
+    device_assignment: if not `None`, a `DeviceAssignment` describing the
+      mapping between logical cores in the computation with physical cores in
+      the TPU topology. May be omitted for a single-core computation, in which
+      case the core attached to task 0, TPU device 0 is used.
+    name: The name of the operator.
+  Returns:
+    A list of output tensors.
+  """
+
+  def guarantee_const_getter(getter, name, *args, **kwargs):
+    with ops.control_dependencies(None):
+      return array_ops.guarantee_const(
+          getter(name, *args, **kwargs), name=name + "/GuaranteeConst")
+
+  def wrapped_computation(*args, **kwargs):
+    """Execute computation under `_TPUInferenceContext`."""
+    context = _TPUInferenceContext(
+        name=ops.get_default_graph().unique_name("rewrite_for_inference"))
+    try:
+      context.Enter()
+
+      vscope = variable_scope.get_variable_scope()
+      prev_custom_getter = vscope.custom_getter
+      prev_caching_device = vscope.caching_device
+      vscope.set_custom_getter(guarantee_const_getter)
+      vscope.set_caching_device(lambda op: op.device)
+
+      result = computation(*args, **kwargs)
+
+      vscope.set_custom_getter(prev_custom_getter)
+      vscope.set_caching_device(prev_caching_device)
+    finally:
+      context.Exit()
+    return result
+
+  # pylint: disable=undefined-variable
+  return rewrite(
+      wrapped_computation,
+      inputs=inputs,
+      infeed_queue=infeed_queue,
+      device_assignment=device_assignment,
+      name=name)
+  # pylint: enable=undefined-variable

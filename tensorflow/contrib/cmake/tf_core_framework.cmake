@@ -213,10 +213,6 @@ else()
   list(REMOVE_ITEM tf_core_platform_srcs ${tf_core_platform_srcs_exclude})
 endif()
 
-file(GLOB tf_core_platform_exclude_srcs
-  "${tensorflow_source_dir}/tensorflow/core/platform/variant_coding.cc")
-list(REMOVE_ITEM tf_core_platform_srcs ${tf_core_platform_exclude_srcs})
-
 list(APPEND tf_core_lib_srcs ${tf_core_platform_srcs})
 
 if(UNIX)
@@ -286,8 +282,6 @@ set(tf_version_srcs ${tensorflow_source_dir}/tensorflow/core/util/version_info.c
 file(GLOB_RECURSE tf_core_framework_srcs
     "${tensorflow_source_dir}/tensorflow/core/framework/*.h"
     "${tensorflow_source_dir}/tensorflow/core/framework/*.cc"
-    "${tensorflow_source_dir}/tensorflow/core/platform/variant_coding.h"
-    "${tensorflow_source_dir}/tensorflow/core/platform/variant_coding.cc"
     "${tensorflow_source_dir}/tensorflow/core/graph/edgeset.h"
     "${tensorflow_source_dir}/tensorflow/core/graph/edgeset.cc"
     "${tensorflow_source_dir}/tensorflow/core/graph/graph.h"
@@ -341,9 +335,3 @@ add_dependencies(tf_core_framework
     tf_core_lib
     proto_text
 )
-
-if(WIN32)
-  # Cmake > 3.6 will quote this as -D"__VERSION__=\"MSVC\"" which nvcc fails on.
-  # Instead of defining this global, limit it to tf_core_framework where its used.
-  target_compile_definitions(tf_core_framework PRIVATE __VERSION__="MSVC")
-endif()

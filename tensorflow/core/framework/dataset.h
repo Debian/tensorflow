@@ -351,6 +351,10 @@ class IteratorBase {
   // in the outputs of this iterator.
   virtual const std::vector<PartialTensorShape>& output_shapes() const = 0;
 
+  // Performs initialization that needs to happen outside of a constructor to
+  // properly propagate errors.
+  virtual Status Initialize(IteratorContext* ctx) { return Status::OK(); }
+
   // Saves the state of this iterator.
   virtual Status Save(OpKernelContext* ctx, IteratorStateWriter* writer) {
     return SaveInternal(writer);
@@ -364,7 +368,7 @@ class IteratorBase {
  protected:
   // This is needed so that sub-classes of IteratorBase can call
   // `SaveInternal` on their parent iterators, e.g., in
-  // `RepeatDataasetOp::Dataset`.
+  // `RepeatDatasetOp::Dataset`.
   Status SaveParent(IteratorStateWriter* writer,
                     const std::unique_ptr<IteratorBase>& parent) {
     return parent->SaveInternal(writer);
@@ -372,7 +376,7 @@ class IteratorBase {
 
   // This is needed so that sub-classes of IteratorBase can call
   // `RestoreInternal` on their parent iterators, e.g., in
-  // `RepeatDataasetOp::Dataset`.
+  // `RepeatDatasetOp::Dataset`.
   Status RestoreParent(IteratorContext* ctx, IteratorStateReader* reader,
                        const std::unique_ptr<IteratorBase>& parent) {
     return parent->RestoreInternal(ctx, reader);
@@ -402,12 +406,13 @@ class DatasetBase : public core::RefCounted {
   // iterator will traverse all elements in this dataset from the
   // start.
   //
-  // Ownership of the created iterator will be transferred to the caller.
-  //
   // The prefix identifies the sequence of iterators leading up to the newly
   // created iterator.
-  virtual std::unique_ptr<IteratorBase> MakeIterator(
-      const string& prefix) const = 0;
+  Status MakeIterator(IteratorContext* ctx, const string& prefix,
+                      std::unique_ptr<IteratorBase>* iterator) const {
+    *iterator = MakeIteratorInternal(prefix);
+    return (*iterator)->Initialize(ctx);
+  }
 
   // Returns a vector of DataType values, representing the respective
   // element types of each tuple component in the outputs of this
@@ -420,7 +425,7 @@ class DatasetBase : public core::RefCounted {
   virtual const std::vector<PartialTensorShape>& output_shapes() const = 0;
 
   // A human-readable debug string for this dataset.
-  virtual string DebugString() = 0;
+  virtual string DebugString() const = 0;
 
   // Serializes the dataset and writes it to the `writer`.
   virtual Status Save(OpKernelContext* ctx, IteratorStateWriter* writer) const {
@@ -451,6 +456,9 @@ class DatasetBase : public core::RefCounted {
                                     Node** node) const {
     return errors::Unimplemented("AsGraphDefInternal");
   }
+
+  virtual std::unique_ptr<IteratorBase> MakeIteratorInternal(
+      const string& prefix) const = 0;
 };
 
 // Base-class for datasets that are built by ops.
@@ -521,7 +529,7 @@ class DatasetIterator : public IteratorBase {
 
   Status GetNext(IteratorContext* ctx, std::vector<Tensor>* out_tensors,
                  bool* end_of_sequence) final {
-    port::Tracing::TraceMe activity(params_.prefix);
+    tracing::ScopedActivity activity(params_.prefix);
     Status s = GetNextInternal(ctx, out_tensors, end_of_sequence);
     if (TF_PREDICT_FALSE(errors::IsOutOfRange(s) && !*end_of_sequence)) {
       s = errors::Internal(
@@ -618,6 +626,12 @@ Status GetDatasetFromVariantTensor(const Tensor& tensor,
 //
 // The ownership of `dataset` is transferred to `tensor`.
 Status StoreDatasetInVariantTensor(DatasetBase* dataset, Tensor* tensor);
+
+namespace dataset {
+
+IteratorContext MakeIteratorContext(OpKernelContext* ctx);
+
+}  // namespace dataset
 
 }  // namespace tensorflow
 

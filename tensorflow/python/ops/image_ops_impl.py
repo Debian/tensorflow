@@ -269,17 +269,7 @@ def random_flip_up_down(image, seed=None):
   Raises:
     ValueError: if the shape of `image` not supported.
   """
-  with ops.name_scope(None, 'random_flip_up_down', [image]) as scope:
-    image = ops.convert_to_tensor(image, name='image')
-    image = _Assert3DImage(image)
-    uniform_random = random_ops.random_uniform([], 0, 1.0, seed=seed)
-    mirror_cond = math_ops.less(uniform_random, .5)
-    result = control_flow_ops.cond(
-        mirror_cond,
-        lambda: array_ops.reverse(image, [0]),
-        lambda: image,
-        name=scope)
-    return fix_image_flip_shape(image, result)
+  return _random_flip(image, 0, seed, 'random_flip_up_down')
 
 
 @tf_export('image.random_flip_left_right')
@@ -301,14 +291,34 @@ def random_flip_left_right(image, seed=None):
   Raises:
     ValueError: if the shape of `image` not supported.
   """
-  with ops.name_scope(None, 'random_flip_left_right', [image]) as scope:
+  return _random_flip(image, 1, seed, 'random_flip_left_right')
+
+
+def _random_flip(image, flip_index, seed, scope_name):
+  """Randomly (50% chance) flip an image along axis `flip_index`.
+    Args:
+      image: A 3-D tensor of shape `[height, width, channels].`
+      flip_index: The dimension along which to flip the image.
+                  Vertical: 0, Horizontal: 1
+      seed: A Python integer. Used to create a random seed. See
+        @{tf.set_random_seed}
+        for behavior.
+      scope_name: Name of the scope in which the ops are added.
+
+    Returns:
+      A 3-D tensor of the same type and shape as `image`.
+
+    Raises:
+      ValueError: if the shape of `image` not supported.
+  """
+  with ops.name_scope(None, scope_name, [image]) as scope:
     image = ops.convert_to_tensor(image, name='image')
     image = _Assert3DImage(image)
     uniform_random = random_ops.random_uniform([], 0, 1.0, seed=seed)
     mirror_cond = math_ops.less(uniform_random, .5)
     result = control_flow_ops.cond(
         mirror_cond,
-        lambda: array_ops.reverse(image, [1]),
+        lambda: array_ops.reverse(image, [flip_index]),
         lambda: image,
         name=scope)
     return fix_image_flip_shape(image, result)
@@ -332,16 +342,7 @@ def flip_left_right(image):
   Raises:
     ValueError: if the shape of `image` not supported.
   """
-  with ops.name_scope(None, 'flip_left_right', [image]):
-    image = ops.convert_to_tensor(image, name='image')
-    image = _AssertAtLeast3DImage(image)
-    shape = image.get_shape()
-    if shape.ndims == 3 or shape.ndims is None:
-      return fix_image_flip_shape(image, array_ops.reverse(image, [1]))
-    elif shape.ndims == 4:
-      return array_ops.reverse(image, [2])
-    else:
-      raise ValueError('\'image\' must have either 3 or 4 dimensions.')
+  return _flip(image, 1, 'flip_left_right')
 
 
 @tf_export('image.flip_up_down')
@@ -362,14 +363,35 @@ def flip_up_down(image):
   Raises:
     ValueError: if the shape of `image` not supported.
   """
-  with ops.name_scope(None, 'flip_up_down', [image]):
+  return _flip(image, 0, 'flip_up_down')
+
+
+def _flip(image, flip_index, scope_name):
+  """Flip an image either horizontally or vertically.
+
+  Outputs the contents of `image` flipped along the dimension `flip_index`.
+
+  See also `reverse()`.
+
+  Args:
+    image: 4-D Tensor of shape `[batch, height, width, channels]` or
+           3-D Tensor of shape `[height, width, channels]`.
+    flip_index: 0 For vertical, 1 for horizontal.
+
+  Returns:
+    A tensor of the same type and shape as `image`.
+
+  Raises:
+    ValueError: if the shape of `image` not supported.
+  """
+  with ops.name_scope(None, scope_name, [image]):
     image = ops.convert_to_tensor(image, name='image')
     image = _AssertAtLeast3DImage(image)
     shape = image.get_shape()
     if shape.ndims == 3 or shape.ndims is None:
-      return fix_image_flip_shape(image, array_ops.reverse(image, [0]))
+      return fix_image_flip_shape(image, array_ops.reverse(image, [flip_index]))
     elif shape.ndims == 4:
-      return array_ops.reverse(image, [1])
+      return array_ops.reverse(image, [flip_index+1])
     else:
       raise ValueError('\'image\' must have either 3 or 4 dimensions.')
 
@@ -501,7 +523,7 @@ def transpose_image(image):
 
 @tf_export('image.central_crop')
 def central_crop(image, central_fraction):
-  """Crop the central region of the image.
+  """Crop the central region of the image(s).
 
   Remove the outer parts of an image but retain the central region of the image
   along each dimension. If we specify central_fraction = 0.5, this function
@@ -514,15 +536,19 @@ def central_crop(image, central_fraction):
       |        |   where "X" is the central 50% of the image.
        --------
 
+  This function works on either a single image (`image` is a 3-D Tensor), or a
+  batch of images (`image` is a 4-D Tensor).
+
   Args:
-    image: 3-D float Tensor of shape [height, width, depth]
+    image: Either a 3-D float Tensor of shape [height, width, depth], or a 4-D
+      Tensor of shape [batch_size, height, width, depth].
     central_fraction: float (0, 1], fraction of size to crop
 
   Raises:
     ValueError: if central_crop_fraction is not within (0, 1].
 
   Returns:
-    3-D float Tensor
+    3-D / 4-D float Tensor, as per the input.
   """
   with ops.name_scope(None, 'central_crop', [image]):
     image = ops.convert_to_tensor(image, name='image')
@@ -531,24 +557,75 @@ def central_crop(image, central_fraction):
     if central_fraction == 1.0:
       return image
 
-    image = _Assert3DImage(image)
+    _AssertAtLeast3DImage(image)
+    rank = image.get_shape().ndims
+    if rank != 3 and rank != 4:
+      raise ValueError('`image` should either be a Tensor with rank = 3 or '
+                       'rank = 4. Had rank = {}.'.format(rank))
 
-    img_shape = array_ops.shape(image)
-    depth = image.get_shape()[2]
-    img_h = math_ops.to_double(img_shape[0])
-    img_w = math_ops.to_double(img_shape[1])
-    bbox_h_start = math_ops.to_int32((img_h - img_h * central_fraction) / 2)
-    bbox_w_start = math_ops.to_int32((img_w - img_w * central_fraction) / 2)
+    # Helper method to return the `idx`-th dimension of `tensor`, along with
+    # a boolean signifying if the dimension is dynamic.
+    def _get_dim(tensor, idx):
+      static_shape = tensor.get_shape()[idx].value
+      if static_shape is not None:
+        return static_shape, False
+      return array_ops.shape(tensor)[idx], True
 
-    bbox_h_size = img_shape[0] - bbox_h_start * 2
-    bbox_w_size = img_shape[1] - bbox_w_start * 2
+    # Get the height, width, depth (and batch size, if the image is a 4-D
+    # tensor).
+    if rank == 3:
+      img_h, dynamic_h = _get_dim(image, 0)
+      img_w, dynamic_w = _get_dim(image, 1)
+      img_d = image.get_shape()[2]
+    else:
+      img_bs = image.get_shape()[0]
+      img_h, dynamic_h = _get_dim(image, 1)
+      img_w, dynamic_w = _get_dim(image, 2)
+      img_d = image.get_shape()[3]
 
-    bbox_begin = array_ops.stack([bbox_h_start, bbox_w_start, 0])
-    bbox_size = array_ops.stack([bbox_h_size, bbox_w_size, -1])
+    # Compute the bounding boxes for the crop. The type and value of the
+    # bounding boxes depend on the `image` tensor's rank and whether / not the
+    # dimensions are statically defined.
+    if dynamic_h:
+      img_hd = math_ops.to_double(img_h)
+      bbox_h_start = math_ops.to_int32((img_hd - img_hd * central_fraction) / 2)
+    else:
+      img_hd = float(img_h)
+      bbox_h_start = int((img_hd - img_hd * central_fraction) / 2)
+
+    if dynamic_w:
+      img_wd = math_ops.to_double(img_w)
+      bbox_w_start = math_ops.to_int32((img_wd - img_wd * central_fraction) / 2)
+    else:
+      img_wd = float(img_w)
+      bbox_w_start = int((img_wd - img_wd * central_fraction) / 2)
+
+    bbox_h_size = img_h - bbox_h_start * 2
+    bbox_w_size = img_w - bbox_w_start * 2
+
+    if rank == 3:
+      bbox_begin = array_ops.stack([bbox_h_start, bbox_w_start, 0])
+      bbox_size = array_ops.stack([bbox_h_size, bbox_w_size, -1])
+    else:
+      bbox_begin = array_ops.stack([0, bbox_h_start, bbox_w_start, 0])
+      bbox_size = array_ops.stack([-1, bbox_h_size, bbox_w_size, -1])
+
     image = array_ops.slice(image, bbox_begin, bbox_size)
 
-    # The first two dimensions are dynamic and unknown.
-    image.set_shape([None, None, depth])
+    # Reshape the `image` tensor to the desired size.
+    if rank == 3:
+      image.set_shape([
+          None if dynamic_h else bbox_h_size,
+          None if dynamic_w else bbox_w_size,
+          img_d
+      ])
+    else:
+      image.set_shape([
+          img_bs,
+          None if dynamic_h else bbox_h_size,
+          None if dynamic_w else bbox_w_size,
+          img_d
+      ])
     return image
 
 
@@ -630,7 +707,7 @@ def pad_to_bounding_box(image, offset_height, offset_width, target_height,
     padded.set_shape(padded_shape)
 
     if not is_batch:
-      padded = array_ops.squeeze(padded, squeeze_dims=[0])
+      padded = array_ops.squeeze(padded, axis=[0])
 
     return padded
 
@@ -710,7 +787,7 @@ def crop_to_bounding_box(image, offset_height, offset_width, target_height,
     cropped.set_shape(cropped_shape)
 
     if not is_batch:
-      cropped = array_ops.squeeze(cropped, squeeze_dims=[0])
+      cropped = array_ops.squeeze(cropped, axis=[0])
 
     return cropped
 
@@ -827,7 +904,7 @@ def resize_image_with_crop_or_pad(image, target_height, target_width):
     resized = control_flow_ops.with_dependencies(assert_ops, resized)
 
     if not is_batch:
-      resized = array_ops.squeeze(resized, squeeze_dims=[0])
+      resized = array_ops.squeeze(resized, axis=[0])
 
     return resized
 
@@ -920,7 +997,7 @@ def resize_images(images,
            for x in [new_width_const, width, new_height_const, height]) and (
                width == new_width_const and height == new_height_const):
       if not is_batch:
-        images = array_ops.squeeze(images, squeeze_dims=[0])
+        images = array_ops.squeeze(images, axis=[0])
       return images
 
     if method == ResizeMethod.BILINEAR:
@@ -943,7 +1020,7 @@ def resize_images(images,
     images.set_shape([None, new_height_const, new_width_const, None])
 
     if not is_batch:
-      images = array_ops.squeeze(images, squeeze_dims=[0])
+      images = array_ops.squeeze(images, axis=[0])
     return images
 
 
@@ -1705,7 +1782,7 @@ def sample_distorted_bounding_box(image_size,
       width / height within this range.
     area_range: An optional list of `floats`. Defaults to `[0.05, 1]`.
       The cropped area of the image must contain a fraction of the
-      supplied image within in this range.
+      supplied image within this range.
     max_attempts: An optional `int`. Defaults to `100`.
       Number of attempts at generating a cropped region of the image
       of the specified constraints. After `max_attempts` failures, return the
@@ -1750,6 +1827,7 @@ def non_max_suppression(boxes,
                         scores,
                         max_output_size,
                         iou_threshold=0.5,
+                        score_threshold=float('-inf'),
                         name=None):
   """Greedily selects a subset of bounding boxes in descending order of score.
 
@@ -1778,6 +1856,8 @@ def non_max_suppression(boxes,
       of boxes to be selected by non max suppression.
     iou_threshold: A float representing the threshold for deciding whether boxes
       overlap too much with respect to IOU.
+    score_threshold: A float representing the threshold for deciding when to
+      remove boxes based on score.
     name: A name for the operation (optional).
 
   Returns:
@@ -1786,8 +1866,10 @@ def non_max_suppression(boxes,
   """
   with ops.name_scope(name, 'non_max_suppression'):
     iou_threshold = ops.convert_to_tensor(iou_threshold, name='iou_threshold')
-    return gen_image_ops.non_max_suppression_v2(boxes, scores, max_output_size,
-                                                iou_threshold)
+    score_threshold = ops.convert_to_tensor(
+        score_threshold, name='score_threshold')
+    return gen_image_ops.non_max_suppression_v3(boxes, scores, max_output_size,
+                                                iou_threshold, score_threshold)
 
 
 _rgb_to_yiq_kernel = [[0.299, 0.59590059,

@@ -157,6 +157,50 @@ class TPUClusterResolverTest(test.TestCase):
     job { name: 'worker' tasks { key: 0 value: '10.1.2.3:8470' } }
     """
     self._verifyClusterSpecEquality(actual_cluster_spec, expected_proto)
+    
+  @mock.patch.object(TPUClusterResolver, '_requestComputeMetadata',
+                     mock_request_compute_metadata)
+  def testUnhealthyCloudTpu(self):
+    tpu_map = {
+        'projects/test-project/locations/us-central1-c/nodes/test-tpu-1': {
+            'ipAddress': '10.1.2.3',
+            'port': '8470',
+            'health': 'UNHEALTHY'
+        }
+    }
+
+    tpu_cluster_resolver = TPUClusterResolver(
+        project=None,
+        zone=None,
+        tpu='test-tpu-1',
+        coordinator_name=None,
+        credentials=None,
+        service=self.mock_service_client(tpu_map=tpu_map))
+
+    with self.assertRaises(RuntimeError):
+      tpu_cluster_resolver.cluster_spec()
+
+  @mock.patch.object(TPUClusterResolver, '_requestComputeMetadata',
+                     mock_request_compute_metadata)
+  def testNotReadyCloudTpu(self):
+    tpu_map = {
+        'projects/test-project/locations/us-central1-c/nodes/test-tpu-1': {
+            'ipAddress': '10.1.2.3',
+            'port': '8470',
+            'state': 'CREATING'
+        }
+    }
+
+    tpu_cluster_resolver = TPUClusterResolver(
+        project=None,
+        zone=None,
+        tpu='test-tpu-1',
+        coordinator_name=None,
+        credentials=None,
+        service=self.mock_service_client(tpu_map=tpu_map))
+
+    with self.assertRaises(RuntimeError):
+      tpu_cluster_resolver.cluster_spec()
 
   def testSimpleSuccessfulRetrieval(self):
     tpu_map = {
@@ -356,8 +400,7 @@ class TPUClusterResolverTest(test.TestCase):
     tpu_cluster_resolver = TPUClusterResolver(tpu='/bns/foo/bar')
     self.assertEqual(
         compat.as_bytes('/bns/foo/bar'), tpu_cluster_resolver.master())
-    self.assertEqual(
-        server_lib.ClusterSpec({}), tpu_cluster_resolver.cluster_spec())
+    self.assertEqual(None, tpu_cluster_resolver.cluster_spec())
 
   def testGkeEnvironment(self):
     os.environ['KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS'] = 'grpc://10.120.27.5:8470'
@@ -368,6 +411,10 @@ class TPUClusterResolverTest(test.TestCase):
         compat.as_bytes(TPUClusterResolver._gkeMaster()))
     del os.environ['KUBE_GOOGLE_CLOUD_TPU_ENDPOINTS']
 
+  def testDiscoveryUrl(self):
+    os.environ['TPU_API_DISCOVERY_URL'] = 'https://{api}.internal/{apiVersion}'
+    self.assertEqual('https://{api}.internal/{apiVersion}',
+                     TPUClusterResolver._discoveryUrl())
 
 if __name__ == '__main__':
   test.main()

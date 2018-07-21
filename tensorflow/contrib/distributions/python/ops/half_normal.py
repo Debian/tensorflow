@@ -105,8 +105,8 @@ class HalfNormal(distribution.Distribution):
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
-    with ops.name_scope(name, values=[scale]):
+    parameters = dict(locals())
+    with ops.name_scope(name, values=[scale]) as name:
       with ops.control_dependencies([check_ops.assert_positive(scale)] if
                                     validate_args else []):
         self._scale = array_ops.identity(scale, name="scale")

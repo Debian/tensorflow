@@ -36,6 +36,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.lib.io import python_io
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import parsing_ops
+from tensorflow.python.ops import string_ops
 from tensorflow.python.platform import test
 from tensorflow.python.util import compat
 
@@ -256,6 +257,29 @@ class TFRecordDatasetSerializationTest(
         lambda: self._build_iterator_graph(num_epochs * 2), num_outputs)
 
 
+def _interleave(iterators, cycle_length):
+  pending_iterators = iterators
+  open_iterators = []
+  num_open = 0
+  for i in range(cycle_length):
+    if pending_iterators:
+      open_iterators.append(pending_iterators.pop(0))
+      num_open += 1
+
+  while num_open:
+    for i in range(min(cycle_length, len(open_iterators))):
+      if open_iterators[i] is None:
+        continue
+      try:
+        yield next(open_iterators[i])
+      except StopIteration:
+        if pending_iterators:
+          open_iterators[i] = pending_iterators.pop(0)
+        else:
+          open_iterators[i] = None
+          num_open -= 1
+
+
 class ReadBatchFeaturesTest(test.TestCase):
 
   def setUp(self):
@@ -295,18 +319,20 @@ class ReadBatchFeaturesTest(test.TestCase):
         ).get_next()
 
   def _record(self, f, r):
-    example = example_pb2.Example(features=feature_pb2.Features(
-        feature={
-            "file":
-                feature_pb2.Feature(int64_list=feature_pb2.Int64List(
-                    value=[f])),
-            "record":
-                feature_pb2.Feature(int64_list=feature_pb2.Int64List(
-                    value=[r])),
-            "keywords":
-                feature_pb2.Feature(bytes_list=feature_pb2.BytesList(
-                    value=self._get_keywords(f, r)))
-        }))
+    example = example_pb2.Example(
+        features=feature_pb2.Features(
+            feature={
+                "file":
+                    feature_pb2.Feature(
+                        int64_list=feature_pb2.Int64List(value=[f])),
+                "record":
+                    feature_pb2.Feature(
+                        int64_list=feature_pb2.Int64List(value=[r])),
+                "keywords":
+                    feature_pb2.Feature(
+                        bytes_list=feature_pb2.BytesList(
+                            value=self._get_keywords(f, r)))
+            }))
     return example.SerializeToString()
 
   def _get_keywords(self, f, r):
@@ -353,8 +379,8 @@ class ReadBatchFeaturesTest(test.TestCase):
           yield j, i
 
     def _next_record_interleaved(file_indices, cycle_length):
-      return self._interleave([_next_record([i]) for i in file_indices],
-                              cycle_length)
+      return _interleave([_next_record([i]) for i in file_indices],
+                         cycle_length)
 
     file_batch = []
     keywords_batch_indices = []
@@ -374,8 +400,8 @@ class ReadBatchFeaturesTest(test.TestCase):
         record_batch.append(r)
         keywords = self._get_keywords(f, r)
         keywords_batch_values.extend(keywords)
-        keywords_batch_indices.extend([[batch_index, i]
-                                       for i in range(len(keywords))])
+        keywords_batch_indices.extend(
+            [[batch_index, i] for i in range(len(keywords))])
         batch_index += 1
         keywords_batch_max_len = max(keywords_batch_max_len, len(keywords))
         if len(file_batch) == batch_size:
@@ -394,28 +420,6 @@ class ReadBatchFeaturesTest(test.TestCase):
           file_batch, keywords_batch_indices, keywords_batch_values,
           [len(file_batch), keywords_batch_max_len], record_batch
       ]
-
-  def _interleave(self, iterators, cycle_length):
-    pending_iterators = iterators
-    open_iterators = []
-    num_open = 0
-    for i in range(cycle_length):
-      if pending_iterators:
-        open_iterators.append(pending_iterators.pop(0))
-        num_open += 1
-
-    while num_open:
-      for i in range(min(cycle_length, len(open_iterators))):
-        if open_iterators[i] is None:
-          continue
-        try:
-          yield next(open_iterators[i])
-        except StopIteration:
-          if pending_iterators:
-            open_iterators[i] = pending_iterators.pop(0)
-          else:
-            open_iterators[i] = None
-            num_open -= 1
 
   def _verify_records(self,
                       sess,
@@ -475,9 +479,10 @@ class ReadBatchFeaturesTest(test.TestCase):
         "file": parsing_ops.FixedLenFeature([], dtypes.int64),
         "record": parsing_ops.FixedLenFeature([], dtypes.int64),
     }
-    dataset = (core_readers.TFRecordDataset(self.test_filenames)
-               .map(lambda x: parsing_ops.parse_single_example(x, features))
-               .repeat(10).batch(2))
+    dataset = (
+        core_readers.TFRecordDataset(self.test_filenames)
+        .map(lambda x: parsing_ops.parse_single_example(x, features))
+        .repeat(10).batch(2))
     iterator = dataset.make_initializable_iterator()
     init_op = iterator.initializer
     next_element = iterator.get_next()
@@ -607,20 +612,23 @@ class MakeCsvDatasetTest(test.TestCase):
         "record %d" % recordno if recordno % 2 == 1 else "",
     ]
 
-  def _csv_record(self, fileno, recordno):
-    return ",".join(str(v) for v in self._csv_values(fileno, recordno))
-
-  def _create_file(self, fileno, header=True, comment=True):
-    fn = os.path.join(self.get_temp_dir(), "csv_file%d.csv" % fileno)
+  def _write_file(self, filename, rows):
+    for i in range(len(rows)):
+      if isinstance(rows[i], list):
+        rows[i] = ",".join(str(v) if v is not None else "" for v in rows[i])
+    fn = os.path.join(self.get_temp_dir(), filename)
     f = open(fn, "w")
-    if header:
-      f.write(",".join(self.COLUMNS) + "\n")
-    for recno in range(self._num_records):
-      f.write(self._csv_record(fileno, recno) + "\n")
-      if comment:
-        f.write("# Some comment goes here. Should be ignored!\n")
+    f.write("\n".join(rows))
     f.close()
     return fn
+
+  def _create_file(self, fileno, header=True):
+    rows = []
+    if header:
+      rows.append(self.COLUMNS)
+    for recno in range(self._num_records):
+      rows.append(self._csv_values(fileno, recno))
+    return self._write_file("csv_file%d.csv" % fileno, rows)
 
   def _create_files(self):
     filenames = []
@@ -634,14 +642,13 @@ class MakeCsvDatasetTest(test.TestCase):
       defaults,
       column_names=COLUMNS,
       label_name=LABEL,
+      select_cols=None,
       batch_size=1,
       num_epochs=1,
       shuffle=False,
       shuffle_seed=None,
       header=True,
-      comment="#",
       na_value="",
-      default_float_type=dtypes.float32,
   ):
     return readers.make_csv_dataset(
         filenames,
@@ -653,9 +660,8 @@ class MakeCsvDatasetTest(test.TestCase):
         shuffle=shuffle,
         shuffle_seed=shuffle_seed,
         header=header,
-        comment=comment,
         na_value=na_value,
-        default_float_type=default_float_type,
+        select_columns=select_cols,
     )
 
   def _next_actual_batch(self, file_indices, batch_size, num_epochs, defaults):
@@ -712,7 +718,7 @@ class MakeCsvDatasetTest(test.TestCase):
     with self.assertRaises(errors.OutOfRangeError):
       sess.run(get_next)
 
-  def test_make_csv_dataset(self):
+  def testMakeCSVDataset(self):
     defaults = self.DEFAULTS
 
     with ops.Graph().as_default() as g:
@@ -739,7 +745,7 @@ class MakeCsvDatasetTest(test.TestCase):
         self._verify_records(
             sess, dataset, range(self._num_files), batch_size=2, num_epochs=10)
 
-  def test_make_csv_dataset_with_bad_columns(self):
+  def testMakeCSVDataset_withBadColumns(self):
     """Tests that exception is raised when input is malformed.
     """
     dupe_columns = self.COLUMNS[:-1] + self.COLUMNS[:1]
@@ -755,7 +761,7 @@ class MakeCsvDatasetTest(test.TestCase):
       self._make_csv_dataset(
           self._test_filenames, defaults, label_name="not_a_real_label")
 
-  def test_make_csv_dataset_with_no_label(self):
+  def testMakeCSVDataset_withNoLabel(self):
     """Tests that CSV datasets can be created when no label is specified.
     """
     defaults = self.DEFAULTS
@@ -776,30 +782,7 @@ class MakeCsvDatasetTest(test.TestCase):
             num_epochs=10,
             label_name=None)
 
-  def test_make_csv_dataset_with_no_comments(self):
-    """Tests that datasets can be created from CSV files with no header line.
-    """
-    defaults = self.DEFAULTS
-    file_without_header = self._create_file(
-        len(self._test_filenames), comment=False)
-    with ops.Graph().as_default() as g:
-      with self.test_session(graph=g) as sess:
-        dataset = self._make_csv_dataset(
-            file_without_header,
-            defaults,
-            batch_size=2,
-            num_epochs=10,
-            comment=None,
-        )
-        self._verify_records(
-            sess,
-            dataset,
-            [len(self._test_filenames)],
-            batch_size=2,
-            num_epochs=10,
-        )
-
-  def test_make_csv_dataset_with_no_header(self):
+  def testMakeCSVDataset_withNoHeader(self):
     """Tests that datasets can be created from CSV files with no header line.
     """
     defaults = self.DEFAULTS
@@ -822,7 +805,7 @@ class MakeCsvDatasetTest(test.TestCase):
             num_epochs=10,
         )
 
-  def test_make_csv_dataset_with_types(self):
+  def testMakeCSVDataset_withTypes(self):
     """Tests that defaults can be a dtype instead of a Tensor for required vals.
     """
     defaults = [d for d in self.COLUMN_TYPES[:-1]]
@@ -832,7 +815,7 @@ class MakeCsvDatasetTest(test.TestCase):
         dataset = self._make_csv_dataset(self._test_filenames, defaults)
         self._verify_records(sess, dataset, range(self._num_files))
 
-  def test_make_csv_dataset_with_no_col_names(self):
+  def testMakeCSVDataset_withNoColNames(self):
     """Tests that datasets can be created when column names are not specified.
 
     In that case, we should infer the column names from the header lines.
@@ -851,12 +834,22 @@ class MakeCsvDatasetTest(test.TestCase):
         self._verify_records(
             sess, dataset, range(self._num_files), batch_size=2, num_epochs=10)
 
-  def test_make_csv_dataset_type_inference(self):
+  def testMakeCSVDataset_withTypeInferenceMismatch(self):
+    # Test that error is thrown when num fields doesn't match columns
+    with self.assertRaises(ValueError):
+      self._make_csv_dataset(
+          self._test_filenames,
+          column_names=self.COLUMNS + ["extra_name"],
+          defaults=None,
+          batch_size=2,
+          num_epochs=10)
+
+  def testMakeCSVDataset_withTypeInference(self):
     """Tests that datasets can be created when no defaults are specified.
 
     In that case, we should infer the types from the first N records.
     """
-    # Test that it works with standard test files (with comments, header, etc)
+    # Test that it works with standard test files (with header, etc)
     with ops.Graph().as_default() as g:
       with self.test_session(graph=g) as sess:
         dataset = self._make_csv_dataset(
@@ -869,25 +862,24 @@ class MakeCsvDatasetTest(test.TestCase):
             num_epochs=10,
             defaults=[[], [], [], [], [""]])
 
-    # Test on a deliberately tricky file
+  def testMakeCSVDataset_withTypeInferenceTricky(self):
+    # Test on a deliberately tricky file (type changes as we read more rows, and
+    # there are null values)
     fn = os.path.join(self.get_temp_dir(), "file.csv")
     expected_dtypes = [
         dtypes.int32, dtypes.int64, dtypes.float32, dtypes.float32,
         dtypes.string, dtypes.string
     ]
-    rows = [[0, 0, 0, "NAN", "", "a"], [1, 2**31 + 1, 2**64, 123, "NAN", ""],
+    col_names = ["col%d" % i for i in range(len(expected_dtypes))]
+    rows = [[None, None, None, "NAN", "",
+             "a"], [1, 2**31 + 1, 2**64, 123, "NAN", ""],
             ['"123"', 2, 2**64, 123.4, "NAN", '"cd,efg"']]
     expected = [[0, 0, 0, 0, "", "a"], [1, 2**31 + 1, 2**64, 123, "", ""],
                 [123, 2, 2**64, 123.4, "", "cd,efg"]]
     for row in expected:
       row[-1] = row[-1].encode("utf-8")  # py3 expects byte strings
       row[-2] = row[-2].encode("utf-8")  # py3 expects byte strings
-    col_names = ["col%d" % i for i in range(len(expected_dtypes))]
-    with open(fn, "w") as f:
-      f.write(",".join(col_names))
-      f.write("\n")
-      for row in rows:
-        f.write(",".join([str(v) if v else "" for v in row]) + "\n")
+    self._write_file("file.csv", [col_names] + rows)
 
     with ops.Graph().as_default() as g:
       with self.test_session(graph=g) as sess:
@@ -895,44 +887,136 @@ class MakeCsvDatasetTest(test.TestCase):
             fn,
             defaults=None,
             column_names=None,
-            batch_size=1,
-            num_epochs=1,
             label_name=None,
             na_value="NAN",
-            default_float_type=dtypes.float32,
         )
         features = dataset.make_one_shot_iterator().get_next()
         # Check that types match
         for i in range(len(expected_dtypes)):
+          print(features["col%d" % i].dtype, expected_dtypes[i])
           assert features["col%d" % i].dtype == expected_dtypes[i]
         for i in range(len(rows)):
           assert sess.run(features) == dict(zip(col_names, expected[i]))
 
-    # With float64 as default type for floats
+  def testMakeCSVDataset_withTypeInferenceAllTypes(self):
+    # Test that we make the correct inference for all types with fallthrough
+    fn = os.path.join(self.get_temp_dir(), "file.csv")
     expected_dtypes = [
-        dtypes.int32, dtypes.int64, dtypes.float64, dtypes.float64,
+        dtypes.int32, dtypes.int64, dtypes.float32, dtypes.float64,
         dtypes.string, dtypes.string
     ]
+    col_names = ["col%d" % i for i in range(len(expected_dtypes))]
+    rows = [[1, 2**31 + 1, 1.0, 4e40, "abc", ""]]
+    expected = [[
+        1, 2**31 + 1, 1.0, 4e40, "abc".encode("utf-8"), "".encode("utf-8")
+    ]]
+    self._write_file("file.csv", [col_names] + rows)
+
     with ops.Graph().as_default() as g:
       with self.test_session(graph=g) as sess:
         dataset = self._make_csv_dataset(
             fn,
             defaults=None,
             column_names=None,
-            batch_size=1,
-            num_epochs=1,
             label_name=None,
             na_value="NAN",
-            default_float_type=dtypes.float64,
         )
         features = dataset.make_one_shot_iterator().get_next()
         # Check that types match
         for i in range(len(expected_dtypes)):
-          assert features["col%d" % i].dtype == expected_dtypes[i]
+          self.assertAllEqual(features["col%d" % i].dtype, expected_dtypes[i])
         for i in range(len(rows)):
-          assert sess.run(features) == dict(zip(col_names, expected[i]))
+          self.assertAllEqual(
+              sess.run(features), dict(zip(col_names, expected[i])))
 
-  def test_make_csv_dataset_with_shuffle(self):
+  def testMakeCSVDataset_withSelectColsError(self):
+    data = [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]
+    col_names = ["col%d" % i for i in range(5)]
+    fn = self._write_file("file.csv", [col_names] + data)
+    with self.assertRaises(ValueError):
+      # Mismatch in number of defaults and number of columns selected,
+      # should raise an error
+      self._make_csv_dataset(
+          fn,
+          defaults=[[0]] * 5,
+          column_names=col_names,
+          label_name=None,
+          select_cols=[1, 3])
+    with self.assertRaises(ValueError):
+      # Invalid column name should raise an error
+      self._make_csv_dataset(
+          fn,
+          defaults=[[0]],
+          column_names=col_names,
+          label_name=None,
+          select_cols=["invalid_col_name"])
+
+  def testMakeCSVDataset_withSelectCols(self):
+    data = [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]
+    col_names = ["col%d" % i for i in range(5)]
+    fn = self._write_file("file.csv", [col_names] + data)
+    # If select_cols is specified, should only yield a subset of columns
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        dataset = self._make_csv_dataset(
+            fn,
+            defaults=[[0], [0]],
+            column_names=col_names,
+            label_name=None,
+            select_cols=[1, 3])
+        expected = [[1, 3], [6, 8]]
+        features = dataset.make_one_shot_iterator().get_next()
+        for i in range(len(data)):
+          self.assertAllEqual(
+              sess.run(features),
+              dict(zip([col_names[1], col_names[3]], expected[i])))
+    # Can still do default inference with select_cols
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        dataset = self._make_csv_dataset(
+            fn,
+            defaults=None,
+            column_names=col_names,
+            label_name=None,
+            select_cols=[1, 3])
+        expected = [[1, 3], [6, 8]]
+        features = dataset.make_one_shot_iterator().get_next()
+        for i in range(len(data)):
+          self.assertAllEqual(
+              sess.run(features),
+              dict(zip([col_names[1], col_names[3]], expected[i])))
+    # Can still do column name inference
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        dataset = self._make_csv_dataset(
+            fn,
+            defaults=None,
+            column_names=None,
+            label_name=None,
+            select_cols=[1, 3])
+        expected = [[1, 3], [6, 8]]
+        features = dataset.make_one_shot_iterator().get_next()
+        for i in range(len(data)):
+          self.assertAllEqual(
+              sess.run(features),
+              dict(zip([col_names[1], col_names[3]], expected[i])))
+    # Can specify column names instead of indices
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        dataset = self._make_csv_dataset(
+            fn,
+            defaults=None,
+            column_names=None,
+            label_name=None,
+            select_cols=[col_names[1], col_names[3]])
+        expected = [[1, 3], [6, 8]]
+        features = dataset.make_one_shot_iterator().get_next()
+        for i in range(len(data)):
+          self.assertAllEqual(
+              sess.run(features),
+              dict(zip([col_names[1], col_names[3]], expected[i])))
+
+  def testMakeCSVDataset_withShuffle(self):
     total_records = self._num_files * self._num_records
     defaults = self.DEFAULTS
     for batch_size in [1, 2]:
@@ -983,6 +1067,190 @@ class MakeCsvDatasetTest(test.TestCase):
             for i in range(len(batch1)):
               all_equal = all_equal and np.array_equal(batch1[i], batch2[i])
           self.assertFalse(all_equal)
+
+
+class MakeTFRecordDatasetTest(TFRecordDatasetTestBase):
+
+  def _next_expected_batch(self,
+                           file_indices,
+                           batch_size,
+                           num_epochs,
+                           cycle_length,
+                           drop_final_batch,
+                           use_parser_fn):
+
+    def _next_record(file_indices):
+      for j in file_indices:
+        for i in range(self._num_records):
+          yield j, i
+
+    def _next_record_interleaved(file_indices, cycle_length):
+      return _interleave([_next_record([i]) for i in file_indices],
+                         cycle_length)
+
+    record_batch = []
+    batch_index = 0
+    for _ in range(num_epochs):
+      if cycle_length == 1:
+        next_records = _next_record(file_indices)
+      else:
+        next_records = _next_record_interleaved(file_indices, cycle_length)
+      for f, r in next_records:
+        record = self._record(f, r)
+        if use_parser_fn:
+          record = record[1:]
+        record_batch.append(record)
+        batch_index += 1
+        if len(record_batch) == batch_size:
+          yield record_batch
+          record_batch = []
+          batch_index = 0
+    if record_batch and not drop_final_batch:
+      yield record_batch
+
+  def _verify_records(self,
+                      sess,
+                      outputs,
+                      batch_size,
+                      file_index,
+                      num_epochs,
+                      interleave_cycle_length,
+                      drop_final_batch,
+                      use_parser_fn):
+    if file_index is not None:
+      file_indices = [file_index]
+    else:
+      file_indices = range(self._num_files)
+
+    for expected_batch in self._next_expected_batch(
+        file_indices, batch_size, num_epochs, interleave_cycle_length,
+        drop_final_batch, use_parser_fn):
+      actual_batch = sess.run(outputs)
+      self.assertAllEqual(expected_batch, actual_batch)
+
+  def _read_test(self, batch_size, num_epochs, file_index=None,
+                 num_parallel_reads=1, drop_final_batch=False, parser_fn=False):
+    if file_index is None:
+      file_pattern = self.test_filenames
+    else:
+      file_pattern = self.test_filenames[file_index]
+
+    if parser_fn:
+      fn = lambda x: string_ops.substr(x, 1, 999)
+    else:
+      fn = None
+
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        outputs = readers.make_tf_record_dataset(
+            file_pattern=file_pattern,
+            num_epochs=num_epochs,
+            batch_size=batch_size,
+            parser_fn=fn,
+            num_parallel_reads=num_parallel_reads,
+            drop_final_batch=drop_final_batch,
+            shuffle=False).make_one_shot_iterator().get_next()
+        self._verify_records(
+            sess, outputs, batch_size, file_index, num_epochs=num_epochs,
+            interleave_cycle_length=num_parallel_reads,
+            drop_final_batch=drop_final_batch, use_parser_fn=parser_fn)
+        with self.assertRaises(errors.OutOfRangeError):
+          sess.run(outputs)
+
+  def testRead(self):
+    for batch_size in [1, 2]:
+      for num_epochs in [1, 3]:
+        # Basic test: read from file 0.
+        self._read_test(batch_size, num_epochs, 0)
+
+        # Basic test: read from file 1.
+        self._read_test(batch_size, num_epochs, 1)
+
+        # Basic test: read from both files.
+        self._read_test(batch_size, num_epochs)
+
+        # Basic test: read from both files, with parallel reads.
+        self._read_test(batch_size, num_epochs, num_parallel_reads=8)
+
+  def testDropFinalBatch(self):
+    for batch_size in [1, 2, 10]:
+      for num_epochs in [1, 3]:
+        # Read from file 0.
+        self._read_test(batch_size, num_epochs, 0, drop_final_batch=True)
+
+        # Read from both files.
+        self._read_test(batch_size, num_epochs, drop_final_batch=True)
+
+        # Read from both files, with parallel reads.
+        self._read_test(batch_size, num_epochs, num_parallel_reads=8,
+                        drop_final_batch=True)
+
+  def testParserFn(self):
+    for batch_size in [1, 2]:
+      for num_epochs in [1, 3]:
+        for drop_final_batch in [False, True]:
+          self._read_test(batch_size, num_epochs, parser_fn=True,
+                          drop_final_batch=drop_final_batch)
+          self._read_test(batch_size, num_epochs, num_parallel_reads=8,
+                          parser_fn=True, drop_final_batch=drop_final_batch)
+
+  def _shuffle_test(self, batch_size, num_epochs, num_parallel_reads=1,
+                    seed=None):
+    with ops.Graph().as_default() as g:
+      with self.test_session(graph=g) as sess:
+        dataset = readers.make_tf_record_dataset(
+            file_pattern=self.test_filenames,
+            num_epochs=num_epochs,
+            batch_size=batch_size,
+            num_parallel_reads=num_parallel_reads,
+            shuffle=True,
+            shuffle_seed=seed)
+        iterator = dataset.make_initializable_iterator()
+        next_element = iterator.get_next()
+
+        sess.run(iterator.initializer)
+        first_batches = []
+        try:
+          while True:
+            first_batches.append(sess.run(next_element))
+        except errors.OutOfRangeError:
+          pass
+
+        sess.run(iterator.initializer)
+        second_batches = []
+        try:
+          while True:
+            second_batches.append(sess.run(next_element))
+        except errors.OutOfRangeError:
+          pass
+
+        self.assertEqual(len(first_batches), len(second_batches))
+        if seed is not None:
+          # if you set a seed, should get the same results
+          for i in range(len(first_batches)):
+            self.assertAllEqual(first_batches[i], second_batches[i])
+
+        expected = []
+        for f in range(self._num_files):
+          for r in range(self._num_records):
+            expected.extend([self._record(f, r)] * num_epochs)
+
+        for batches in (first_batches, second_batches):
+          actual = []
+          for b in batches:
+            actual.extend(b)
+          self.assertAllEqual(sorted(expected), sorted(actual))
+
+  def testShuffle(self):
+    for batch_size in [1, 2]:
+      for num_epochs in [1, 3]:
+        for num_parallel_reads in [1, 2]:
+          # Test that all expected elements are produced
+          self._shuffle_test(batch_size, num_epochs, num_parallel_reads)
+          # Test that elements are produced in a consistent order if
+          # you specify a seed.
+          self._shuffle_test(batch_size, num_epochs, num_parallel_reads,
+                             seed=21345)
 
 
 if __name__ == "__main__":
