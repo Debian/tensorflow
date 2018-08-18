@@ -90,6 +90,16 @@ cc_library(
     deps = [":context"],
 )
 
+cc_library(
+    name = "kernel_api",
+    hdrs = [
+        "builtin_op_data.h",
+        "builtin_ops.h",
+        "context.h",
+        "context_util.h",
+    ],
+)
+
 exports_files(["builtin_ops.h"])
 
 cc_library(
@@ -118,6 +128,7 @@ cc_library(
     hdrs = [
         "allocation.h",
         "context.h",
+        "context_util.h",
         "error_reporter.h",
         "graph_info.h",
         "interpreter.h",
@@ -135,6 +146,7 @@ cc_library(
         ":memory_planner",
         ":schema_fbs_version",
         ":simple_memory_arena",
+        ":string",
         ":util",
         "//tensorflow/contrib/lite/kernels:eigen_support",
         "//tensorflow/contrib/lite/kernels:gemm_support",
@@ -174,6 +186,7 @@ cc_test(
     deps = [
         ":framework",
         ":string_util",
+        "//tensorflow/contrib/lite/kernels:builtin_ops",
         "//tensorflow/contrib/lite/kernels:kernel_util",
         "//tensorflow/contrib/lite/kernels/internal:tensor_utils",
         "//tensorflow/contrib/lite/schema:schema_fbs",
