@@ -31,10 +31,9 @@ from tensorflow.python.estimator import run_config as run_config_lib
 from tensorflow.python.estimator.inputs import numpy_io
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import test_util
-from tensorflow.python.keras import backend as K
 from tensorflow.python.keras import testing_utils
-from tensorflow.python.keras.applications import mobilenet
 from tensorflow.python.keras.optimizers import SGD
+from tensorflow.python.ops.parsing_ops import gen_parsing_ops
 from tensorflow.python.platform import gfile
 from tensorflow.python.platform import test
 from tensorflow.python.summary.writer import writer_cache
@@ -60,9 +59,9 @@ def simple_sequential_model():
   return model
 
 
-def simple_functional_model():
+def simple_functional_model(activation='relu'):
   a = keras.layers.Input(shape=_INPUT_SIZE)
-  b = keras.layers.Dense(16, activation='relu')(a)
+  b = keras.layers.Dense(16, activation=activation)(a)
   b = keras.layers.Dropout(0.1)(b)
   b = keras.layers.Dense(_NUM_CLASS, activation='softmax')(b)
   model = keras.models.Model(inputs=[a], outputs=[b])
@@ -146,13 +145,13 @@ def randomize_io_type(array, name):
 def multi_inputs_multi_outputs_model():
   a = keras.layers.Input(shape=(16,), name='input_a')
   b = keras.layers.Input(shape=(16,), name='input_b')
-  m = keras.layers.Input(shape=(8,), dtype='bool', name='input_m')
+  m = keras.layers.Input(shape=(8,), dtype='string', name='input_m')
   dense = keras.layers.Dense(8, name='dense_1')
 
   a_2 = dense(a)
-  # Apply a mask
-  s_2 = keras.layers.Lambda(lambda k:
-                            K.switch(k[0], k[1], K.zeros_like(k[1])))([m, a_2])
+  # Read m
+  m_2 = keras.layers.Lambda(gen_parsing_ops.string_to_number)(m)
+  s_2 = keras.layers.Lambda(lambda k: k[0] * k[1])([m_2, a_2])
   b_2 = dense(b)
   merged = keras.layers.concatenate([s_2, b_2], name='merge')
   c = keras.layers.Dense(3, activation='softmax', name='dense_2')(merged)
@@ -204,6 +203,7 @@ class TestKerasEstimator(test_util.TensorFlowTestCase):
       writer_cache.FileWriterCache.clear()
       gfile.DeleteRecursively(self._config.model_dir)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_train_with_tf_optimizer(self):
     for model_type in ['sequential', 'functional']:
       keras_model, (_, _), (
@@ -231,6 +231,7 @@ class TestKerasEstimator(test_util.TensorFlowTestCase):
       writer_cache.FileWriterCache.clear()
       gfile.DeleteRecursively(self._config.model_dir)
 
+  @test_util.run_in_graph_and_eager_modes
   def test_train_with_subclassed_model(self):
     keras_model, (_, _), (
         _, _), train_input_fn, eval_input_fn = get_resource_for_simple_model(
@@ -372,13 +373,13 @@ class TestKerasEstimator(test_util.TensorFlowTestCase):
 
     def train_input_fn():
       input_dict = {'input_a': a_train, 'input_b': b_train,
-                    'input_m': input_m_train > 0}
+                    'input_m': input_m_train.astype(np.str)}
       output_dict = {'dense_2': c_train, 'dense_3': d_train}
       return input_dict, output_dict
 
     def eval_input_fn():
       input_dict = {'input_a': a_test, 'input_b': b_test,
-                    'input_m': input_m_test > 0}
+                    'input_m': input_m_test.astype(np.str)}
       output_dict = {'dense_2': c_test, 'dense_3': d_test}
       return input_dict, output_dict
 
@@ -472,21 +473,25 @@ class TestKerasEstimator(test_util.TensorFlowTestCase):
         est_keras.train(input_fn=invald_output_name_input_fn, steps=100)
 
   def test_custom_objects(self):
-    keras_mobile = mobilenet.MobileNet(weights=None)
-    keras_mobile.compile(loss='categorical_crossentropy', optimizer='adam')
+    
+    def relu6(x):
+      return keras.backend.relu(x, max_value=6)
+    
+    keras_model = simple_functional_model(activation=relu6)
+    keras_model.compile(loss='categorical_crossentropy', optimizer='adam')
     custom_objects = {
-        'relu6': mobilenet.relu6,
-        'DepthwiseConv2D': mobilenet.DepthwiseConv2D
+        'relu6': relu6
     }
+
     with self.assertRaisesRegexp(ValueError, 'relu6'):
       with self.test_session():
         keras_lib.model_to_estimator(
-            keras_model=keras_mobile,
+            keras_model=keras_model,
             model_dir=tempfile.mkdtemp(dir=self._base_dir))
 
     with self.test_session():
       keras_lib.model_to_estimator(
-          keras_model=keras_mobile,
+          keras_model=keras_model,
           model_dir=tempfile.mkdtemp(dir=self._base_dir),
           custom_objects=custom_objects)
 
