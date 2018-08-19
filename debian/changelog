@@ -1,5 +1,7 @@
-tensorflow (1.10.0+dfsg-1) UNRELEASED; urgency=medium
+tensorflow (1.10.0+dfsg-A1) UNRELEASED; urgency=medium
 
   * Initial release. (Closes: #804612)
+  * Stage A (with Debian revision "A*") indicates that the source
+    package only provides C and C++ library and development files.
 
  -- Mo Zhou <cdluminate@gmail.com>  Sun, 19 Aug 2018 04:02:09 +0000
