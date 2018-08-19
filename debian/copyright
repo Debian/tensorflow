@@ -1,0 +1,91 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Google
+Upstream-Contact: https://github.com/tensorflow/tensorflow/issues
+Source: https://github.com/tensorflow/tensorflow
+Files-Excluded:
+ tensorflow/core/lib/bmp/testdata/lena.bmp
+ tensorflow/core/lib/gif/testdata/lena.gif
+
+Files:     *
+Copyright: 2016-2018 The TensorFlow Authors
+           2015-2018 Google Inc.
+           2013-2018 The Android Open Source Project
+           2016-2017 The Sonnet Authors.
+License: Apache-2.0
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/FixedPoint
+ ./third_party/eigen3/unsupported/Eigen/CXX11/NeuralNetworks
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/FixedPoint/FixedPointTypes.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/FixedPoint/MatMatProduct.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/FixedPoint/MatVecProduct.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/Activations.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/Attention.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/Pooling.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/SoftMax.h
+ ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/SpatialConvolutions.h
+Copyright: 2014-2015, Benoit Steiner <benoit.steiner.goog@gmail.com>
+License: MPL-2.0
+
+Files: ./tensorflow/java/maven/hadoop/pom.xml
+ ./tensorflow/java/maven/pom.xml
+ ./tensorflow/java/maven/spark-connector/pom.xml
+ ./third_party/hadoop/LICENSE.txt
+ ./third_party/hadoop/hdfs.h
+ ./third_party/mkl/LICENSE
+ ./third_party/mkl/MKL_LICENSE
+ ./third_party/mkl_dnn/LICENSE
+Copyright: NONE
+License: Apache-2.0
+ FIXME
+
+Files: ./tensorflow/contrib/eager/python/examples/rnn_colorbot/rnn_colorbot.py
+Copyright: 2017, The TensorFlow Authors.
+License: Apache-2.0 and/or CC-BY-SA
+
+Files: ./tensorflow/python/keras/datasets/mnist.py
+Copyright: 2015, The TensorFlow Authors.
+License: Apache-2.0 and/or CC-BY-SA-3.0
+
+Files: ./third_party/examples/eager/spinn/LICENSE
+Copyright: 2017
+License: BSD-3-clause
+ FIXME
+
+Files: ./tensorflow/docs_src/tutorials/sequences/audio_recognition.md
+Copyright: NONE
+License: CC-BY
+ FIXME
+
+Files: ./tensorflow/contrib/eager/python/examples/rnn_colorbot/README.md
+Copyright: NONE
+License: CC-BY-SA
+ FIXME
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/src/FixedPoint/MatMatProductNEON.h
+Copyright: 2015, Benoit Jacob <benoitjacob@google.com>
+  2015, Benoit Steiner <benoit.steiner.goog@gmail.com>
+License: MPL-2.0
+ FIXME
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/Core
+Copyright: 2013, Christian Seiler <christian@iwakd.de>
+  2014, Benoit Steiner <benoit.steiner.goog@gmail.com>
+License: MPL-2.0
+ FIXME
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/TensorConvolutionByFFT.h
+Copyright: 2014, Benoit Steiner <benoit.steiner.goog@gmail.com>
+  2015, Jianwei Cui <thucjw@gmail.com>
+License: MPL-2.0
+ FIXME
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/src/FixedPoint/MatMatProductAVX2.h
+Copyright: 2015, Benoit Steiner <benoit.steiner.goog@gmail.com>
+  2015, Matthew Sarett <msarett@google.com>
+License: MPL-2.0
+ FIXME
+
+Files: ./third_party/eigen3/unsupported/Eigen/CXX11/src/NeuralNetworks/BackwardSpatialConvolutions.h
+Copyright: 2015, Ke Yang <yangke@gmail.com>
+License: MPL-2.0
+ FIXME
