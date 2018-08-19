@@ -126,7 +126,19 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
   outside the replicated computation.
   """
 
-  def __init__(self, name, num_replicas):
+  def __init__(self, name, num_replicas, pivot):
+    """Builds a new TPUReplicateContext.
+
+    Args:
+      name: a unique name for the context, used to populate the `_tpu_replicate`
+        attribute.
+      num_replicas: an integer that gives the number of replicas for the
+        computation.
+      pivot: a pivot node. Nodes in the TPUReplicateContext that do not have any
+        inputs will have a control dependency on the pivot node. This ensures
+        that nodes are correctly included in any enclosing control flow
+        contexts.
+    """
     super(TPUReplicateContext, self).__init__()
     self._num_replicas = num_replicas
     self._outer_device_function_stack = None
@@ -138,6 +150,7 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
     self._host_compute_core = []
     self._name = name
     self._unsupported_ops = []
+    self._pivot = pivot
 
   def report_unsupported_operations(self):
     if self._unsupported_ops:
@@ -214,7 +227,7 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
     class FakeOp(object):
       """A helper class to determine the current device.
 
-      Supports only the device set/get methods needed to run the
+      Supports only the type and device set/get methods needed to run the
       graph's _apply_device_function method.
       """
 
@@ -222,11 +235,18 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
         self._device = ""
 
       @property
+      def type(self):
+        return "FakeOp"
+
+      @property
       def device(self):
         return self._device
 
       def _set_device(self, device):
-        self._device = device.to_string()
+        if isinstance(device, pydev.DeviceSpec):
+          self._device = device.to_string()
+        else:
+          self._device = device
 
     if self._outside_compilation_cluster:
       raise NotImplementedError("Cannot nest outside_compilation clusters")
@@ -261,9 +281,6 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
       graph = ops.get_default_graph()
       self._outer_device_function_stack = list(graph._device_function_stack)  # pylint: disable=protected-access
     super(TPUReplicateContext, self).Enter()
-
-  def Exit(self):
-    super(TPUReplicateContext, self).Exit()
 
   def HostComputeCore(self):
     return self._host_compute_core
@@ -300,10 +317,64 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
       op.graph.prevent_feeding(op)
       op.graph.prevent_fetching(op)
 
+    # Remove any control edges from outer control flow contexts. These may cause
+    # mismatched frame errors.
+    control_inputs, external_inputs = self._RemoveExternalControlEdges(op)
+
+    if not op.inputs:
+      # Add a control edge from the control pivot to this op.
+      if not control_inputs:
+        # pylint: disable=protected-access
+        op._add_control_input(self.GetControlPivot())
+        # pylint: enable=protected-access
+    else:
+      for index in xrange(len(op.inputs)):
+        x = op.inputs[index]
+        real_x = self.AddValue(x)
+        if real_x != x:
+          op._update_input(index, real_x)  # pylint: disable=protected-access
+
+    if external_inputs:
+      # Use an identity to pull control inputs as data inputs. Note that we
+      # ignore ops which don't have outputs. TODO(phawkins): fix that.
+      with ops.control_dependencies(None):
+        self.Enter()
+        external_inputs = [
+            array_ops.identity(x.outputs[0]).op
+            for x in external_inputs
+            if x.outputs
+        ]
+        self.Exit()
+      # pylint: disable=protected-access
+      op._add_control_inputs(external_inputs)
+      # pylint: enable=protected-access
+
+    # Mark op's outputs as seen by this context and any outer contexts.
+    output_names = [x.name for x in op.outputs]
+    context = self
+    while context is not None:
+      # pylint: disable=protected-access
+      context._values.update(output_names)
+      context = context._outer_context
+      # pylint: enable=protected-access
+
+    if self._outer_context:
+      self._outer_context.AddInnerOp(op)
+
   def AddValue(self, val):
+    if val.name in self._values:
+      # Use the real value if it comes from outer context.
+      result = self._external_values.get(val.name)
+      return val if result is None else result
+
     result = val
+    self._values.add(val.name)
     if self._outer_context:
       result = self._outer_context.AddValue(val)
+      self._values.add(result.name)
+
+    self._external_values[val.name] = result
+
     return result
 
   def AddInnerOp(self, op):
@@ -318,6 +389,16 @@ class TPUReplicateContext(control_flow_ops.XLAControlFlowContext):
     # grad_state outside the TPUReplicateContext affect the graph inside so the
     # grad_state should be as if this is the top-level gradient state.
     return None
+
+  @property
+  def back_prop(self):
+    """Forwards to the enclosing while context, if any."""
+    if self.GetWhileContext():
+      return self.GetWhileContext().back_prop
+    return False
+
+  def GetControlPivot(self):
+    return self._pivot
 
 
 def outside_compilation(computation, *args, **kwargs):
@@ -505,7 +586,9 @@ def split_compile_and_replicate(computation,
         tpu_ops.tpu_replicated_input(replicas, name="input{}".format(i)))
 
   cluster_name = graph.unique_name("cluster")
-  context = TPUReplicateContext(name=cluster_name, num_replicas=num_replicas)
+  pivot = control_flow_ops.no_op(name=cluster_name + "/pivot")
+  context = TPUReplicateContext(
+      name=cluster_name, num_replicas=num_replicas, pivot=pivot)
   try:
     context.Enter()
 
@@ -515,16 +598,22 @@ def split_compile_and_replicate(computation,
     with tpu_function.tpu_shard_context(
         num_replicas), ops.control_dependencies([metadata]):
 
-      # The EncapsulateTPUComputations rewrite needs to identify the
-      # replicated arguments inside each computation. Adds identity operators
-      # tagged with an attribute _tpu_replicated_input to identify the
-      # replicated inputs.
+      # For backward compatibility reasons, we tag replicated inputs with the
+      # _tpu_replicated_input attribute. This does nothing and exists only for
+      # backward compatibility.
+      # TODO(phawkins): delete the attr_scope after 6/28/2018.
       # pylint: disable=protected-access
-      with graph._attr_scope({"_tpu_replicated_input":
-                              attr_value_pb2.AttrValue(b=True)}):
+      with graph._attr_scope({
+          "_tpu_replicated_input": attr_value_pb2.AttrValue(b=True)
+      }):
+        # Add identity ops so even unused inputs are "consumed" by the
+        # computation. This is to avoid orphaned TPUReplicatedInput nodes.
+        # TODO(phawkins): consider instead pruning unused TPUReplicatedInput
+        # and eliding trivial TPUReplicatedInput/TPUReplicatedOutput pairs.
         computation_inputs = [
             array_ops.identity(x, name="replicated_input_{}".format(i))
-            for i, x in enumerate(computation_inputs)]
+            for i, x in enumerate(computation_inputs)
+        ]
       # pylint: enable=protected-access
 
       # If there is an infeed queue, adds the dequeued values to the
@@ -547,10 +636,16 @@ def split_compile_and_replicate(computation,
 
       vscope.set_use_resource(saved_use_resource)
 
+    # If the computation returns `None`, make it an empty tuple.
+    if outputs is None:
+      outputs = tuple()
     # If the computation only returned one value, makes it a tuple.
     if not isinstance(outputs, (list, tuple)):
       outputs = (outputs,)
 
+    # Append `no_op` here so that fetching any return value of this function
+    # will trigger TPUExecute node.
+    outputs += (control_flow_ops.no_op(),)
     try:
       with ops.device(core(0)):
         outputs = [
@@ -582,6 +677,7 @@ def split_compile_and_replicate(computation,
       with ops.device(t.device if t.device else core(0)):
         new_output_tensors.append(array_ops.identity(t))
     output_tensors = new_output_tensors
+    context.ExitResult(output_tensors)
   finally:
     context.report_unsupported_operations()
     context.Exit()

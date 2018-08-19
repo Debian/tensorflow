@@ -51,7 +51,7 @@ HeuristicLayoutAssignment(const HloInstruction* instr,
   //   H <=> Y
   //   W <=> X
   //
-  // Therefore kOutputInputYX means NHWC; kBatchDepthYX means NCHW.
+  // Therefore kOutputInputYX and kBatchDepthYX mean NCHW.
 
   // As of today, our empirical evidence is that cudnn 7.0 is faster on V100 x
   // fp16 with the mostly-NHWC layout. The heuristic may change as cudnn version
@@ -159,7 +159,13 @@ Status GpuLayoutAssignment::AddBackendConstraintsToDnnConvCustomCall(
 
 Status GpuLayoutAssignment::AddBackendConstraints(
     LayoutConstraints* constraints) {
-  for (auto* instruction : constraints->computation()->instructions()) {
+  // Add convolution constraints in reverse postorder that the earliest
+  // convolution layout propagates first. This reduces the likelihood of fusion
+  // nodes with copies.
+  auto post_order = constraints->computation()->MakeInstructionPostOrder();
+  for (auto iterator = post_order.rbegin(); iterator != post_order.rend();
+       ++iterator) {
+    HloInstruction* instruction = *iterator;
     if (IsCustomCallToDnnConvolution(*instruction)) {
       TF_RETURN_IF_ERROR(
           AddBackendConstraintsToDnnConvCustomCall(instruction, constraints));

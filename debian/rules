@@ -2,30 +2,49 @@
 #export DH_VERBOSE=1
 
 TMPDIR=tf_cpu_build
-BUILDOPTIONS=-DCMAKE_BUILD_TYPE=Release \
-			 -Dtensorflow_VERBOSE=ON \
-			 -Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
-			 -Dtensorflow_ENABLE_GRPC_SUPPORT=OFF \
-			 -Dtensorflow_ENABLE_HDFS_SUPPORT=OFF \
-			 -Dtensorflow_ENABLE_JEMALLOC_SUPPORT=OFF \
-			 -Dtensorflow_BUILD_CC_EXAMPLE=ON \
-			 -Dtensorflow_BUILD_PYTHON_BINDINGS=ON \
-			 -Dtensorflow_BUILD_ALL_KERNELS=ON \
-			 -Dtensorflow_BUILD_CONTRIB_KERNELS=ON \
-			 -Dtensorflow_BUILD_CC_TESTS=OFF \
-			 -Dtensorflow_BUILD_PYTHON_TESTS=OFF \
-			 -Dtensorflow_BUILD_MORE_PYTHON_TESTS=OFF \
-			 -Dtensorflow_BUILD_SHARED_LIB=ON \
-			 -Dtensorflow_OPTIMIZE_FOR_NATIVE_ARCH=ON \
-			 -Dtensorflow_ENABLE_SNAPPY_SUPPORT=OFF \
-			 -Dtensorflow_DISABLE_EIGEN_FORCEINLINE=OFF \
-			 -Dtensorflow_WIN_CPU_SIMD_OPTIONS=OFF \
-			 -Dtensorflow_ENABLE_MKL_SUPPORT=OFF \
-			 -Dtensorflow_ENABLE_MKLDNN_SUPPORT=OFF \
-			 -Dtensorflow_ENABLE_GPU=OFF \
-			 -Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
-			 -Dsystemlib_ZLIB=ON \
-			 -DPYTHON_EXECUTABLE=/usr/bin/python3
+
+# FIXME: don't download eigen3 double-convertion
+DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
+	-Dtensorflow_VERBOSE=ON \
+	-Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
+	-Dtensorflow_ENABLE_GRPC_SUPPORT=ON \
+	-Dtensorflow_ENABLE_HDFS_SUPPORT=OFF \
+	-Dtensorflow_ENABLE_JEMALLOC_SUPPORT=OFF \
+	-Dtensorflow_BUILD_CC_EXAMPLE=OFF \
+	-Dtensorflow_BUILD_PYTHON_BINDINGS=ON \
+	-Dtensorflow_BUILD_ALL_KERNELS=ON \
+	-Dtensorflow_BUILD_CONTRIB_KERNELS=ON \
+	-Dtensorflow_BUILD_CC_TESTS=OFF \
+	-Dtensorflow_BUILD_PYTHON_TESTS=OFF \
+	-Dtensorflow_BUILD_MORE_PYTHON_TESTS=OFF \
+	-Dtensorflow_BUILD_SHARED_LIB=ON \
+	-Dtensorflow_OPTIMIZE_FOR_NATIVE_ARCH=OFF \
+	-Dtensorflow_ENABLE_SNAPPY_SUPPORT=ON \
+	-Dtensorflow_DISABLE_EIGEN_FORCEINLINE=OFF \
+	-Dtensorflow_WIN_CPU_SIMD_OPTIONS=OFF \
+	-Dtensorflow_ENABLE_MKL_SUPPORT=OFF \
+	-Dtensorflow_ENABLE_MKLDNN_SUPPORT=OFF \
+	-Dtensorflow_ENABLE_GPU=OFF \
+	-Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
+	-Dsystemlib_ZLIB=ON \
+	-Dsystemlib_GRPC=ON \
+	-Dsystemlib_JSONCPP=ON \
+	-Dsystemlib_EIGEN=OFF \
+	-Dsystemlib_RE2=ON \
+	-Dsystemlib_PROTOBUF=ON \
+	-Dsystemlib_JPEG=ON \
+	-Dsystemlib_SNAPPY=ON \
+	-Dsystemlib_PNG=ON \
+	-Dsystemlib_FARMHASH=ON \
+	-Dsystemlib_DOUBLE_CONVERSION=OFF \
+	-Dsystemlib_SQLITE=ON \
+	-Dsystemlib_LMDB=ON \
+	-Dsystemlib_GEMMLOWP=ON \
+	-Dsystemlib_NSYNC=ON \
+	-Dsystemlib_GIF=ON \
+	-Dsystemlib_HIGHWAYHASH=ON \
+	-Dsystemlib_GTEST=ON \
+	-DPYTHON_EXECUTABLE=/usr/bin/python3
 
 
 %:
@@ -43,7 +62,9 @@ override_dh_auto_configure: $(TMPDIR)
 		cmake ../tensorflow/contrib/cmake/
 
 override_dh_auto_build: $(TMPDIR)
-	dh_auto_build --builddirectory=$(TMPDIR)
+	# target:tensorflow for libtensorflow.so
+	# target:tf_python_build_pip_package for the python package
+	dh_auto_build --builddirectory=$(TMPDIR) -- tensorflow tf_python_build_pip_package
 
 override_dh_auto_test: $(TMPDIR)
-	true
+	true  #FIXME: temporary

@@ -2,9 +2,11 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # Apache 2.0
 
+load("//tensorflow/contrib/lite:build_def.bzl", "tflite_copts")
+
 common_copts = [
     "-Wall",
-]
+] + tflite_copts()
 
 cc_library(
     name = "profiler",
@@ -18,6 +20,7 @@ cc_test(
     srcs = ["profiler_test.cc"],
     copts = ["-DTFLITE_PROFILING_ENABLED"],
     defines = ["TFLITE_PROFILING_ENABLED"],
+    tags = ["no_oss"],
     deps = [
         ":profiler",
         "//tensorflow/contrib/lite/testing:util",
@@ -36,12 +39,14 @@ cc_library(
     name = "time",
     srcs = ["time.cc"],
     hdrs = ["time.h"],
+    copts = common_copts,
 )
 
 cc_library(
     name = "profile_summarizer",
     srcs = ["profile_summarizer.cc"],
     hdrs = ["profile_summarizer.h"],
+    copts = common_copts,
     deps = [
         ":profiler",
         "//tensorflow/contrib/lite:framework",
@@ -53,6 +58,8 @@ cc_library(
 cc_test(
     name = "profile_summarizer_test",
     srcs = ["profile_summarizer_test.cc"],
+    copts = common_copts,
+    tags = ["no_oss"],
     deps = [
         ":profile_summarizer",
         "//tensorflow/contrib/lite:framework",
@@ -70,6 +77,7 @@ cc_test(
     srcs = ["profile_buffer_test.cc"],
     copts = ["-DTFLITE_PROFILING_ENABLED"],
     defines = ["TFLITE_PROFILING_ENABLED"],
+    tags = ["no_oss"],
     deps = [
         ":profile_buffer",
         "//tensorflow/contrib/lite/testing:util",
