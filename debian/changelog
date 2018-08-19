@@ -1,5 +1,5 @@
-tensorflow (1.10.0-1) UNRELEASED; urgency=low
+tensorflow (1.10.0+dfsg-1) UNRELEASED; urgency=medium
 
   * Initial release. (Closes: #804612)
 
- -- Mo Zhou <cdluminate@gmail.com>  Sat, 21 Jul 2018 10:02:02 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Sun, 19 Aug 2018 04:02:09 +0000

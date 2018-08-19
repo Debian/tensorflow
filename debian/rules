@@ -55,7 +55,6 @@ $(TMPDIR):
 
 override_dh_auto_clean:
 	-$(RM) -rf $(TMPDIR)
-	-git clean -xdf
 
 override_dh_auto_configure: $(TMPDIR)
 	set -e; cd $(TMPDIR); \
