@@ -32,6 +32,7 @@ Build-Depends:
  libsqlite3-dev,
  libdouble-conversion-dev,
  libgtest-dev,
+ libgrpc++-dev,
 
               
 Package: tensorflow
