@@ -19,6 +19,11 @@ Only C and C++ interface is provided.
   - [ ] working on amd64?
   - [ ] working on ppc64el?
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
+- [ ] sort out this confusing lintian E
+      source-is-missing tensorflow/compiler/aot/codegen_test_o.golden
+- [ ] remaining lintian warnings and errors.
+- [ ] traverse the 16000+ files in the source tree and complete d/copyright.
+      ummmmmmmmmm.............
 
 - [ ] upload to experimental.
 
