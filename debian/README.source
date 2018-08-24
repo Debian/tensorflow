@@ -69,6 +69,7 @@ Exp-Stage B
 
 Provide the Python interface.
 
+- [ ] do we have all the required python dependencies?
 - [ ] build pywrap_tensorflow_internal.so
 - [ ] figure out how to generate python API
 - [ ] install python files
