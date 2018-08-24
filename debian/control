@@ -23,6 +23,7 @@ Build-Depends:
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
+ libmkldnn-dev [amd64],
  libnsync-dev,
  libpng-dev,
  libprotobuf-dev (>= 3.6.0~),
