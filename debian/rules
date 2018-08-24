@@ -48,16 +48,16 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 
 
 %:
-	dh $@ --buildsystem=cmake
+	dh $@ -Scmake -Dtensorflow/contrib/cmake
 
 override_dh_auto_configure:
-	cp -rv debian/cmake/* .
-	dh_auto_configure -- $(DEB_CMAKE_OPTS)
+	cp -rv debian/cmake/* tensorflow/contrib/cmake/
+	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
 	
 override_dh_auto_build:
 	# target:tensorflow for libtensorflow.so
 	# target:tf_python_build_pip_package for the python package
-	dh_auto_build --builddirectory=$(TMPDIR) -- tensorflow tf_python_build_pip_package
+	dh_auto_build -- tensorflow tf_python_build_pip_package
 
 override_dh_auto_test:
 	true  #FIXME: temporary
