@@ -1,5 +1,5 @@
 #!/usr/bin/dh-exec
-include/tensorflow  usr/include/
-include/third_party/eigen3  usr/include/tensorflow/
+usr/include/tensorflow
+usr/include/third_party/eigen3  usr/include/tensorflow/
 
-lib/libtensorflow.so  usr/lib/${DEB_HOST_MULTIARCH}/
+usr/lib/libtensorflow.so  usr/lib/${DEB_HOST_MULTIARCH}/
