@@ -19,14 +19,8 @@ cmake_policy(SET CMP0022 NEW)
 # Options
 option(tensorflow_VERBOSE "Enable for verbose output" OFF)
 
-if(WIN32)
-# BoringSSL is disabled for windows as it currently doesn't build with
-# MSBuild. (Ninja is required.)
-option(tensorflow_ENABLE_SSL_SUPPORT "Enable boringssl support" OFF)
-else()
 # BoringSSL is enabled for gRPC.
-option(tensorflow_ENABLE_SSL_SUPPORT "Enable boringssl support" ON)
-endif()
+option(tensorflow_ENABLE_SSL_SUPPORT "Enable boringssl support" OFF)
 
 option(tensorflow_ENABLE_GRPC_SUPPORT "Enable gRPC support" OFF)
 option(tensorflow_ENABLE_HDFS_SUPPORT "Enable HDFS support" OFF)
@@ -97,13 +91,9 @@ if (NOT WIN32)
   endif (systemlib_ALL)
 endif()
 
-if (WIN32)
-  set(BOOL_WIN32 ON)
-else (WIN32)
-  set(BOOL_WIN32 OFF)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-endif (WIN32)
+set(BOOL_WIN32 OFF)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
 # [CLEANUP] Remove when done
 # For debugging
@@ -136,38 +126,6 @@ if (tensorflow_DISABLE_EIGEN_FORCEINLINE)
 endif()
 
 add_definitions(-DEIGEN_AVOID_STL_ARRAY)
-if(WIN32)
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-      # 64 bits
-      add_definitions(-DWIN64)
-  elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
-      # 32 bits
-      # temporary fix for #18241
-      add_definitions(-DEIGEN_DEFAULT_DENSE_INDEX_TYPE=std::int64_t)
-  endif()
-  add_definitions(-DNOMINMAX -D_WIN32_WINNT=0x0A00 -DLANG_CXX11)
-  add_definitions(-DWIN32 -DOS_WIN -D_MBCS -DWIN32_LEAN_AND_MEAN -DNOGDI -DPLATFORM_WINDOWS)
-  add_definitions(-DTENSORFLOW_USE_EIGEN_THREADPOOL -DEIGEN_HAS_C99_MATH)
-  add_definitions(-DTF_COMPILE_LIBRARY)
-  add_definitions(/bigobj /nologo /EHsc /GF /MP /Gm-)
-  # Suppress warnings to reduce build log size.
-  add_definitions(/wd4267 /wd4244 /wd4800 /wd4503 /wd4554 /wd4996 /wd4348 /wd4018)
-  add_definitions(/wd4099 /wd4146 /wd4267 /wd4305 /wd4307)
-  add_definitions(/wd4715 /wd4722 /wd4723 /wd4838 /wd4309 /wd4334)
-  add_definitions(/wd4003 /wd4244 /wd4267 /wd4503 /wd4506 /wd4800 /wd4996)
-  # Suppress linker warnings.
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
-  set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-  set(CMAKE_CXX_FLAGS_DEBUG "/D_DEBUG /MDd /Ob2")
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /D_ITERATOR_DEBUG_LEVEL=0")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /D_ITERATOR_DEBUG_LEVEL=0")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /D_ITERATOR_DEBUG_LEVEL=0")
-
-  # Try to avoid flaky failures due to failed generation of generate.stamp files.
-  set(CMAKE_SUPPRESS_REGENERATION ON)
-endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -std=c++11")
@@ -187,20 +145,6 @@ include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-fopenmp" GCC_OPENMP_SUPPORT)
 if (GCC_OPENMP_SUPPORT)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-endif()
-CHECK_CXX_COMPILER_FLAG("/openmp" MSVC_OPENMP_SUPPORT)
-if (MSVC_OPENMP_SUPPORT)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
-endif()
-
-# MSVC SIMD instructions
-if (tensorflow_WIN_CPU_SIMD_OPTIONS)
-  if (WIN32)
-    CHECK_CXX_COMPILER_FLAG(${tensorflow_WIN_CPU_SIMD_OPTIONS} COMPILER_OPT_WIN_CPU_SIMD_SUPPORTED)
-    if(COMPILER_OPT_WIN_CPU_SIMD_SUPPORTED)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${tensorflow_WIN_CPU_SIMD_OPTIONS}")
-    endif()
-  endif()
 endif()
 
 if (tensorflow_ENABLE_JEMALLOC_SUPPORT)
@@ -300,12 +244,7 @@ if(tensorflow_ENABLE_SNAPPY_SUPPORT)
   list(APPEND tensorflow_EXTERNAL_DEPENDENCIES snappy)
   include_directories(${snappy_INCLUDE_DIR})
 endif()
-if(WIN32)
-  list(APPEND tensorflow_EXTERNAL_LIBRARIES wsock32 ws2_32 shlwapi)
-endif()
-if(UNIX)
-  list(APPEND tensorflow_EXTERNAL_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
-endif()
+list(APPEND tensorflow_EXTERNAL_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 if(HAIKU)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES network)
 endif()
@@ -328,12 +267,10 @@ if (tensorflow_ENABLE_MKL_SUPPORT)
 endif (tensorflow_ENABLE_MKL_SUPPORT)
 
 if (tensorflow_ENABLE_GPU)
-  if (NOT WIN32)
-    # Default install paths for cuda libraries in Linux
-    # In some Linux distros, find_package(CUDA) seems to require CMAKE_LIBRARY_PATH to include cuda-lib paths
-    list(APPEND CMAKE_LIBRARY_PATH "${tensorflow_CUDA_LIBRARY_PATH}")
-    list(APPEND CMAKE_LIBRARY_PATH "${tensorflow_CUDA_LIBRARY_PATH}/stubs")
-  endif (NOT WIN32)
+  # Default install paths for cuda libraries in Linux
+  # In some Linux distros, find_package(CUDA) seems to require CMAKE_LIBRARY_PATH to include cuda-lib paths
+  list(APPEND CMAKE_LIBRARY_PATH "${tensorflow_CUDA_LIBRARY_PATH}")
+  list(APPEND CMAKE_LIBRARY_PATH "${tensorflow_CUDA_LIBRARY_PATH}/stubs")
 
   # later command will make use of the value in tensorflow_CUDA_VERSION
   find_package(CUDA ${tensorflow_CUDA_VERSION} REQUIRED EXACT)
@@ -358,50 +295,36 @@ if (tensorflow_ENABLE_GPU)
   set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
   set(CUDA_INCLUDE ${CUDA_TOOLKIT_TARGET_DIR} ${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/include)
   include_directories(${CUDA_INCLUDE})
-  if (WIN32)
-    add_definitions(-DGOOGLE_CUDA=1 -DTF_EXTRA_CUDA_CAPABILITIES=3.0,3.5,5.2)
-  else (WIN32)
-    # Without these double quotes, cmake in Linux makes it "-DTF_EXTRA_CUDA_CAPABILITIES=3.0, -D3.5, -D5.2" for cc, which incurs build breaks
-    add_definitions(-DGOOGLE_CUDA=1 -D"TF_EXTRA_CUDA_CAPABILITIES=3.0,3.5,5.2")
-  endif (WIN32)
 
-  if (WIN32)
-    # add cudnn
-    if(NOT CUDNN_HOME)
-      set(CUDNN_HOME ${CUDA_TOOLKIT_TARGET_DIR})
-    endif(NOT CUDNN_HOME)
-    set(CUDNN_INCLUDE "${CUDNN_HOME}/include")
+  # Without these double quotes, cmake in Linux makes it "-DTF_EXTRA_CUDA_CAPABILITIES=3.0, -D3.5, -D5.2" for cc, which incurs build breaks
+  add_definitions(-DGOOGLE_CUDA=1 -D"TF_EXTRA_CUDA_CAPABILITIES=3.0,3.5,5.2")
 
-    set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_CUFFT_LIBRARIES}
-      ${CUDA_curand_LIBRARY} ${CUDA_cupti_LIBRARY} ${CUDA_cusolver_LIBRARY} ${CUDNN_HOME}/lib/x64/cudnn.lib)
-  else (WIN32)
-    set(CUDNN_INCLUDE "${tensorflow_CUDNN_INCLUDE}")
+  set(CUDNN_INCLUDE "${tensorflow_CUDNN_INCLUDE}")
 
-    find_library(nccl_STATIC_LIBRARY NAMES libnccl_static.a PATHS ${tensorflow_PATH_NCCL_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
-    if (NOT nccl_STATIC_LIBRARY)
-      message(FATAL_ERROR "NCCL is required for GPU-build")
-    else (NOT nccl_STATIC_LIBRARY)
-      message("nccl-static: ${nccl_STATIC_LIBRARY}")
-      # something like /usr/lib64/libnccl_static.a
-    endif (NOT nccl_STATIC_LIBRARY)
+  find_library(nccl_STATIC_LIBRARY NAMES libnccl_static.a PATHS ${tensorflow_PATH_NCCL_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
+  if (NOT nccl_STATIC_LIBRARY)
+    message(FATAL_ERROR "NCCL is required for GPU-build")
+  else (NOT nccl_STATIC_LIBRARY)
+    message("nccl-static: ${nccl_STATIC_LIBRARY}")
+    # something like /usr/lib64/libnccl_static.a
+  endif (NOT nccl_STATIC_LIBRARY)
 
-    find_library(cudnn_STATIC_LIBRARY NAMES libcudnn_static.a PATHS ${tensorflow_PATH_CUDNN_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
-    if (NOT cudnn_STATIC_LIBRARY)
-      message(FATAL_ERROR "CUDNN is required for GPU-build")
-    else (NOT cudnn_STATIC_LIBRARY)
-      message("cudnn-static: ${cudnn_STATIC_LIBRARY}")
-    endif (NOT cudnn_STATIC_LIBRARY)
+  find_library(cudnn_STATIC_LIBRARY NAMES libcudnn_static.a PATHS ${tensorflow_PATH_CUDNN_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
+  if (NOT cudnn_STATIC_LIBRARY)
+    message(FATAL_ERROR "CUDNN is required for GPU-build")
+  else (NOT cudnn_STATIC_LIBRARY)
+    message("cudnn-static: ${cudnn_STATIC_LIBRARY}")
+  endif (NOT cudnn_STATIC_LIBRARY)
 
-    find_library(culibos_STATIC_LIBRARY NAMES libculibos.a PATHS ${tensorflow_PATH_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
-    if (NOT culibos_STATIC_LIBRARY)
-      message(FATAL_ERROR "CULIBOS is required for GPU-build")
-    else (NOT culibos_STATIC_LIBRARY)
-      message("culibos-static: ${culibos_STATIC_LIBRARY}")
-    endif (NOT culibos_STATIC_LIBRARY)
+  find_library(culibos_STATIC_LIBRARY NAMES libculibos.a PATHS ${tensorflow_PATH_STATIC_LIB} ${CUDA_TOOLKIT_ROOT_DIR})
+  if (NOT culibos_STATIC_LIBRARY)
+    message(FATAL_ERROR "CULIBOS is required for GPU-build")
+  else (NOT culibos_STATIC_LIBRARY)
+    message("culibos-static: ${culibos_STATIC_LIBRARY}")
+  endif (NOT culibos_STATIC_LIBRARY)
 
-    set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_CUFFT_LIBRARIES}
-      ${CUDA_curand_LIBRARY} ${CUDA_cupti_LIBRARY} ${CUDA_cusolver_LIBRARY} ${cudnn_STATIC_LIBRARY} ${culibos_STATIC_LIBRARY} ${nccl_STATIC_LIBRARY})
-  endif (WIN32)
+  set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_CUFFT_LIBRARIES}
+    ${CUDA_curand_LIBRARY} ${CUDA_cupti_LIBRARY} ${CUDA_cusolver_LIBRARY} ${cudnn_STATIC_LIBRARY} ${culibos_STATIC_LIBRARY} ${nccl_STATIC_LIBRARY})
   include_directories(${CUDNN_INCLUDE})
 
   # Remove "." from CUDA version variable.
@@ -438,26 +361,14 @@ if (tensorflow_ENABLE_GPU)
   include_directories(${tensorflow_source_dir}/third_party/gpus)
   # add cuda libraries to tensorflow_EXTERNAL_LIBRARIES
   list(APPEND tensorflow_EXTERNAL_LIBRARIES ${CUDA_LIBRARIES})
-  if(NOT WIN32)
-    # add gomp to tensorflow_EXTERNAL_LIBRARIES, needed by libcusolver.so
-    list(APPEND tensorflow_EXTERNAL_LIBRARIES gomp)
-  endif()
+  # add gomp to tensorflow_EXTERNAL_LIBRARIES, needed by libcusolver.so
+  list(APPEND tensorflow_EXTERNAL_LIBRARIES gomp)
 
   # NOTE(mrry): Update these flags when the version of CUDA or cuDNN used
   # in the default build is upgraded.
-  if(WIN32)
-    set(tensorflow_BUILD_INFO_FLAGS --build_config cuda --key_value
-      msvcp_dll_name=msvcp140.dll
-      cudart_dll_name=cudart64_${short_CUDA_VER}.dll
-      cuda_version_number=${tensorflow_CUDA_VERSION}
-      nvcuda_dll_name=nvcuda.dll
-      cudnn_dll_name=cudnn64_${tensorflow_CUDNN_VERSION}.dll
-      cudnn_version_number=${tensorflow_CUDNN_VERSION})
-  else(WIN32)
-    set(tensorflow_BUILD_INFO_FLAGS --build_config cuda --key_value
-	    cuda_version_number=${tensorflow_CUDA_VERSION}
-	    cudnn_version_number=${tensorflow_CUDNN_VERSION})
-  endif(WIN32)
+	set(tensorflow_BUILD_INFO_FLAGS --build_config cuda --key_value
+		cuda_version_number=${tensorflow_CUDA_VERSION}
+		cudnn_version_number=${tensorflow_CUDNN_VERSION})
 else(tensorflow_ENABLE_GPU)
   set(tensorflow_BUILD_INFO_FLAGS --build_config cpu --key_value
     msvcp_dll_name=msvcp140.dll)
