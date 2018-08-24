@@ -11,6 +11,7 @@ Uploaders: Mo Zhou <cdluminate@gmail.com>,
 Build-Depends:
  cmake,
  debhelper (>= 11~),
+ dh-exec,
  dh-python,
  libdouble-conversion-dev (>= 3.0.0+git20180802.4e8b3b5~),
  libfarmhash-dev,
@@ -45,7 +46,8 @@ Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends},
  libtensorflow1.10 (= ${binary:Version}),
- python3-tensorflow (= ${binary:Version}), 
+ libtensorflow-bin (= ${binary:Version}),
+# python3-tensorflow (= ${binary:Version}), 
 Recommends:
  libtensorflow-dev (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning
@@ -111,17 +113,17 @@ Description: Computation using data flow graphs for scalable machine learning (b
  .
  This package ships binary utilities of tensorflow.
 
-Package: python3-tensorflow
-Architecture: any
-Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow1.10 (>= ${source:Version}~),
-Description: Computation using data flow graphs for scalable machine learning (Py3)
- TensorFlow is an open source software library for numerical computation
- using data flow graphs. The graph nodes represent mathematical operations,
- while the graph edges represent the multidimensional data arrays (tensors)
- that flow between them. This flexible architecture enables you to deploy
- computation to one or more CPUs or GPUs in a desktop, server, or mobile
- device without rewriting code.
- .
- This package ships Python3 interface of tensorflow.
+#Package: python3-tensorflow
+#Architecture: any
+#Multi-Arch: foreign
+#Depends: ${misc:Depends}, ${shlibs:Depends},
+# libtensorflow1.10 (>= ${source:Version}~),
+#Description: Computation using data flow graphs for scalable machine learning (Py3)
+# TensorFlow is an open source software library for numerical computation
+# using data flow graphs. The graph nodes represent mathematical operations,
+# while the graph edges represent the multidimensional data arrays (tensors)
+# that flow between them. This flexible architecture enables you to deploy
+# computation to one or more CPUs or GPUs in a desktop, server, or mobile
+# device without rewriting code.
+# .
+# This package ships Python3 interface of tensorflow.
