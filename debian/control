@@ -8,14 +8,32 @@ Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
 Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
 Uploaders: Mo Zhou <cdluminate@gmail.com>,
-Build-Depends: debhelper (>= 11~),
-               cmake,
-               dh-python,
-               swig,
-               python3,
-               python3-all-dev,
-               python3-numpy,
+Build-Depends:
+ debhelper (>= 11~),
+ cmake,
+ dh-python,
+ swig,
+ python3,
+ python3-all-dev,
+ python3-numpy,
+ libgif-dev,
+ libjsoncpp-dev,
+ libfarmhash-dev,
+ zlib1g-dev,
+ libpng-dev,
+ libjpeg-dev,
+ liblmdb-dev,
+ libgemmlowp-dev,
+ libhighwayhash-dev,
+ libnsync-dev,
+ libprotobuf-dev,
+ protobuf-compiler,
+ libre2-dev,
+ libsqlite3-dev,
+ libdouble-conversion-dev,
+ libgtest-dev,
 
+              
 Package: tensorflow
 Section: metapackages
 Architecture: any
