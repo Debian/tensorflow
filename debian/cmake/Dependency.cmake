@@ -25,6 +25,7 @@ add_custom_target(gif)
 find_package(PkgConfig)
 set(grpc_INCLUDE_DIRS "/usr/include/")
 set(grpc_STATIC_LIBRARIES "-lgrpc++ -lgrpc")
+set(GRPC_BUILD "/usr/bin")
 add_custom_target(grpc)
 
 # gtest
