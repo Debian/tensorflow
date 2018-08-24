@@ -26,24 +26,6 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 	-Dtensorflow_ENABLE_MKLDNN_SUPPORT=OFF \
 	-Dtensorflow_ENABLE_GPU=OFF \
 	-Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
-	-Dsystemlib_ZLIB=ON \
-	-Dsystemlib_GRPC=ON \
-	-Dsystemlib_JSONCPP=ON \
-	-Dsystemlib_EIGEN=OFF \
-	-Dsystemlib_RE2=ON \
-	-Dsystemlib_PROTOBUF=ON \
-	-Dsystemlib_JPEG=ON \
-	-Dsystemlib_SNAPPY=ON \
-	-Dsystemlib_PNG=ON \
-	-Dsystemlib_FARMHASH=ON \
-	-Dsystemlib_DOUBLE_CONVERSION=OFF \
-	-Dsystemlib_SQLITE=ON \
-	-Dsystemlib_LMDB=ON \
-	-Dsystemlib_GEMMLOWP=ON \
-	-Dsystemlib_NSYNC=ON \
-	-Dsystemlib_GIF=ON \
-	-Dsystemlib_HIGHWAYHASH=ON \
-	-Dsystemlib_GTEST=ON \
 	-DPYTHON_EXECUTABLE=/usr/bin/python3
 
 
