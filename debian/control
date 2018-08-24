@@ -17,7 +17,7 @@ Build-Depends:
  libfarmhash-dev,
  libgemmlowp-dev,
  libgif-dev,
- libgrpc++-dev (>= 1.14.1~),
+# libgrpc++-dev (>= 1.14.1~),
  libgtest-dev,
  libhighwayhash-dev,
  libjpeg-dev,
