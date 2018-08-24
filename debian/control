@@ -35,6 +35,8 @@ Build-Depends:
  libgrpc++-dev,
  libsuperlu-dev,
  protobuf-compiler-grpc,
+ libsnappy-dev,
+ libprotoc-dev,
 
               
 Package: tensorflow
