@@ -82,6 +82,7 @@ add_library(tensorflow SHARED
     $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
     ${tensorflow_deffile}
 )
+set_target_properties(tensorflow PROPERTIES VERSION ${TF_PROJ_VERSION} SOVERSION ${TF_PROJ_SOVERSION})
 
 target_link_libraries(tensorflow PRIVATE
     ${tf_core_gpu_kernels_lib}
