@@ -1,6 +1,5 @@
 # A part of modified TensorFlow CMake for Debian.
-# Copyright (C) 2018 Mo Zhou.
-# MIT/Expat License
+# Copyright (C) 2018 Mo Zhou. MIT/Expat License
 
 # double-conversion
 set(double_conversion_INCLUDE_DIR "/usr/include/double-conversion")
