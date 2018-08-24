@@ -60,6 +60,7 @@ Only C and C++ interface is provided.
       /usr/bin/ld: error: compare_graphs(.debug_info) is too large (0x366f36be bytes)
       /usr/bin/ld: error: compare_graphs(.debug_str) is too large (0x6a64010e bytes)
       /usr/bin/ld: error: compare_graphs(.debug_loc) is too large (0x1fd19fe0 bytes)
+- [ ] how to prevent "make install" from building everything again?
 
 - [ ] upload to experimental.
 
