@@ -51,6 +51,15 @@ Only C and C++ interface is provided.
       -rwxr-xr-x 1 debian debian 3.6G Aug 24 13:53 libtensorflow.so.1.10.0 (unstripped)
       -rwxr-xr-x 1 debian debian 104M Aug 24 14:00 libtensorflow.so.1.10.0 (stripped)
 - [ ] 16GB RAM + 16GB swap is not enough to avoid triggering OOM killer?
+- [ ] get rid of static linking written for stupid windows
+      /usr/bin/ld: error: benchmark_model(.debug_info) is too large (0x35a9f359 bytes)
+      /usr/bin/ld: error: benchmark_model(.debug_str) is too large (0x6a545d15 bytes)
+      /usr/bin/ld: error: benchmark_model(.debug_loc) is too large (0x1f5b1950 bytes)
+      make[3]: Leaving directory '/<<BUILDDIR>>/tensorflow-1.10.0+dfsg/obj-x86_64-linux-gnu'
+      [ 98%] Built target benchmark_model
+      /usr/bin/ld: error: compare_graphs(.debug_info) is too large (0x366f36be bytes)
+      /usr/bin/ld: error: compare_graphs(.debug_str) is too large (0x6a64010e bytes)
+      /usr/bin/ld: error: compare_graphs(.debug_loc) is too large (0x1fd19fe0 bytes)
 
 - [ ] upload to experimental.
 
