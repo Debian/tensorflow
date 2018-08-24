@@ -11,3 +11,102 @@ index c974a470..109e08c1 100644
  #include "tensorflow/core/debug/debug_service.grpc.pb.h"
  
  namespace tensorflow {
+diff --git a/tensorflow/core/debug/debug_io_utils.cc b/tensorflow/core/debug/debug_io_utils.cc
+index 9e8002d4..95290b2f 100644
+--- a/tensorflow/core/debug/debug_io_utils.cc
++++ b/tensorflow/core/debug/debug_io_utils.cc
+@@ -22,11 +22,11 @@ limitations under the License.
+ #include <utility>
+ #include <vector>
+ 
+-#ifndef PLATFORM_WINDOWS
++#if 0
+ #include "grpcpp/create_channel.h"
+ #else
+ // winsock2.h is used in grpc, so Ws2_32.lib is needed
+-#pragma comment(lib, "Ws2_32.lib")
++//#pragma comment(lib, "Ws2_32.lib")
+ #endif  // #ifndef PLATFORM_WINDOWS
+ 
+ #include "tensorflow/core/debug/debug_callback_registry.h"
+@@ -238,7 +238,7 @@ string AppendTimestampToFilePath(const string& in, const uint64 timestamp) {
+   return out;
+ }
+ 
+-#ifndef PLATFORM_WINDOWS
++#if 0
+ // Publishes encoded GraphDef through a gRPC debugger stream, in chunks,
+ // conforming to the gRPC message size limit.
+ Status PublishEncodedGraphDefInChunks(const string& encoded_graph_def,
+@@ -369,7 +369,7 @@ Status DebugIO::PublishDebugMetadata(
+   Status status;
+   for (const string& url : debug_urls) {
+     if (str_util::Lowercase(url).find(kGrpcURLScheme) == 0) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+       Event grpc_event;
+ 
+       // Determine the path (if any) in the grpc:// URL, and add it as a field
+@@ -425,7 +425,7 @@ Status DebugIO::PublishDebugTensor(const DebugNodeKey& debug_node_key,
+         fail_statuses.push_back(s);
+       }
+     } else if (str_util::Lowercase(url).find(kGrpcURLScheme) == 0) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+       Status s = DebugGrpcIO::SendTensorThroughGrpcStream(
+           debug_node_key, tensor, wall_time_us, url, gated_grpc);
+ 
+@@ -498,7 +498,7 @@ Status DebugIO::PublishGraph(const Graph& graph, const string& device_name,
+       status.Update(
+           DebugFileIO::DumpEventProtoToFile(event, dump_root_dir, file_name));
+     } else if (debug_url.find(kGrpcURLScheme) == 0) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+       status.Update(PublishEncodedGraphDefInChunks(buf, device_name, now_micros,
+                                                    debug_url));
+ #else
+@@ -512,7 +512,7 @@ Status DebugIO::PublishGraph(const Graph& graph, const string& device_name,
+ 
+ bool DebugIO::IsCopyNodeGateOpen(
+     const std::vector<DebugWatchAndURLSpec>& specs) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+   for (const DebugWatchAndURLSpec& spec : specs) {
+     if (!spec.gated_grpc || spec.url.compare(0, strlen(DebugIO::kGrpcURLScheme),
+                                              DebugIO::kGrpcURLScheme)) {
+@@ -531,7 +531,7 @@ bool DebugIO::IsCopyNodeGateOpen(
+ 
+ bool DebugIO::IsDebugNodeGateOpen(const string& watch_key,
+                                   const std::vector<string>& debug_urls) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+   for (const string& debug_url : debug_urls) {
+     if (debug_url.compare(0, strlen(DebugIO::kGrpcURLScheme),
+                           DebugIO::kGrpcURLScheme)) {
+@@ -550,7 +550,7 @@ bool DebugIO::IsDebugNodeGateOpen(const string& watch_key,
+ 
+ bool DebugIO::IsDebugURLGateOpen(const string& watch_key,
+                                  const string& debug_url) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+   if (debug_url.find(kGrpcURLScheme) != 0) {
+     return true;
+   } else {
+@@ -563,7 +563,7 @@ bool DebugIO::IsDebugURLGateOpen(const string& watch_key,
+ 
+ Status DebugIO::CloseDebugURL(const string& debug_url) {
+   if (debug_url.find(DebugIO::kGrpcURLScheme) == 0) {
+-#ifndef PLATFORM_WINDOWS
++#if 0
+     return DebugGrpcIO::CloseGrpcStream(debug_url);
+ #else
+     GRPC_OSS_WINDOWS_UNIMPLEMENTED_ERROR;
+@@ -670,7 +670,7 @@ Status DebugFileIO::RecursiveCreateDir(Env* env, const string& dir) {
+   }
+ }
+ 
+-#ifndef PLATFORM_WINDOWS
++#if 0
+ DebugGrpcChannel::DebugGrpcChannel(const string& server_stream_addr)
+     : server_stream_addr_(server_stream_addr),
+       url_(strings::StrCat(DebugIO::kGrpcURLScheme, server_stream_addr)) {}
