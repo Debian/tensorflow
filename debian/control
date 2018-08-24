@@ -30,7 +30,7 @@ Build-Depends:
  protobuf-compiler,
  libre2-dev,
  libsqlite3-dev,
- libdouble-conversion-dev,
+ libdouble-conversion-dev (>= 3.0.0+git20180802.4e8b3b5~),
  libgtest-dev,
  libgrpc++-dev,
  libsuperlu-dev,
