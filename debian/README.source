@@ -30,6 +30,7 @@ Exp-Stage A
 Only C and C++ interface is provided.
 
 - [x] prevent the build system from downloading anything.
+- [x] deal with all the C/C++ lib dependencies.
 - [x] produce libtensorflow.so.1.10 and install it into .deb package.
 - [x] ambiguous FFT2D license.
 
