@@ -91,9 +91,8 @@ set(sqlite_STATIC_LIBRARIES "-lsqlite3")
 add_custom_target(sqlite)
 
 # zlib
-find_package(PkgConfig)
-pkg_search_module(ZLIB REQUIRED zlib)
 set(zlib_INCLUDE_DIR ${ZLIB_INCLUDE_DIRS})
+set(zlib_STATIC_LIBRARIES "-lz")
 add_custom_target(zlib)
 
 # stubs
