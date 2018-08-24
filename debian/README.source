@@ -1,5 +1,5 @@
 Generating and importing upstream tarball
-===
+=========================================
 
 * Clone upstream git repo
 
@@ -11,3 +11,18 @@ Generating and importing upstream tarball
   git archive v1.2.1 | gzip > ../tensorflow_1.2.1.orig.tar.gz
 
 * gbp import-orig --pristine-tar ../tensorflow_1.2.1.orig.tar.gz
+
+
+Debian's own cmake build
+========================
+
+Google is going to drop cmake build. See debian/cmake/README.md
+
+
+Ambiguous FFT2D license
+=======================
+
+https://lists.debian.org/debian-legal/2018/08/msg00005.html
+https://github.com/tensorflow/tensorflow/issues/21724
+
+Maybe it's a free license.
