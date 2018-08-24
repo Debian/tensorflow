@@ -7,7 +7,7 @@ export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 	-Dtensorflow_VERBOSE=ON \
 	-Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_GRPC_SUPPORT=ON \
+	-Dtensorflow_ENABLE_GRPC_SUPPORT=OFF \
 	-Dtensorflow_ENABLE_HDFS_SUPPORT=OFF \
 	-Dtensorflow_ENABLE_JEMALLOC_SUPPORT=OFF \
 	-Dtensorflow_BUILD_CC_EXAMPLE=OFF \
