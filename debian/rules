@@ -1,9 +1,9 @@
 #!/usr/bin/make -f
-#export DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CFLAGS_MAINT_APPEND = #-Wall
+export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-TMPDIR=tf_cpu_build
-
-# FIXME: don't download eigen3 double-convertion
 DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 	-Dtensorflow_VERBOSE=ON \
 	-Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
@@ -50,20 +50,14 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 %:
 	dh $@ --buildsystem=cmake
 
-$(TMPDIR):
-	mkdir $@
-
-override_dh_auto_clean:
-	-$(RM) -rf $(TMPDIR)
-
-override_dh_auto_configure: $(TMPDIR)
-	set -e; cd $(TMPDIR); \
-		cmake ../tensorflow/contrib/cmake/
-
-override_dh_auto_build: $(TMPDIR)
+override_dh_auto_configure:
+	cp -rv debian/cmake/* .
+	dh_auto_configure -- $(DEB_CMAKE_OPTS)
+	
+override_dh_auto_build:
 	# target:tensorflow for libtensorflow.so
 	# target:tf_python_build_pip_package for the python package
 	dh_auto_build --builddirectory=$(TMPDIR) -- tensorflow tf_python_build_pip_package
 
-override_dh_auto_test: $(TMPDIR)
+override_dh_auto_test:
 	true  #FIXME: temporary
