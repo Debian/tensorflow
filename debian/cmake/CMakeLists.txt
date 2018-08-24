@@ -208,26 +208,9 @@ if (tensorflow_ENABLE_JEMALLOC_SUPPORT)
 endif()
 
 # External dependencies
-include(zlib)
-include(gif)
-include(png)
-include(jpeg)
-include(lmdb)
+include(Dependency.cmake)
 include(eigen)
-include(gemmlowp)
-include(jsoncpp)
-include(farmhash)
 include(fft2d)
-include(highwayhash)
-include(nsync)
-include(protobuf)
-include(re2)
-include(cub)
-include(sqlite)
-include(double_conversion)
-if (tensorflow_BUILD_CC_TESTS)
-  include(googletest)
-endif()
 
 add_definitions(${ADD_CFLAGS})
 link_directories(${ADD_LINK_DIRECTORY})
@@ -257,22 +240,13 @@ else (systemlib_ZLIB)
 endif (systemlib_ZLIB)
 
 set(tensorflow_EXTERNAL_DEPENDENCIES
-    zlib_copy_headers_to_destination
-    gif_copy_headers_to_destination
-    png_copy_headers_to_destination
-    jpeg_copy_headers_to_destination
-    lmdb_copy_headers_to_destination
     jsoncpp
-    farmhash_copy_headers_to_destination
-    highwayhash_copy_headers_to_destination
-    nsync_copy_headers_to_destination
     protobuf
     eigen
     gemmlowp
     cub
     fft2d
     re2
-    sqlite_copy_headers_to_destination
     double_conversion
 )
 
@@ -304,7 +278,7 @@ if(tensorflow_ENABLE_GRPC_SUPPORT)
     include(boringssl)
     include_directories(${boringssl_INCLUDE_DIR})
   endif()
-  include(grpc)
+  #include(grpc)
   include_directories(${GRPC_INCLUDE_DIRS})
   # Place boringssl after grpc as grpc depends on boringssl.
   list(APPEND tensorflow_EXTERNAL_LIBRARIES ${grpc_STATIC_LIBRARIES})
@@ -321,7 +295,7 @@ if(tensorflow_ENABLE_JEMALLOC_SUPPORT)
   include_directories(${jemalloc_INCLUDE_DIRS})
 endif()
 if(tensorflow_ENABLE_SNAPPY_SUPPORT)
-  include(snappy)
+  #include(snappy)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES ${snappy_STATIC_LIBRARIES})
   list(APPEND tensorflow_EXTERNAL_DEPENDENCIES snappy)
   include_directories(${snappy_INCLUDE_DIR})

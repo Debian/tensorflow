@@ -51,7 +51,8 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=RelWithDbgInfo \
 	dh $@ -Scmake -Dtensorflow/contrib/cmake
 
 override_dh_auto_configure:
-	cp -rv debian/cmake/* tensorflow/contrib/cmake/
+	-$(RM) -rf tensorflow/contrib/cmake
+	cp -rv debian/cmake tensorflow/contrib/
 	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
 	
 override_dh_auto_build:
