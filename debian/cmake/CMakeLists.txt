@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.5)
 
 # Project
 project(tensorflow C CXX)
-
 # Set C++14 as standard for the whole project
 set(CMAKE_CXX_STANDARD 14)
 
@@ -11,10 +10,6 @@ set(CMAKE_CXX_STANDARD 14)
 get_filename_component(tf_contrib_source_dir ${tensorflow_SOURCE_DIR} PATH)
 get_filename_component(tf_tf_source_dir ${tf_contrib_source_dir} PATH)
 get_filename_component(tensorflow_source_dir ${tf_tf_source_dir} PATH)
-
-# [CLEANUP] Not sure if this is needed (copied from Protobuf)
-# CMake policies
-cmake_policy(SET CMP0022 NEW)
 
 # Options
 option(tensorflow_VERBOSE "Enable for verbose output" OFF)
@@ -28,11 +23,11 @@ option(tensorflow_ENABLE_JEMALLOC_SUPPORT "Enable jemalloc support" OFF)
 option(tensorflow_BUILD_CC_EXAMPLE "Build the C++ tutorial example" ON)
 option(tensorflow_BUILD_PYTHON_BINDINGS "Build the Python bindings" ON)
 option(tensorflow_BUILD_ALL_KERNELS "Build all OpKernels" ON)
-option(tensorflow_BUILD_CONTRIB_KERNELS "Build OpKernels from tensorflow/contrib/..." ON)
+option(tensorflow_BUILD_CONTRIB_KERNELS "Build OpKernels from tensorflow/contrib/..." OFF)
 option(tensorflow_BUILD_CC_TESTS "Build cc unit tests " OFF)
 option(tensorflow_BUILD_PYTHON_TESTS "Build python unit tests " OFF)
 option(tensorflow_BUILD_MORE_PYTHON_TESTS "Build more python unit tests for contrib packages" OFF)
-option(tensorflow_BUILD_SHARED_LIB "Build TensorFlow as a shared library" OFF)
+option(tensorflow_BUILD_SHARED_LIB "Build TensorFlow as a shared library" ON)
 option(tensorflow_OPTIMIZE_FOR_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture (if available)" ON)
 option(tensorflow_ENABLE_SNAPPY_SUPPORT "Enable SNAPPY compression support" ON)
 option(tensorflow_DISABLE_EIGEN_FORCEINLINE "Disable forceinline, to speed up build on windows." OFF)
@@ -46,13 +41,6 @@ option(tensorflow_ENABLE_MKLDNN_SUPPORT "Enable Intel MKLDNN support, requires M
 option(tensorflow_ENABLE_GPU "Enable GPU support" OFF)
 set(tensorflow_CUDA_VERSION "9.0" CACHE STRING "CUDA version to build against")
 set(tensorflow_CUDNN_VERSION "7" CACHE STRING "cuDNN version to build against")
-
-if(HAIKU)
-	option(tensorflow_ENABLE_POSITION_INDEPENDENT_CODE "Enable PIE support" OFF)
-else()
-	option(tensorflow_ENABLE_POSITION_INDEPENDENT_CODE "Enable PIE support" ON)
-endif()
-
 
 if (NOT WIN32)
   # Threads: defines CMAKE_THREAD_LIBS_INIT and adds -pthread compile option
@@ -82,13 +70,6 @@ if (NOT WIN32)
     set(tensorflow_CUDA_LIBRARY_PATH /usr/local/cuda/lib64)
   endif (NOT tensorflow_CUDA_LIBRARY_PATH)
 
-  # Options for linking other libraries
-  option(systemlib_ZLIB "Use the system installed library as shared objects instead of downloading ZLIB and statically linking to it: ZLIB" OFF)
-
-  option(systemlib_ALL "Turn on every possible systemlib_* options" OFF)
-  if (systemlib_ALL)
-    set (systemlib_ZLIB ON)
-  endif (systemlib_ALL)
 endif()
 
 set(BOOL_WIN32 OFF)
@@ -173,15 +154,8 @@ set(tensorflow_EXTERNAL_LIBRARIES
     ${re2_STATIC_LIBRARIES}
     ${sqlite_STATIC_LIBRARIES}
     ${double_conversion_STATIC_LIBRARIES}
+    ${zlib_STATIC_LIBRARIES}
 )
-
-if (systemlib_ZLIB)
-  set(tensorflow_EXTERNAL_LIBRARIES ${tensorflow_EXTERNAL_LIBRARIES}
-      ${ZLIB_LIBRARIES})
-else (systemlib_ZLIB)
-  set(tensorflow_EXTERNAL_LIBRARIES ${tensorflow_EXTERNAL_LIBRARIES}
-    ${zlib_STATIC_LIBRARIES})
-endif (systemlib_ZLIB)
 
 set(tensorflow_EXTERNAL_DEPENDENCIES
     jsoncpp
