@@ -21,12 +21,12 @@ set(gif_INCLUDE_DIR "/usr/include")
 set(gif_STATIC_LIBRARIES "-lgif")
 add_custom_target(gif)
 
-# grpc
-find_package(PkgConfig)
-set(grpc_INCLUDE_DIRS "/usr/include/")
-set(grpc_STATIC_LIBRARIES "-lgrpc++ -lgrpc")
-set(GRPC_BUILD "/usr/bin")
-add_custom_target(grpc)
+# grpc FIXME: FTBFS with GRPC support: API mismatch.
+#find_package(PkgConfig)
+#set(grpc_INCLUDE_DIRS "/usr/include/")
+#set(grpc_STATIC_LIBRARIES "-lgrpc++ -lgrpc")
+#set(GRPC_BUILD "/usr/bin")
+#add_custom_target(grpc)
 
 # gtest
 set(googletest_INCLUDE_DIRS "/usr/include")
