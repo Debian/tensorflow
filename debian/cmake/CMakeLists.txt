@@ -30,7 +30,6 @@ option(tensorflow_BUILD_CONTRIB_KERNELS "Build OpKernels from tensorflow/contrib
 option(tensorflow_BUILD_CC_TESTS "Build cc unit tests " OFF)
 option(tensorflow_BUILD_PYTHON_TESTS "Build python unit tests " OFF)
 option(tensorflow_BUILD_MORE_PYTHON_TESTS "Build more python unit tests for contrib packages" OFF)
-option(tensorflow_BUILD_SHARED_LIB "Build TensorFlow as a shared library" ON)
 option(tensorflow_OPTIMIZE_FOR_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture (if available)" ON)
 option(tensorflow_ENABLE_SNAPPY_SUPPORT "Enable SNAPPY compression support" ON)
 option(tensorflow_DISABLE_EIGEN_FORCEINLINE "Disable forceinline, to speed up build on windows." OFF)
@@ -383,9 +382,10 @@ include(tf_tools.cmake)
 if(tensorflow_BUILD_PYTHON_BINDINGS)
   include(tf_python.cmake)
 endif()
-if(tensorflow_BUILD_SHARED_LIB)
-  include(tf_shared_lib.cmake)
-endif()
+
+# Build the shared object libtensorflow.so.SOVERSION
+include(tf_shared_lib.cmake)
+
 if(tensorflow_BUILD_CC_TESTS OR tensorflow_BUILD_PYTHON_TESTS)
   include(tf_tests.cmake)
 endif()
