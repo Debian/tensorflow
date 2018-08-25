@@ -359,8 +359,8 @@ endif()
 # Let's get to work!
 include(010_tf_protos_cc.cmake)
 include(020_tf_core_lib.cmake)
+include(030_tf_core_framework.cmake)
 
-include(tf_core_framework.cmake)
 if (tensorflow_ENABLE_GPU)
   include(tf_stream_executor.cmake)
 endif()
