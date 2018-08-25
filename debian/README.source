@@ -33,9 +33,9 @@ Only C and C++ interface is provided.
 - [x] deal with all the C/C++ lib dependencies.
 - [x] produce libtensorflow.so.1.10 and install it into .deb package.
 - [x] ambiguous FFT2D license.
+- [x] make sure nothing from contrib is built.
 
 - [ ] build tests files (googletest) and run the tests.
-- [ ] make sure nothing from contrib is built. they are not officially supported.
 - [ ] remove useless parts from cmake build.
 - [ ] misc improvements to cmake build. (at least make it easier to read)
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
