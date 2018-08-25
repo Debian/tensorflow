@@ -30,7 +30,8 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=Release \
 ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
 export DEB_CXXFLAGS_MAINT_APPEND += \
 	-Wno-ignored-attributes \
-	-Wno-unused-result
+	-Wno-unused-result \
+	-Wno-return-type
 DEB_CMAKE_OPTS += \
 	-DCMAKE_VERBOSE_MAKEFILE=OFF \
 	-Dtensorflow_VERBOSE=OFF
