@@ -365,7 +365,7 @@ if (tensorflow_ENABLE_GPU)
   include(tf_stream_executor.cmake)
 endif()
 
-include(tf_core_cpu.cmake)
+include(040_tf_core_cpu.cmake)
 include(tf_core_ops.cmake)
 include(tf_core_direct_session.cmake)
 include(tf_core_kernels.cmake)
