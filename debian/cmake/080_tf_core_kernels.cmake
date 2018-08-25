@@ -140,7 +140,7 @@ file(GLOB tf_core_kernels_cloud_srcs
     "${tensorflow_source_dir}/tensorflow/contrib/cloud/kernels/*.h"
     "${tensorflow_source_dir}/tensorflow/contrib/cloud/kernels/*.cc"
 )
-list(REMOVE_ITEM tf_core_kernels_srcs ${tf_core_kernels_cloud_srcs})
+list(REMOVE_ITEM tf_core_kernels_srcs "${tf_core_kernels_cloud_srcs}")
 
 file(GLOB_RECURSE tf_core_kernels_exclude_srcs
    "${tensorflow_source_dir}/tensorflow/core/kernels/*test*.h"
