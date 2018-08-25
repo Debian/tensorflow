@@ -27,6 +27,11 @@ DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=Release \
 	-Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
 	-DPYTHON_EXECUTABLE=/usr/bin/python3
 
+ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
+export DEB_CXXFLAGS_MAINT_APPEND += -Wno-ignored-attributes
+DEB_CMAKE_OPTS += -DCMAKE_VERBOSE_MAKEFILE=OFF
+endif
+
 
 %:
 	dh $@ -Scmake -Dtensorflow/contrib/cmake
