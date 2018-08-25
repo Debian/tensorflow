@@ -89,7 +89,7 @@ Section: libdevel
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow1.10 (= ${binary:Depends}),
+ libtensorflow1.10 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (dev)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -104,7 +104,7 @@ Package: libtensorflow-bin
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow1.10 (= ${binary:Depends}),
+ libtensorflow1.10 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (bin)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
