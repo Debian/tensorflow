@@ -376,8 +376,12 @@ include(080_tf_core_kernels.cmake)
 if(tensorflow_ENABLE_GRPC_SUPPORT)
   include(tf_core_distributed_runtime.cmake)
 endif()
+
 # We include tf_cc_ops first, because tf_c depends on tf_cc.
-include(tf_cc_ops.cmake)
+include(100_tf_cc_framework.cmake)
+include(110_tf_cc_op_gen.cmake)
+include(120_tf_cc_ops.cmake)
+
 include(tf_c.cmake)
 include(tf_grappler.cmake)
 include(tf_core_profiler.cmake)
