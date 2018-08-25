@@ -357,6 +357,7 @@ if(NOT ${PYTHONINTERP_FOUND})
 endif()
 
 # Let's get to work!
+include(010_tf_protos_cc.cmake)
 include(tf_core_framework.cmake)
 if (tensorflow_ENABLE_GPU)
   include(tf_stream_executor.cmake)
