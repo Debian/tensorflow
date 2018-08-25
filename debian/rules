@@ -45,7 +45,12 @@ override_dh_auto_configure:
 override_dh_auto_build:
 	# target:tensorflow for libtensorflow.so
 	# target:tf_python_build_pip_package for the python package
-	dh_auto_build -- tensorflow #tf_python_build_pip_package
+	#dh_auto_build -- tensorflow tf_python_build_pip_package
+	dh_auto_build -- install
+
+override_dh_auto_install:
+	# Don't build everything again.
+	echo "Note: dh_auto_install is noop'ed."
 
 override_dh_auto_test:
 	true  #FIXME: temporary
