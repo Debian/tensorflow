@@ -396,7 +396,7 @@ if(tensorflow_BUILD_PYTHON_BINDINGS)
 endif()
 
 # Build the shared object libtensorflow.so.SOVERSION
-include(tf_shared_lib.cmake)
+include(500_tf_shared_object.cmake)
 
 if(tensorflow_BUILD_CC_TESTS OR tensorflow_BUILD_PYTHON_TESTS)
   include(tf_tests.cmake)
