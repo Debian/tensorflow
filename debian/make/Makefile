@@ -16,8 +16,6 @@ ifeq ($(origin MAKEFILE_DIR), undefined)
 	MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 endif
 
-HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
-
 # Where compiled objects are stored.
 HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_BINDIR := $(MAKEFILE_DIR)/gen/host_bin/
@@ -25,7 +23,6 @@ HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 
 # Settings for the host compiler.
 HOST_CXX := $(CC_PREFIX) gcc
-HOST_CXXFLAGS := --std=c++11
 HOST_LDOPTS :=
 HOST_LDOPTS += -L/usr/local/lib
 
@@ -72,9 +69,8 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) gcc
-OPTFLAGS := -O2
 
-CXXFLAGS := --std=c++11 -DIS_SLIM_BUILD -fno-exceptions -DNDEBUG $(OPTFLAGS)
+CXXFLAGS := --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2
 LDFLAGS :=
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
@@ -312,12 +308,12 @@ $(PROTO_OBJS): $(PROTO_CC_SRCS) $(PBT_GEN_FILES)
 # For normal manually-created TensorFlow C++ source files.
 $(HOST_OBJDIR)%.o: %.cc
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
+	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
 
 # Compiles object code from protoc-built C++ source files.
 $(HOST_OBJDIR)%.pb.o: $(HOST_GENDIR)%.pb.cc
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
+	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
 
 # Ensures we wait until proto_text has generated the .h files from protos before
 # we compile the C++.
@@ -326,7 +322,7 @@ $(PROTO_TEXT_OBJS) : $(PROTO_TEXT_PB_H_FILES)
 # Runs proto_text to generate C++ source files from protos.
 $(PROTO_TEXT): $(PROTO_TEXT_OBJS) $(PROTO_TEXT_PB_H_FILES)
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(HOST_CXXFLAGS) $(HOST_INCLUDES) \
+	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) \
 	-o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) $(HOST_LDOPTS) $(LIBS)
 
 # Compiles the C++ source files from protos using protoc.
