@@ -33,7 +33,7 @@ target_link_libraries(${benchmark_model} PUBLIC
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
 
-install(TARGETS ${transform_graph} ${summarize_graph} ${compare_graphs} ${benchmark_model}
+install(TARGETS ${benchmark_model}
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)

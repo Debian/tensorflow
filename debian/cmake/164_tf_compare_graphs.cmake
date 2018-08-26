@@ -33,3 +33,8 @@ target_link_libraries(${compare_graphs} PUBLIC
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
+
+install(TARGETS ${compare_graphs}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib)
