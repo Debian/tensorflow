@@ -2,7 +2,7 @@ README.Debian
 =============
 
 Debian's own cmake/make build
-------------------------
+-----------------------------
 
  Google is going to drop cmake build. This packaging project forked
  the CMake build system from TensorFlow v1.10.0 and modified it.
@@ -13,8 +13,16 @@ Debian's own cmake/make build
  when linking multiple ELF biaries in parallel. Maybe this situation
  can be improved by tweaking the cmake build.
 
- Tensorflow's makefile build is also forked to debian/make.
+ Tensorflow's makefile build is also forked to debian/make. Different
+ from CMake, this set of makefile only compiles the core library
+ with the minimal functionality set as possible.
 
+ CMake build is used for AMD64 and PPC64EL, which are able to train
+ neural networks. Other architectures use Makefile to compile
+ a tensorflow library with core functionality set, with which
+ at least they can conduct the forward pass with pretrained neural
+ networks. AArch64 uses Makefile because I don't have energy
+ to care about Tegra or CUDA-AArch64.
 
 Ambiguous FFT2D license
 -----------------------
@@ -22,7 +30,7 @@ Ambiguous FFT2D license
  https://lists.debian.org/debian-legal/2018/08/msg00005.html
  https://github.com/tensorflow/tensorflow/issues/21724
  
- Maybe it's a free license.
+ Well, let's assume that it's a free license.
 
 
 Things remain to be done
@@ -37,6 +45,7 @@ Only C and C++ interface is provided.
 - [x] deal with all the C/C++ lib dependencies.
 - [x] produce libtensorflow.so.1.10 and install it into .deb package.
 - [x] ambiguous FFT2D license.
+- [x] architectures that doesn't make cmake.
 
 - [ ] build nothing from contrib as long as possible
 - [ ] build tests files (googletest) and run the tests.
@@ -85,12 +94,6 @@ Provide the Python interface.
 
 - [ ] bump debian revision to -B* and upload to experimental.
 
-Unstable
---------
-
-- [ ] Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
-- [ ] upload to unstable.
-
 Not Decided Yet
 ---------------
 
@@ -101,15 +104,8 @@ Well, maybe the following is not going to happen.
       I dislike javascript.
       I know nothing about Go.
       I dislike java.
-- [ ] GPU (CUDA) support
-      This requires us to prepare another copy of source code and
-      rename it to tensorflow-cuda. (just like what I've done for
-      src:caffe and src:caffe-contrib). Apart from that, without
-      cuDNN, the GPU version will be pointless and useless.
-      CUDA version of tensorflow is not planned yet. At the same
-      time the CUDA version could also be linked against MKL.
-- [ ] debian/make/Makefile is forked from tensorflow/contrib/makefile.
-      This can be used for platforms that don't have cmake.
+- [ ] upload to unstable.
+      Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
 
 Will Never Get Fixed
 --------------------
@@ -121,3 +117,13 @@ Will Never Get Fixed
 - [ ] Go binding if no one works on it.
 - [ ] Java binding if no one works on it.
 - [ ] compile and provide documentation if no one works on it.
+- [ ] GPU (CUDA) support if no one works on it.
+      .
+      If you want the CUDA version, why not use TensorFlow official binaries?
+      .
+      This requires us to prepare another copy of source code and
+      rename it to tensorflow-cuda. (just like what I've done for
+      src:caffe and src:caffe-contrib). Apart from that, without
+      cuDNN, the GPU version will be pointless and useless.
+      CUDA version of tensorflow is not planned yet. At the same
+      time the CUDA version could also be linked against MKL.
