@@ -46,6 +46,13 @@ else
 	dh $@ -Smakefile
 endif
 
+override_dh_auto_clean:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+	dh_auto_clean
+else
+	dh_auto_build -- -f debian/make/Makefile clean
+endif
+
 override_dh_auto_configure:
 ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
 	# Replace upstream CMake build with our modified one.
@@ -57,6 +64,20 @@ else
 	mv debian/embedded/eigen* debian/embedded/eigen
 	tar -zxvf debian/embedded/fft.tgz -C debian/embedded/
 endif
-	
+
+override_dh_auto_build:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+	dh_auto_build
+else
+	dh_auto_build -- -f debian/make/Makefile
+endif
+
+override_dh_auto_install:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+	dh_auto_install
+else
+	dh_auto_build -- -f debian/make/Makefile install
+endif
+
 override_dh_auto_test:
 	true  #FIXME: temporary
