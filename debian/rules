@@ -4,6 +4,15 @@ export DEB_CFLAGS_MAINT_APPEND = #-Wall
 export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
+# Select buildsystem according to architecture.
+# amd64, ppc64el: cmake
+# others: makefile
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+export DEB_TFBSYS = cmake
+else
+export DEB_TFBSYS = makefile
+endif
+
 DEB_CMAKE_OPTS = \
 	-DCMAKE_BUILD_TYPE=Release \
 	-Dtensorflow_VERBOSE=ON \
@@ -40,21 +49,21 @@ endif
 
 
 %:
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh $@ -Scmake -Dtensorflow/contrib/cmake
 else
 	dh $@ -Smakefile
 endif
 
 override_dh_auto_clean:
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh_auto_clean
 else
 	dh_auto_build -- -f debian/make/Makefile clean
 endif
 
 override_dh_auto_configure:
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	# Replace upstream CMake build with our modified one.
 	cp -rv debian/cmake tensorflow/contrib/
 	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
@@ -66,14 +75,14 @@ else
 endif
 
 override_dh_auto_build:
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh_auto_build
 else
 	dh_auto_build -- -f debian/make/Makefile
 endif
 
 override_dh_auto_install:
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
+ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh_auto_install
 else
 	dh_auto_build -- -f debian/make/Makefile install
