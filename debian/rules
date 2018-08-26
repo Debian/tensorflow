@@ -4,7 +4,8 @@ export DEB_CFLAGS_MAINT_APPEND = #-Wall
 export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-DEB_CMAKE_OPTS = -DCMAKE_BUILD_TYPE=Release \
+DEB_CMAKE_OPTS = \
+	-DCMAKE_BUILD_TYPE=Release \
 	-Dtensorflow_VERBOSE=ON \
 	-Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
 	-Dtensorflow_ENABLE_GRPC_SUPPORT=OFF \
@@ -50,7 +51,8 @@ override_dh_auto_build:
 	# target:tensorflow for libtensorflow.so
 	# target:tf_python_build_pip_package for the python package
 	#dh_auto_build -- tensorflow tf_python_build_pip_package
-	dh_auto_build -- install
+	-mkdir -p debian/tmp/
+	dh_auto_build -- install DESTDIR=$(shell pwd)/tmp/
 
 override_dh_auto_install:
 	# Don't build everything again.
