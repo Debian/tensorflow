@@ -391,7 +391,12 @@ if(tensorflow_BUILD_CC_EXAMPLE)
   include(tf_label_image_example.cmake)
 endif()
 
-include(tf_tools.cmake)
+include(161_tf_proto_text.cmake)
+include(162_tf_tools_transform_graph.cmake)
+include(163_tf_summarize_graph.cmake)
+include(164_tf_compare_graphs.cmake)
+include(165_tf_benchmark_model.cmake)
+
 if(tensorflow_BUILD_PYTHON_BINDINGS)
   include(tf_python.cmake)
 endif()
