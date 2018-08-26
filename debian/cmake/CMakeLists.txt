@@ -357,6 +357,7 @@ if(NOT ${PYTHONINTERP_FOUND})
 endif()
 
 # Let's get to work!
+include(001_dh_variables.cmake)
 include(010_tf_protos_cc.cmake)
 include(020_tf_core_lib.cmake)
 include(030_tf_core_framework.cmake)
