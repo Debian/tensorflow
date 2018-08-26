@@ -218,6 +218,19 @@ BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
 # The target that's compiled if there's no command-line arguments.
 all: $(LIB_PATH) $(BENCHMARK_NAME) libtensorflow-core.so
 
+DESTDIR ?= $(MAKEFILE_DIR)/../tmp
+INST_INC ?= $(DESTDIR)/usr/include/tensorflow/
+INST_LIB ?= $(DESTDIR)/usr/lib/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)/
+INST_BIN ?= $(DESTDIR)/usr/bin/
+
+install: all
+	mkdir -p $(INST_INC)
+	# FIXME: what header to install?
+	mkdir -p $(INST_LIB)
+	install -m0644 libtensorflow-core.so* $(INST_LIB)
+	mkdir -p $(INST_BIN)
+	install -m0755 $(BENCHMARK_NAME) $(INST_BIN)
+
 # Rules for target compilation.
 
 .phony_version_info:
@@ -230,7 +243,11 @@ $(LIB_PATH): $(LIB_OBJS)
 	$(AR) $(ARFLAGS) $(LIB_PATH) $(LIB_OBJS)
 
 libtensorflow-core.so: $(LIB_OBJS)
-	$(CXX) -fPIC -shared $(CXXFLAGS) $(LDFLAGS) $(LIB_OBJS) -o libtensorflow.so
+	$(CXX) -fPIC -shared $(CXXFLAGS) $(LDFLAGS) $(LIB_OBJS) \
+		-o libtensorflow-core.so.1.10.0 \
+		-Wl,-soname=libtensorflow-core.so.1.10
+	ln -s libtensorflow-core.so.1.10.0 libtensorflow-core.so.1.10
+	ln -s libtensorflow-core.so.1.10.0 libtensorflow-core.so
 
 $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH) $(CUDA_LIB_DEPS)
 	@mkdir -p $(dir $@)
