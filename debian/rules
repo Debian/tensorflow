@@ -8,7 +8,7 @@ export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 # amd64, ppc64el: cmake
 # others: makefile
 ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
-export DEB_TFBSYS = cmake
+export DEB_TFBSYS = makefile
 else
 export DEB_TFBSYS = makefile
 endif
@@ -45,6 +45,14 @@ export DEB_CXXFLAGS_MAINT_APPEND += \
 DEB_CMAKE_OPTS += \
 	-DCMAKE_VERBOSE_MAKEFILE=OFF \
 	-Dtensorflow_VERBOSE=OFF
+endif
+
+# Export compiler flags for Makefile
+ifneq (,$(filter $(DEB_TFBSYS), makefile))
+export CPPFLAGS = $(CPPFLAGS)
+export CFLAGS = $(CFLAGS)
+export CXXFLAGS = $(CXXFLAGS)
+export LDFLAGS = $(LDFLAGS)
 endif
 
 
