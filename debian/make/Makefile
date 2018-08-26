@@ -17,10 +17,6 @@ HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_BINDIR := $(MAKEFILE_DIR)/gen/host_bin/
 HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 
-INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR) \
-	-I$(PROTOGENDIR) -I$(PBTGENDIR) -I/usr/include/gemmlowp/
-
-
 # proto_text is a tool that converts protobufs into a form we can use more
 # compactly within TensorFlow. It's a bit like protoc, but is designed to
 # produce a much more minimal result so we can save binary space.
@@ -61,7 +57,7 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) gcc
 
-CXXFLAGS := --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2
+CXXFLAGS := --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2 -DNDEBUG
 LDFLAGS :=
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
@@ -222,6 +218,11 @@ DESTDIR ?= $(MAKEFILE_DIR)/../tmp
 INST_INC ?= $(DESTDIR)/usr/include/tensorflow/
 INST_LIB ?= $(DESTDIR)/usr/lib/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)/
 INST_BIN ?= $(DESTDIR)/usr/bin/
+
+INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR) \
+	-I$(PROTOGENDIR) -I$(PBTGENDIR) -I/usr/include/gemmlowp/
+
+
 
 install: all
 	mkdir -p $(INST_INC)
