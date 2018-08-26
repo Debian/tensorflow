@@ -40,12 +40,23 @@ endif
 
 
 %:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
 	dh $@ -Scmake -Dtensorflow/contrib/cmake
+else
+	dh $@ -Smakefile
+endif
 
 override_dh_auto_configure:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
 	# Replace upstream CMake build with our modified one.
 	cp -rv debian/cmake tensorflow/contrib/
 	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
+else
+	# prepare embedded source code
+	tar -zxvf debian/embedded/fd6845384b86.tar.gz -C debian/embedded/
+	mv debian/embedded/eigen* debian/embedded/eigen
+	tar -zxvf debian/embedded/fft.tgz -C debian/embedded/
+endif
 	
 override_dh_auto_test:
 	true  #FIXME: temporary
