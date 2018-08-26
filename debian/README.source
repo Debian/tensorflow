@@ -108,6 +108,7 @@ Well, maybe the following is not going to happen.
       CUDA version of tensorflow is not planned yet. At the same
       time the CUDA version could also be linked against MKL.
 - [ ] compile and provide documentation.
+- [ ] EIGEN_USE_BLAS ?
 
 Will Never Get Fixed
 --------------------
