@@ -130,10 +130,6 @@ install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/core/
 install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
         DESTINATION include/tensorflow/stream_executor
         FILES_MATCHING PATTERN "*.h")
-# google protobuf headers
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/protobuf/src/protobuf/src/google/
-        DESTINATION include/google
-        FILES_MATCHING PATTERN "*.h")
 # Eigen directory
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/Eigen/
         DESTINATION include/Eigen)
