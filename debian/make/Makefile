@@ -7,10 +7,6 @@
 # The default setup below is aimed at Unix-like devices, and should work on
 # modern Linux and OS X distributions without changes.
 
-SHELL := /bin/bash
-
-# Host compilation settings
-
 # Find where we're running from, so we can store generated files here.
 ifeq ($(origin MAKEFILE_DIR), undefined)
 	MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
@@ -21,13 +17,8 @@ HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_BINDIR := $(MAKEFILE_DIR)/gen/host_bin/
 HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 
-# Settings for the host compiler.
-HOST_CXX := $(CC_PREFIX) gcc
-HOST_LDOPTS :=
-HOST_LDOPTS += -L/usr/local/lib
-
-HOST_INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR)
-
+INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR) \
+	-I$(PROTOGENDIR) -I$(PBTGENDIR) -I/usr/include/gemmlowp/
 
 
 # proto_text is a tool that converts protobufs into a form we can use more
@@ -73,10 +64,6 @@ CXX := $(CC_PREFIX) gcc
 CXXFLAGS := --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2
 LDFLAGS :=
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
-
-INCLUDES := -I$(MAKEFILE_DIR)/../embedded/eigen -I. \
--I$(PROTOGENDIR) \
--I$(PBTGENDIR)
 
 LIBS := -lstdc++ -lprotobuf -lpthread -lm -lz -ldl -lpthread \
 	-lnsync -lnsync_cpp -ldouble-conversion
@@ -229,7 +216,7 @@ BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
 .PHONY: clean cleantarget
 
 # The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME)
+all: $(LIB_PATH) $(BENCHMARK_NAME) libtensorflow-core.so
 
 # Rules for target compilation.
 
@@ -241,6 +228,9 @@ tensorflow/core/util/version_info.cc: .phony_version_info
 $(LIB_PATH): $(LIB_OBJS)
 	@mkdir -p $(dir $@)
 	$(AR) $(ARFLAGS) $(LIB_PATH) $(LIB_OBJS)
+
+libtensorflow-core.so: $(LIB_OBJS)
+	$(CXX) -fPIC -shared $(CXXFLAGS) $(LDFLAGS) $(LIB_OBJS) -o libtensorflow.so
 
 $(BENCHMARK_NAME): $(BENCHMARK_OBJS) $(LIB_PATH) $(CUDA_LIB_DEPS)
 	@mkdir -p $(dir $@)
@@ -308,12 +298,12 @@ $(PROTO_OBJS): $(PROTO_CC_SRCS) $(PBT_GEN_FILES)
 # For normal manually-created TensorFlow C++ source files.
 $(HOST_OBJDIR)%.o: %.cc
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 # Compiles object code from protoc-built C++ source files.
 $(HOST_OBJDIR)%.pb.o: $(HOST_GENDIR)%.pb.cc
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 # Ensures we wait until proto_text has generated the .h files from protos before
 # we compile the C++.
@@ -322,7 +312,7 @@ $(PROTO_TEXT_OBJS) : $(PROTO_TEXT_PB_H_FILES)
 # Runs proto_text to generate C++ source files from protos.
 $(PROTO_TEXT): $(PROTO_TEXT_OBJS) $(PROTO_TEXT_PB_H_FILES)
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(CXXFLAGS) $(HOST_INCLUDES) \
+	$(CXX) $(CXXFLAGS) $(INCLUDES) \
 	-o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) $(HOST_LDOPTS) $(LIBS)
 
 # Compiles the C++ source files from protos using protoc.
