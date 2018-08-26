@@ -42,11 +42,6 @@ endif
 	dh $@ -Scmake -Dtensorflow/contrib/cmake
 
 override_dh_auto_configure:
-	# The most reliable way to avoid building anything from contrib.
-	# Exceptions: contrib/tensorboard
-	mkdir -p tensorflow/dontbuildit/
-	mv tensorflow/contrib/* tensorflow/dontbuildit/
-	mv tensorflow/dontbuildit/tensorboard tensorflow/contrib/
 	# Replace upstream CMake build with our modified one.
 	cp -rv debian/cmake tensorflow/contrib/
 	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
