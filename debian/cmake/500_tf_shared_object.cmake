@@ -106,12 +106,12 @@ target_include_directories(tensorflow PUBLIC
 
 install(TARGETS tensorflow EXPORT tensorflow_export
         RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
+		LIBRARY DESTINATION lib/${DEB_HOST_MULTIARCH}/
+		ARCHIVE DESTINATION lib/${DEB_HOST_MULTIARCH}/)
         
 install(EXPORT tensorflow_export
         FILE TensorflowConfig.cmake
-        DESTINATION lib/cmake)
+        DESTINATION share/cmake/tensorflow/)
 
 # install necessary headers
 # tensorflow headers
@@ -127,21 +127,24 @@ install(DIRECTORY ${tensorflow_source_dir}/tensorflow/core/
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/core/
         DESTINATION include/tensorflow/core
         FILES_MATCHING PATTERN "*.h")
-install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
-        DESTINATION include/tensorflow/stream_executor
-        FILES_MATCHING PATTERN "*.h")
+if (tensorflow_ENABLE_GPU)
+  install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
+          DESTINATION include/tensorflow/stream_executor
+          FILES_MATCHING PATTERN "*.h")
+endif (tensorflow_ENABLE_GPU)
 # Eigen directory
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/Eigen/
-        DESTINATION include/Eigen)
+        DESTINATION include/tensorflow/Eigen)
 # external directory
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/eigen_archive/
-        DESTINATION include/external/eigen_archive)
+        DESTINATION include/tensorflow/external/eigen_archive)
 # third_party eigen directory
 install(DIRECTORY ${tensorflow_source_dir}/third_party/eigen3/
-        DESTINATION include/third_party/eigen3)
+        DESTINATION include/tensorflow/third_party/eigen3)
 # unsupported Eigen directory
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/unsupported/Eigen/
-        DESTINATION include/unsupported/Eigen)
+        DESTINATION include/tensorflow/unsupported/Eigen)
+
 # mkl
 if (tensorflow_ENABLE_MKL_SUPPORT)
     install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/mkl/src/mkl/include/
