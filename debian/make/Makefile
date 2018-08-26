@@ -1,7 +1,8 @@
 # This Makefile compiles a library containing the C++ runtime for the TensorFlow
 # library. It's designed for use on platforms with limited resources where
-# running a full Bazel build would be prohibitive, or for cross-compilation onto
-# embedded systems. It includes only a bare-bones set of functionality.
+# running a full Bazel build would be prohibitive.
+#
+# It includes only a bare-bones set of functionality.
 #
 # The default setup below is aimed at Unix-like devices, and should work on
 # modern Linux and OS X distributions without changes.
@@ -15,11 +16,7 @@ ifeq ($(origin MAKEFILE_DIR), undefined)
 	MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 endif
 
-HAS_GEN_HOST_PROTOC := \
-$(shell test -f $(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc && echo "true" ||\
-echo "false")
-
-HOST_ARCH := $(shell if [[ $(shell uname -m) =~ i[345678]86 ]]; then echo x86_32; else echo $(shell uname -m); fi)
+HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 # Where compiled objects are stored.
 HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
@@ -30,17 +27,10 @@ HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_CXX := $(CC_PREFIX) gcc
 HOST_CXXFLAGS := --std=c++11
 HOST_LDOPTS :=
-ifeq ($(HAS_GEN_HOST_PROTOC),true)
-	HOST_LDOPTS += -L$(MAKEFILE_DIR)/gen/protobuf-host/lib
-endif
 HOST_LDOPTS += -L/usr/local/lib
 
 HOST_INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR)
-ifeq ($(HAS_GEN_HOST_PROTOC),true)
-	HOST_INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
-endif
 
-HOST_LIBS := -lstdc++ -lprotobuf -lpthread -lm -lz -ldl -lpthread -lnsync -lnsync_cpp -ldouble-conversion
 
 
 # proto_text is a tool that converts protobufs into a form we can use more
@@ -91,17 +81,11 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 INCLUDES := -I$(MAKEFILE_DIR)/../embedded/eigen -I. \
 -I$(PROTOGENDIR) \
 -I$(PBTGENDIR)
-ifeq ($(HAS_GEN_HOST_PROTOC),true)
-	INCLUDES += -I$(MAKEFILE_DIR)/gen/protobuf-host/include
-endif
 
-LIBS := $(TARGET_NSYNC_LIB) -lstdc++ -lprotobuf -lz -lm -lnsync -lpthread -lnsync_cpp
+LIBS := -lstdc++ -lprotobuf -lpthread -lm -lz -ldl -lpthread \
+	-lnsync -lnsync_cpp -ldouble-conversion
 
-ifeq ($(HAS_GEN_HOST_PROTOC),true)
-	PROTOC := $(MAKEFILE_DIR)/gen/protobuf-host/bin/protoc
-else
 	PROTOC := protoc
-endif
 
 $(info PROTOC = "$(PROTOC)")
 $(info CC_PREFIX = "$(CC_PREFIX)")
@@ -111,16 +95,9 @@ AR := ar
 ARFLAGS := -r
 LIBFLAGS :=
 
-# Make sure that we don't strip global constructors on Linux.
-ifeq ($(TARGET),LINUX)
-ifeq ($(HAS_GEN_HOST_PROTOC),true)
-	LIBFLAGS += -L$(MAKEFILE_DIR)/gen/protobuf-host/lib
-	export LD_LIBRARY_PATH=$(MAKEFILE_DIR)/gen/protobuf-host/lib
-endif
-	CXXFLAGS += -fPIC
-	LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
-	LDFLAGS := -Wl,--no-whole-archive
-endif
+CXXFLAGS += -fPIC
+LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
+LDFLAGS := -Wl,--no-whole-archive
 # If we're on Linux, also link in the dl library.
 ifeq ($(TARGET),LINUX)
 	LIBS += -ldl -lpthread
@@ -350,7 +327,7 @@ $(PROTO_TEXT_OBJS) : $(PROTO_TEXT_PB_H_FILES)
 $(PROTO_TEXT): $(PROTO_TEXT_OBJS) $(PROTO_TEXT_PB_H_FILES)
 	@mkdir -p $(dir $@)
 	$(HOST_CXX) $(HOST_CXXFLAGS) $(HOST_INCLUDES) \
-	-o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) $(HOST_LDOPTS) $(HOST_LIBS)
+	-o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) $(HOST_LDOPTS) $(LIBS)
 
 # Compiles the C++ source files from protos using protoc.
 $(HOST_GENDIR)%.pb.cc $(HOST_GENDIR)%.pb.h: %.proto
@@ -380,8 +357,3 @@ $(DEPDIR)/%.d: ;
 .PRECIOUS: $(DEPDIR)/%.d
 
 -include $(patsubst %,$(DEPDIR)/%.d,$(basename $(TF_CC_SRCS)))
-
-ifdef SUB_MAKEFILES
-  $(warning "include sub makefiles, must not contain white spaces in the path:" $(SUB_MAKEFILES))
-  include $(SUB_MAKEFILES)
-endif
