@@ -5,8 +5,8 @@ export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # Select buildsystem according to architecture.
-# amd64, ppc64el: cmake
-# others: makefile
+# - amd64, ppc64el: cmake
+# - others: makefile
 ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
 export DEB_TFBSYS = makefile
 else
@@ -45,6 +45,12 @@ export DEB_CXXFLAGS_MAINT_APPEND += \
 DEB_CMAKE_OPTS += \
 	-DCMAKE_VERBOSE_MAKEFILE=OFF \
 	-Dtensorflow_VERBOSE=OFF
+endif
+
+# [Ubuntu] Don't use -O3 as default for ppc64el
+ifneq (,$(filter $(DEB_HOST_ARCH), ppc64el))
+export DEB_CXXFLAGS_MAINT_STRIP = -O3
+export DEB_CXXFLAGS_MAINT_PREPEND = -O2
 endif
 
 
