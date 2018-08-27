@@ -61,12 +61,12 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) gcc
 
-CXXFLAGS += --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2 -DNDEBUG -fPIC
+CXXFLAGS += --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2 -DNDEBUG -fPIC -pthread
 CPPFLAGS +=
 LDFLAGS +=
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
-LIBS := -lstdc++ -lprotobuf -lpthread -lm -lz -ldl -lpthread \
+LIBS := -lstdc++ -pthread -lprotobuf -lpthread -lm -lz -ldl \
 	-lnsync -lnsync_cpp -ldouble-conversion
 
 PROTOC := protoc
