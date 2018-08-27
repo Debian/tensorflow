@@ -47,14 +47,6 @@ DEB_CMAKE_OPTS += \
 	-Dtensorflow_VERBOSE=OFF
 endif
 
-# Export compiler flags for Makefile
-ifneq (,$(filter $(DEB_TFBSYS), makefile))
-export CPPFLAGS = $(CPPFLAGS)
-export CFLAGS = $(CFLAGS)
-export CXXFLAGS = $(CXXFLAGS)
-export LDFLAGS = $(LDFLAGS)
-endif
-
 
 %:
 ifneq (,$(filter $(DEB_TFBSYS), cmake))
@@ -93,7 +85,9 @@ override_dh_auto_install:
 ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh_auto_install
 else
-	dh_auto_build -- -f debian/make/Makefile install
+	dh_auto_build -- -f debian/make/Makefile install \
+		CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+		CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
 endif
 
 override_dh_auto_test:
