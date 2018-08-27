@@ -29,8 +29,7 @@ Ambiguous FFT2D license
 
  https://lists.debian.org/debian-legal/2018/08/msg00005.html
  https://github.com/tensorflow/tensorflow/issues/21724
- 
- Well, let's assume that it's a free license.
+ Well, let's assume it's a free license.
 
 
 Things remain to be done
@@ -61,9 +60,6 @@ Only C and C++ interface is provided.
 - [ ] remaining lintian warnings and errors.
 - [ ] traverse the 16000+ files in the source tree and complete d/copyright.
       ummmmmmmmmm.............
-- [ ] Can't the blob be even smaller?
-      -rwxr-xr-x 1 debian debian 3.6G Aug 24 13:53 libtensorflow.so.1.10.0 (unstripped)
-      -rwxr-xr-x 1 debian debian 104M Aug 24 14:00 libtensorflow.so.1.10.0 (stripped)
 - [ ] 16GB RAM + 16GB swap is not enough to avoid triggering OOM killer?
 - [ ] get rid of static linking written for stupid windows
       /usr/bin/ld: error: benchmark_model(.debug_info) is too large (0x35a9f359 bytes)
@@ -75,6 +71,9 @@ Only C and C++ interface is provided.
       /usr/bin/ld: error: compare_graphs(.debug_str) is too large (0x6a64010e bytes)
       /usr/bin/ld: error: compare_graphs(.debug_loc) is too large (0x1fd19fe0 bytes)
 - [ ] how to prevent "make install" from building everything again?
+- [ ] check the difference between makefile and cmake.
+  - [ ] We really need the CMake build?
+- [ ] parallel ld triggers OOM killer.
 
 - [ ] upload to experimental.
 
@@ -97,8 +96,6 @@ Provide the Python interface.
 Not Decided Yet
 ---------------
 
-Well, maybe the following is not going to happen.
-
 - [ ] re-enable GRPC support. (FTBFS since 1.13 -> 1.14 in experimental)
       As long as TF doesn't FTBFS with it.
       I dislike javascript.
@@ -106,6 +103,9 @@ Well, maybe the following is not going to happen.
       I dislike java.
 - [ ] upload to unstable.
       Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
+- [ ] Compile both AVX+ version and Generic version. Automatically
+      choose the working one during postinst according to the machine's
+      cpu capability.
 
 Will Never Get Fixed
 --------------------
