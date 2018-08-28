@@ -18,15 +18,22 @@ endif
 
 # Where compiled objects are stored.
 HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
-HOST_BINDIR := $(MAKEFILE_DIR)/gen/host_bin/
 HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
+GENDIR := $(MAKEFILE_DIR)/gen/
+OBJDIR := $(GENDIR)obj/
+LIBDIR := $(GENDIR)lib/
+BINDIR := $(GENDIR)bin/
+PBTGENDIR := $(GENDIR)proto_text/
+PROTOGENDIR := $(GENDIR)proto/
+DEPDIR := $(GENDIR)dep/
+$(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # proto_text is a tool that converts protobufs into a form we can use more
 # compactly within TensorFlow. It's a bit like protoc, but is designed to
 # produce a much more minimal result so we can save binary space.
 # We have to build it on the host system first so that we can create files
 # that are needed for the runtime building.
-PROTO_TEXT := $(HOST_BINDIR)proto_text
+PROTO_TEXT := $(BINDIR)proto_text
 # The list of dependencies is derived from the Bazel build file by running
 # the gen_file_lists.sh script on a system with a working Bazel setup.
 PROTO_TEXT_CC_FILES := $(shell cat $(MAKEFILE_DIR)/proto_text_cc_files.txt)
@@ -47,16 +54,6 @@ PROTO_TEXT_OBJS := $(PROTO_TEXT_CC_OBJS) $(PROTO_TEXT_PB_OBJS)
 # You should override TARGET on the command line if you're cross-compiling, e.g.
 # make -f tensorflow/contrib/makefile/Makefile TARGET=ANDROID
 TARGET := LINUX
-
-# Where compiled objects are stored.
-GENDIR := $(MAKEFILE_DIR)/gen/
-OBJDIR := $(GENDIR)obj/
-LIBDIR := $(GENDIR)lib/
-BINDIR := $(GENDIR)bin/
-PBTGENDIR := $(GENDIR)proto_text/
-PROTOGENDIR := $(GENDIR)proto/
-DEPDIR := $(GENDIR)dep/
-$(shell mkdir -p $(DEPDIR) >/dev/null)
 
 # Settings for the target compiler.
 CXX := $(CC_PREFIX) gcc
