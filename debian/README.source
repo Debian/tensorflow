@@ -1,6 +1,30 @@
 README.Debian
 =============
 
+Principles specific to this source package
+------------------------------------------
+
+1. Don't use code from tensorflow/contrib as long as possible.
+
+   They are not officially supported by upstream.
+
+2. This source packages provides CPU-only verison of TF instead
+   of CUDA version. Necessity of CPU-only Version:
+  
+   (1) Compilable on all architectures. CUDA is specific to amd64
+       and ppc64el, and aarch64. What's even worse, we don't have
+       available CUDA compiler for aarch64.
+
+   (2) CPU-only Version can stay in the main section. Once compiled
+       with CUDA, the source must enter contrib section.
+
+   That being said, please don't remove CUDA related build from the
+   build system because that would be easier for maintainer to
+   synchronize the CUDA version and CPU version.
+
+   src:caffe and src:caffe-contrib is an example for illustration.
+
+
 Debian's own cmake/make build
 -----------------------------
 
@@ -45,23 +69,20 @@ Only C and C++ interface is provided.
 - [x] produce libtensorflow.so.1.10 and install it into .deb package.
 - [x] ambiguous FFT2D license.
 - [x] architectures that doesn't make cmake.
+- [x] sort out this confusing lintian E
+      source-is-missing tensorflow/compiler/aot/codegen_test_o.golden
+      Done: https://salsa.debian.org/lintian/lintian/commit/75a5b2d4ef35346200588ceaa8a4d26143f42195
 
 - [ ] build nothing from contrib as long as possible
 - [ ] build tests files (googletest) and run the tests.
-- [ ] remove useless parts from cmake build.
-- [ ] misc improvements to cmake build. (at least make it easier to read)
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
   - [ ] working on amd64?
   - [ ] working on ppc64el?
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
-- [ ] sort out this confusing lintian E
-      source-is-missing tensorflow/compiler/aot/codegen_test_o.golden
 - [ ] remaining lintian warnings and errors.
-- [ ] traverse the 16000+ files in the source tree and complete d/copyright.
-      ummmmmmmmmm.............
-- [ ] 16GB RAM + 16GB swap is not enough to avoid triggering OOM killer?
-- [ ] get rid of static linking written for stupid windows
+- [ ] traverse the 16000+ files in the source tree and complete d/copyright.  ummmmmmmmmm.............
+- [ ] get rid of this error
       /usr/bin/ld: error: benchmark_model(.debug_info) is too large (0x35a9f359 bytes)
       /usr/bin/ld: error: benchmark_model(.debug_str) is too large (0x6a545d15 bytes)
       /usr/bin/ld: error: benchmark_model(.debug_loc) is too large (0x1f5b1950 bytes)
@@ -70,10 +91,11 @@ Only C and C++ interface is provided.
       /usr/bin/ld: error: compare_graphs(.debug_info) is too large (0x366f36be bytes)
       /usr/bin/ld: error: compare_graphs(.debug_str) is too large (0x6a64010e bytes)
       /usr/bin/ld: error: compare_graphs(.debug_loc) is too large (0x1fd19fe0 bytes)
-- [ ] how to prevent "make install" from building everything again?
+- [ ] (cmake) prevent "make install" from building everything again?
 - [ ] check the difference between makefile and cmake.
   - [ ] We really need the CMake build?
 - [ ] parallel ld triggers OOM killer.
+- [ ] cleanup the mess in cmake/makefile, removing useless stuff. make them easier to read.
 
 - [ ] upload to experimental.
 
