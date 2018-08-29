@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CFLAGS_MAINT_APPEND = #-Wall
-export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
+export DEB_CXXFLAGS_MAINT_APPEND = -gsplit-dwarf #-Wall
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # Select buildsystem according to architecture.
