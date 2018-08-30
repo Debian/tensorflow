@@ -7,16 +7,26 @@
 # The default setup below is aimed at Unix-like devices, and should work on
 # modern Linux and OS X distributions without changes.
 
+# ============================================================== [ Project ] ==
 VERSION   := 1.10.0
 SOVERSION := 1.10
-SOFILE    := libtensorflow.so
 
-# Find where we're running from, so we can store generated files here.
+# ======================================================= [ Compiler Flags ] ==
+CXXFLAGS += --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2 -DNDEBUG -fPIC -pthread
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
+LIBS := -lstdc++ -pthread -lprotobuf -lpthread -lm -lz -ldl \
+	-lnsync -lnsync_cpp -ldouble-conversion
+AR := ar
+PROTOC     := protoc
+ARFLAGS := -r
+LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
+LDFLAGS := -Wl,--no-whole-archive
+
+# ========================================================== [ Directories ] ==
 ifeq ($(origin MAKEFILE_DIR), undefined)
 	MAKEFILE_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 endif
 
-# Where compiled objects are stored.
 HOST_OBJDIR := $(MAKEFILE_DIR)/gen/host_obj/
 HOST_GENDIR := $(MAKEFILE_DIR)/gen/host_obj/
 GENDIR := $(MAKEFILE_DIR)/gen/
@@ -27,58 +37,16 @@ PBTGENDIR := $(GENDIR)proto_text/
 PROTOGENDIR := $(GENDIR)proto/
 DEPDIR := $(GENDIR)dep/
 $(shell mkdir -p $(DEPDIR) >/dev/null)
+DESTDIR ?= $(MAKEFILE_DIR)/../tmp
+INST_INC ?= $(DESTDIR)/usr/include/tensorflow/
+INST_LIB ?= $(DESTDIR)/usr/lib/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)/
+INST_BIN ?= $(DESTDIR)/usr/bin/
+INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR) \
+	-I$(PROTOGENDIR) -I$(PBTGENDIR) -I/usr/include/gemmlowp/
 
-# proto_text is a tool that converts protobufs into a form we can use more
-# compactly within TensorFlow. It's a bit like protoc, but is designed to
-# produce a much more minimal result so we can save binary space.
-# We have to build it on the host system first so that we can create files
-# that are needed for the runtime building.
-PROTO_TEXT := $(BINDIR)proto_text
-# The list of dependencies is derived from the Bazel build file by running
-# the gen_file_lists.sh script on a system with a working Bazel setup.
-PROTO_TEXT_CC_FILES := $(shell cat $(MAKEFILE_DIR)/proto_text_cc_files.txt)
-PROTO_TEXT_PB_CC_LIST := \
-	$(shell cat $(MAKEFILE_DIR)/proto_text_pb_cc_files.txt) \
-	$(wildcard tensorflow/contrib/makefile/downloads/double_conversion/double-conversion/*.cc)
-PROTO_TEXT_PB_H_LIST := $(shell cat $(MAKEFILE_DIR)/proto_text_pb_h_files.txt)
 
-# Locations of the intermediate files proto_text generates.
-PROTO_TEXT_PB_H_FILES := $(addprefix $(HOST_GENDIR), $(PROTO_TEXT_PB_H_LIST))
-PROTO_TEXT_CC_OBJS := $(addprefix $(HOST_OBJDIR), $(PROTO_TEXT_CC_FILES:.cc=.o))
-PROTO_TEXT_PB_OBJS := $(addprefix $(HOST_OBJDIR), $(PROTO_TEXT_PB_CC_LIST:.cc=.o))
-PROTO_TEXT_OBJS := $(PROTO_TEXT_CC_OBJS) $(PROTO_TEXT_PB_OBJS)
-
-# Target device settings.
-
-# Default to running on the same system we're compiling on.
-# You should override TARGET on the command line if you're cross-compiling, e.g.
-# make -f tensorflow/contrib/makefile/Makefile TARGET=ANDROID
-TARGET := LINUX
-
-# Settings for the target compiler.
-CXX := $(CC_PREFIX) gcc
-
-CXXFLAGS += --std=c++14 -DIS_SLIM_BUILD -fno-exceptions -O2 -DNDEBUG -fPIC -pthread
-CPPFLAGS +=
-LDFLAGS +=
-DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
-
-LIBS := -lstdc++ -pthread -lprotobuf -lpthread -lm -lz -ldl \
-	-lnsync -lnsync_cpp -ldouble-conversion
-
-PROTOC := protoc
-
-$(info PROTOC = "$(PROTOC)")
-$(info CC_PREFIX = "$(CC_PREFIX)")
-
-PROTOCFLAGS :=
-AR := ar
-ARFLAGS := -r
-LIBFLAGS :=
-
-LIBFLAGS += -Wl,--allow-multiple-definition -Wl,--whole-archive
-LDFLAGS := -Wl,--no-whole-archive
-
+# ====================================================== [ Target Binaries ] ==
+SOFILE     := libtensorflow.so
 
 # This library is the main target for this makefile. It will contain a minimal
 # runtime that can be linked in to other programs.
@@ -87,6 +55,36 @@ LIB_PATH := $(LIBDIR)$(LIB_NAME)
 
 # A small example program that shows how to link against the library.
 BENCHMARK_NAME := $(BINDIR)benchmark
+
+# proto_text is a tool that converts protobufs into a form we can use more
+# compactly within TensorFlow. It's a bit like protoc, but is designed to
+# produce a much more minimal result so we can save binary space.
+# We have to build it on the host system first so that we can create files
+# that are needed for the runtime building.
+PROTO_TEXT := $(BINDIR)proto_text
+
+# The target that's compiled if there's no command-line arguments.
+all: $(LIB_PATH) $(BENCHMARK_NAME) $(SOFILE)
+
+# ======================================================= [ Proto Globbing ] ==
+
+# The list of dependencies is derived from the Bazel build file by running
+# the gen_file_lists.sh script on a system with a working Bazel setup.
+PROTO_TEXT_CC_FILES := $(shell cat $(MAKEFILE_DIR)/proto_text_cc_files.txt)
+
+PROTO_TEXT_PB_CC_LIST := \
+	$(shell cat $(MAKEFILE_DIR)/proto_text_pb_cc_files.txt) \
+	$(wildcard tensorflow/contrib/makefile/downloads/double_conversion/double-conversion/*.cc)
+
+PROTO_TEXT_PB_H_LIST := $(shell cat $(MAKEFILE_DIR)/proto_text_pb_h_files.txt)
+
+# Locations of the intermediate files proto_text generates.
+PROTO_TEXT_PB_H_FILES := $(addprefix $(HOST_GENDIR), $(PROTO_TEXT_PB_H_LIST))
+PROTO_TEXT_CC_OBJS := $(addprefix $(HOST_OBJDIR), $(PROTO_TEXT_CC_FILES:.cc=.o))
+PROTO_TEXT_PB_OBJS := $(addprefix $(HOST_OBJDIR), $(PROTO_TEXT_PB_CC_LIST:.cc=.o))
+PROTO_TEXT_OBJS := $(PROTO_TEXT_CC_OBJS) $(PROTO_TEXT_PB_OBJS)
+
+# ================================================== [ CXX Source Globbing ] ==
 
 # What sources we want to compile, derived from the main Bazel build using the
 # gen_file_lists.sh script.
@@ -189,6 +187,8 @@ tensorflow/core/util/reporter.cc \
 tensorflow/tools/benchmark/benchmark_model.cc \
 tensorflow/tools/benchmark/benchmark_model_main.cc
 
+# ============================================================== [ Objects ] ==
+
 # File names of the intermediate files target compilation generates.
 TF_CC_OBJS := $(addprefix $(OBJDIR), \
 $(patsubst %.cc,%.o,$(patsubst %.c,%.o,$(TF_CC_SRCS))))
@@ -200,27 +200,6 @@ LIB_OBJS := $(PROTO_OBJS) $(TF_CC_OBJS) $(PBT_OBJS)
 BENCHMARK_OBJS := $(addprefix $(OBJDIR), $(BENCHMARK_SRCS:.cc=.o))
 
 .PHONY: clean cleantarget
-
-# The target that's compiled if there's no command-line arguments.
-all: $(LIB_PATH) $(BENCHMARK_NAME) $(SOFILE)
-
-DESTDIR ?= $(MAKEFILE_DIR)/../tmp
-INST_INC ?= $(DESTDIR)/usr/include/tensorflow/
-INST_LIB ?= $(DESTDIR)/usr/lib/$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)/
-INST_BIN ?= $(DESTDIR)/usr/bin/
-
-INCLUDES :=  -I. -I$(MAKEFILE_DIR)/../embedded/eigen  -I$(HOST_GENDIR) \
-	-I$(PROTOGENDIR) -I$(PBTGENDIR) -I/usr/include/gemmlowp/
-
-install: all
-	mkdir -p $(INST_INC)
-	# FIXME: what header to install?
-	mkdir -p $(INST_LIB)
-	install -m0644 $(SOFILE)* $(INST_LIB)
-	mkdir -p $(INST_BIN)
-	install -m0755 $(BENCHMARK_NAME) $(INST_BIN)
-
-# Rules for target compilation.
 
 .phony_version_info:
 tensorflow/core/util/version_info.cc: .phony_version_info
@@ -349,3 +328,13 @@ $(DEPDIR)/%.d: ;
 .PRECIOUS: $(DEPDIR)/%.d
 
 -include $(patsubst %,$(DEPDIR)/%.d,$(basename $(TF_CC_SRCS)))
+
+# ============================================================== [ Install ] ==
+
+install: all
+	mkdir -p $(INST_INC)
+	# FIXME: what header to install?
+	mkdir -p $(INST_LIB)
+	install -m0644 $(SOFILE)* $(INST_LIB)
+	mkdir -p $(INST_BIN)
+	install -m0755 $(BENCHMARK_NAME) $(INST_BIN)
