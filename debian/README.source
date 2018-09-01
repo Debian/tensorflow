@@ -51,6 +51,18 @@ Debian's own cmake/make build
  networks. AArch64 uses Makefile because I don't have energy
  to care about Tegra or CUDA-AArch64.
 
+Debian's Native Makefile
+------------------------
+
+  1. bash debian/bazelQuery.sh
+  2. cat debian/flags.mk
+  3. make -f debian/proto_text.mk
+  4. make -f debian/tf_proto_text.mk
+  5. make -f debian/tf_proto.mk
+  6. make -f debian/tf_knl_ops.mk
+  ...
+
+
 Ambiguous FFT2D license
 -----------------------
 

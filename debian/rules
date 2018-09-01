@@ -75,9 +75,7 @@ ifneq (,$(filter $(DEB_TFBSYS), cmake))
 	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
 else
 	# prepare embedded source code
-	tar -zxvf debian/embedded/fd6845384b86.tar.gz -C debian/embedded/
-	mv debian/embedded/eigen* debian/embedded/eigen
-	tar -zxvf debian/embedded/fft.tgz -C debian/embedded/
+	$(SHELL) debian/embedded.sh
 endif
 
 override_dh_auto_build:
