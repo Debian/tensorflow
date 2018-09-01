@@ -24,7 +24,7 @@ sed -E 's#:#/#g' | \
 sort > tf_proto_files.txt
 
 bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' | \
-grep "pb_text\.cc$" | \
+grep "pb_text\.h$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' | \
 sort > tf_pb_text_files.txt
@@ -49,3 +49,5 @@ grep -E "//tensorflow/.*\.h$" | \
 sed -E 's#^//##g' | \
 sed -E 's#:#/#g' | \
 sort > proto_text_pb_h_files.txt
+
+# [bazel release 0.16.1]

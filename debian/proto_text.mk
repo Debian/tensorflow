@@ -4,13 +4,14 @@
 # proto_text_pb_cc_files.txt
 # proto_text_pb_h_files.txt
 
-BDIR := $(shell pwd)/proto_text.build/
+BDIR := $(shell pwd)/build/
 $(shell mkdir -p $(BDIR))
 PROTO_TEXT := $(BDIR)/proto_text
 PROTOC := protoc
 INCLUDES := -I.
-CXXFLAGS := -pthread -DPLATFORM_POSIX
+CXXFLAGS := -pthread -DPLATFORM_POSIX -std=c++14 -fPIC
 LIBS := -lpthread -lprotobuf
+LDFLAGS := -Wl,--as-needed
 
 .PHONY: all
 all: $(PROTO_TEXT)
