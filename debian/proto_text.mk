@@ -6,8 +6,10 @@
 
 include debian/flags.mk
 
-.PHONY: all
-all: $(PROTO_TEXT)
+$(PROTO_TEXT):  $(PROTO_TEXT_PB_H_GEN) $(PROTO_TEXT_OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) -o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) \
+		$(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(INCLUDES) $(LIBS)
 
 $(BDIR)%.o: %.cc
 	@mkdir -p $(dir $@)
@@ -34,11 +36,6 @@ PROTO_TEXT_PB_H_GEN  := $(addprefix $(BDIR), $(PROTO_TEXT_PB_H_SRCS))
 PROTO_TEXT_OBJS := $(PROTO_TEXT_PB_CC_OBJS) $(PROTO_TEXT_CC_OBJS)
 
 $(PROTO_TEXT_OBJS): $(PROTO_TEXT_PB_H_GEN)
-
-$(PROTO_TEXT):  $(PROTO_TEXT_PB_H_GEN) $(PROTO_TEXT_OBJS)
-	@mkdir -p $(dir $@)
-	$(CXX) -o $(PROTO_TEXT) $(PROTO_TEXT_OBJS) \
-		$(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(INCLUDES) $(LIBS)
 
 .PHONY: clean
 clean:
