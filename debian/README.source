@@ -24,6 +24,9 @@ Principles specific to this source package
 
    src:caffe and src:caffe-contrib is an example for illustration.
 
+3. Build nothing from contrib as long as possible. Code in contrib
+   is not officially supported.
+
 
 Debian's own cmake/make build
 -----------------------------
@@ -72,8 +75,8 @@ Only C and C++ interface is provided.
 - [x] sort out this confusing lintian E
       source-is-missing tensorflow/compiler/aot/codegen_test_o.golden
       Done: https://salsa.debian.org/lintian/lintian/commit/75a5b2d4ef35346200588ceaa8a4d26143f42195
+- [x] parallel ld triggers OOM killer. CXXFLAGS += -gsplit-dwarf
 
-- [ ] build nothing from contrib as long as possible
 - [ ] build tests files (googletest) and run the tests.
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
@@ -94,7 +97,6 @@ Only C and C++ interface is provided.
 - [ ] (cmake) prevent "make install" from building everything again?
 - [ ] check the difference between makefile and cmake.
   - [ ] We really need the CMake build?
-- [ ] parallel ld triggers OOM killer.
 - [ ] cleanup the mess in cmake/makefile, removing useless stuff. make them easier to read.
 
 - [ ] upload to experimental.
