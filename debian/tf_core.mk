@@ -3,9 +3,13 @@
 include debian/flags.mk
 
 TF_CORE := $(BDIR)/tf_core.a
-$(TF_CORE): $(BDIR)/tf_core_ops.a $(BDIR)/tf_core_kernels.a \
-		$(BDIR)/tf_core_lib.a $(BDIR)/tf_core_platform.a
-	ar rcs $@ $<
+TF_CORE_COMPONENTS := \
+	$(BDIR)/tf_core_ops.a $(BDIR)/tf_core_kernels.a \
+	$(BDIR)/tf_core_lib.a $(BDIR)/tf_core_platform.a \
+	$(BDIR)/tf_core_framework.a
+
+$(TF_CORE): $(TF_CORE_COMPONENTS)
+	ar rcs $@ $(TF_CORE_COMPONENTS)
 
 # core / ops ------------------------------------------------------------------
 
@@ -43,7 +47,7 @@ CORE_LIB_OBJS := $(addprefix $(BDIR), $(CORE_LIB_SRCS:.cc=.o))
 $(BDIR)/tf_core_lib.a: $(CORE_LIB_OBJS)
 	ar rcs $@ $(CORE_LIB_OBJS)
 
-# core / platform
+# core / platform -------------------------------------------------------------
 
 CORE_PLATFORM_SRCS_EXCL := $(wildcard tensorflow/core/platform/*test.cc) \
 	$(wildcard tensorflow/core/platform/default/cuda*.cc)
@@ -56,6 +60,17 @@ CORE_PLATFORM_OBJS := $(addprefix $(BDIR), $(CORE_PLATFORM_SRCS:.cc=.o))
 
 $(BDIR)/tf_core_platform.a: $(CORE_PLATFORM_OBJS)
 	ar rcs $@ $(CORE_PLATFORM_OBJS)
+
+# core / framework ------------------------------------------------------------
+
+CORE_FRAME_SRCS_EXCL := $(wildcard tensorflow/core/framework/*test.cc) \
+	$(wildcard tensorflow/core/framework/*testutils.cc)
+CORE_FRAME_SRCS := $(wildcard tensorflow/core/framework/*.cc)
+CORE_FRAME_SRCS := $(filter-out $(CORE_FRAME_SRCS_EXCL), $(CORE_FRAME_SRCS))
+CORE_FRAME_OBJS := $(addprefix $(BDIR), $(CORE_FRAME_SRCS:.cc=.o))
+
+$(BDIR)/tf_core_framework.a: $(CORE_FRAME_OBJS)
+	ar rcs $@ $(CORE_FRAMEWORK_OBJS)
 
 # generic rule for objects ----------------------------------------------------
 
