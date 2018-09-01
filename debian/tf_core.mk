@@ -6,7 +6,8 @@ TF_CORE := $(BDIR)/tf_core.a
 TF_CORE_COMPONENTS := \
 	$(BDIR)/tf_core_ops.a $(BDIR)/tf_core_kernels.a \
 	$(BDIR)/tf_core_lib.a $(BDIR)/tf_core_platform.a \
-	$(BDIR)/tf_core_framework.a $(BDIR)/tf_core_graph.a
+	$(BDIR)/tf_core_framework.a $(BDIR)/tf_core_graph.a \
+	$(BDIR)/tf_core_util.a
 
 $(TF_CORE): $(TF_CORE_COMPONENTS)
 	ar rcs $@ $(TF_CORE_COMPONENTS)
@@ -81,6 +82,16 @@ CORE_GRAPH_OBJS := $(addprefix $(BDIR), $(CORE_GRAPH_SRCS:.cc=.o))
 
 $(BDIR)/tf_core_graph.a: $(CORE_GRAPH_OBJS)
 	ar rcs $@ $(CORE_GRAPH_OBJS)
+
+# core / util -----------------------------------------------------------------
+
+CORE_UTIL_SRCS_EXCL := $(wildcard tensorflow/core/util/*test.cc)
+CORE_UTIL_SRCS := $(wildcard tensorflow/core/util/*.cc)
+CORE_UTIL_SRCS := $(filter-out $(CORE_UTIL_SRCS_EXCL), $(CORE_UTIL_SRCS))
+CORE_UTIL_OBJS := $(addprefix $(BDIR), $(CORE_UTIL_SRCS:.cc=.o))
+
+$(BDIR)/tf_core_util.a: $(CORE_UTIL_OBJS)
+	ar rcs $@ $(CORE_UTIL_OBJS)
 
 # generic rule for objects ----------------------------------------------------
 
