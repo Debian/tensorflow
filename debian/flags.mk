@@ -7,5 +7,5 @@ PROTOC := protoc
 INCLUDES := -I/usr/include -I. -I$(BDIR) -Idebian/embedded/eigen -I/usr/include/gemmlowp \
 	-Ithird_party/eigen3 -I/usr/include/google
 CXXFLAGS := -pthread -DPLATFORM_POSIX -std=c++14 -fPIC
-LIBS := -lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion -ldl
-LDFLAGS := -Wl,--as-needed
+LIBS := -lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion -ldl -lm -lz
+LDFLAGS := -Wl,--as-needed -Wl,--no-whole-archive
