@@ -50,4 +50,11 @@ sed -E 's#^//##g' | \
 sed -E 's#:#/#g' | \
 sort > proto_text_pb_h_files.txt
 
+bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' | \
+grep -E '//tensorflow.*.cc$' | \
+grep -E -v 'gen_proto_text_functions' \
+| sed -E 's#^//##g' \
+| sed -E 's#:#/#g' \
+| sort > android_tf_lib_cc.txt
+
 # [bazel release 0.16.1]
