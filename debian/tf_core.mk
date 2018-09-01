@@ -7,7 +7,8 @@ TF_CORE_COMPONENTS := \
 	$(BDIR)/tf_core_ops.a $(BDIR)/tf_core_kernels.a \
 	$(BDIR)/tf_core_lib.a $(BDIR)/tf_core_platform.a \
 	$(BDIR)/tf_core_framework.a $(BDIR)/tf_core_graph.a \
-	$(BDIR)/tf_core_util.a $(BDIR)/tf_core_common_runtime.a
+	$(BDIR)/tf_core_util.a $(BDIR)/tf_core_common_runtime.a \
+	$(BDIR)/tf_core_grappler.a
 
 $(TF_CORE): $(TF_CORE_COMPONENTS)
 	ar rcs $@ $(TF_CORE_COMPONENTS)
@@ -102,6 +103,18 @@ CORE_CR_OBJS := $(addprefix $(BDIR), $(CORE_CR_SRCS:.cc=.o))
 
 $(BDIR)/tf_core_common_runtime.a: $(CORE_CR_OBJS)
 	ar rcs $@ $(CORE_CR_OBJS)
+
+# core / grappler -------------------------------------------------------------
+
+CORE_GR_SRCS_EXCL := $(wildcard tensorflow/core/grappler/*test.cc) \
+	$(wildcard tensorflow/core/grappler/*/*test.cc)
+CORE_GR_SRCS := $(wildcard tensorflow/core/grappler/*.cc) \
+	$(wildcard tensorflow/core/grappler/*/*.cc)
+CORE_GR_SRCS := $(filter-out $(CORE_GR_SRCS_EXCL), $(CORE_GR_SRCS))
+CORE_GR_OBJS := $(addprefix $(BDIR), $(CORE_GR_SRCS:.cc=.o))
+
+$(BDIR)/tf_core_grappler.a: $(CORE_GR_OBJS)
+	ar rcs $@ $(CORE_GR_OBJS)
 
 # generic rule for objects ----------------------------------------------------
 
