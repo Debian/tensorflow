@@ -107,7 +107,9 @@ $(BDIR)/tf_core_common_runtime.a: $(CORE_CR_OBJS)
 # core / grappler -------------------------------------------------------------
 
 CORE_GR_SRCS_EXCL := $(wildcard tensorflow/core/grappler/*test.cc) \
-	$(wildcard tensorflow/core/grappler/*/*test.cc)
+	$(wildcard tensorflow/core/grappler/*/*test.cc) \
+	tensorflow/core/grappler/inputs/file_input_yielder.cc \
+	tensorflow/core/grappler/inputs/trivial_test_graph_input_yielder.cc
 CORE_GR_SRCS := $(wildcard tensorflow/core/grappler/*.cc) \
 	$(wildcard tensorflow/core/grappler/*/*.cc)
 CORE_GR_SRCS := $(filter-out $(CORE_GR_SRCS_EXCL), $(CORE_GR_SRCS))
