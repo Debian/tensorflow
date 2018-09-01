@@ -11,7 +11,8 @@ PBT_IMPL_GEN := $(addprefix $(BDIR), $(PBT_H:.pb_text.h=.pb_text-impl.h))
 PBT_CC_GEN := $(addprefix $(BDIR), $(PBT_H:.h=.cc))
 PBT_OBJS := $(addprefix $(BDIR), $(PBT_H:.h=.o))
 
-all: $(PBT_OBJS)
+$(BDIR)/tf_proto_text.a: $(PBT_OBJS)
+	ar rcs $@ $(PBT_OBJS)
 
 $(BDIR)%.pb_text.o: $(BDIR)%.pb_text.cc
 	@mkdir -p $(dir $@)
@@ -21,4 +22,3 @@ $(BDIR)%.pb_text.cc $(BDIR)%.pb_text.h $(BDIR)%.pb_text-impl.h: %.proto | $(PROT
 	@mkdir -p $(dir $@)
 	$(PROTO_TEXT) $(BDIR)/tensorflow/core tensorflow/core \
 		tensorflow/tools/proto_text/placeholder.txt $<
-
