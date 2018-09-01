@@ -6,3 +6,4 @@ make -f debian/proto_text.mk -j$JOBS
 make -f debian/tf_proto_text.mk -j$JOBS
 make -f debian/tf_proto.mk -j$JOBS
 make -f debian/tf_core_ops.mk -j$JOBS
+make -f debian/tf_core_kernels.mk -j$JOBS
