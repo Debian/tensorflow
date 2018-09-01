@@ -110,6 +110,7 @@ Only C and C++ interface is provided.
 - [ ] check the difference between makefile and cmake.
   - [ ] We really need the CMake build?
 - [ ] cleanup the mess in cmake/makefile, removing useless stuff. make them easier to read.
+- [ ] we have three build systems now ... we must remove two.
 
 - [ ] upload to experimental.
 
@@ -134,14 +135,13 @@ Not Decided Yet
 
 - [ ] re-enable GRPC support. (FTBFS since 1.13 -> 1.14 in experimental)
       As long as TF doesn't FTBFS with it.
-      I dislike javascript.
-      I know nothing about Go.
-      I dislike java.
 - [ ] upload to unstable.
       Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
 - [ ] Compile both AVX+ version and Generic version. Automatically
       choose the working one during postinst according to the machine's
       cpu capability.
+- [ ] core/debug
+- [ ] core/distributed_runtime
 
 Will Never Get Fixed
 --------------------
