@@ -4,15 +4,11 @@
 # tf_proto_files.txt
 
 include debian/flags.mk
+include debian/globs.mk
 
 X_TF_PROTO: $(BDIR)/tf_proto.a $(BDIR)/tf_proto_text.a
 
 # -----------------------------------------------------------------------------
-
-TF_PROTO := $(shell find tensorflow/core -type f -name '*.proto')
-TF_PROTO_H_GEN := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.h))
-TF_PROTO_CC_GEN := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.cc))
-TF_PROTO_OBJS := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.o))
 
 $(BDIR)/tf_proto.a: $(TF_PROTO_OBJS)
 	ar rcs $@ $(TF_PROTO_OBJS)
@@ -26,13 +22,6 @@ $(BDIR)%.pb.cc $(BDIR)%.pb.h: %.proto
 	$(PROTOC) $< --cpp_out $(BDIR)
 
 # -----------------------------------------------------------------------------
-
-PBT_H := $(shell find tensorflow/core -type f -name '*.proto')
-PBT_H := $(PBT_H:.proto=.pb.h)
-PBT_H_GEN := $(addprefix $(BDIR), $(PBT_H))
-PBT_IMPL_GEN := $(addprefix $(BDIR), $(PBT_H:.pb_text.h=.pb_text-impl.h))
-PBT_CC_GEN := $(addprefix $(BDIR), $(PBT_H:.h=.cc))
-PBT_OBJS := $(addprefix $(BDIR), $(PBT_H:.h=.o))
 
 $(BDIR)/tf_proto_text.a: $(PBT_OBJS)
 	ar rcs $@ $(PBT_OBJS)
