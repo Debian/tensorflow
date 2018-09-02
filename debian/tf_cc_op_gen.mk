@@ -1,7 +1,7 @@
 include debian/flags.mk
 
 OP_NAMES := $(shell find tensorflow/core/ops/ -type f -name '*ops.cc')
-OP_NAMES := $(patsubst tensorflow/core/ops/%.cc,%, $(OP_NAMES))
+OP_NAMES := $(patsubst tensorflow/core/ops/%.cc,%, $(OP_NAMES)) no_op
 
 X_TF_CC_OP_GEN: $(addsuffix _gen, $(addprefix $(BDIR), $(OP_NAMES)))
 
