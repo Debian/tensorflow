@@ -17,6 +17,7 @@ CORE_SRCS := \
 	$(wildcard tensorflow/core/kernels/*.cc) \
 	$(wildcard tensorflow/core/kernels/*/*.cc) \
 	$(wildcard tensorflow/core/kernels/*/*/*.cc) \
+	$(wildcard tensorflow/core/lib/*.cc) \
 	$(wildcard tensorflow/core/lib/*/*.cc) \
 	$(wildcard tensorflow/core/ops/*.cc) \
 	$(wildcard tensorflow/core/platform/*.cc) \
@@ -71,6 +72,7 @@ CORE_SRCS_EX := \
 	tensorflow/core/kernels/debug_ops.cc \
 	tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc
 
+CORE_SRCS := $(sort $(CORE_SRCS))
 CORE_SRCS := $(filter-out $(CORE_SRCS_EX), $(CORE_SRCS))
 CORE_OBJS := $(addprefix $(BDIR), $(CORE_SRCS:.cc=.o))
 
