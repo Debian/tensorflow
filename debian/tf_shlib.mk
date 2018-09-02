@@ -12,4 +12,4 @@ $(BDIR)/libtensorflow.so: \
 		-o $(BDIR)/libtensorflow.so.$(VERSION) \
 		-Wl,--soname=libtensorflow.so.$(SOVERSION)
 	ln -sr $(BDIR)/libtensorflow.so.$(VERSION) $(BDIR)/libtensorflow.so.$(SOVERSION)
-	ln -sr $(BDIR)/libtensorflow.so.$(VERSION) $(BDIR)/libtensorlfow.so
+	ln -sr $(BDIR)/libtensorflow.so.$(VERSION) $(BDIR)/libtensorflow.so
