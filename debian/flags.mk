@@ -1,5 +1,8 @@
 # Common Flags for TensorFlow Makefile
 
+VERSION := 1.10.1
+SOVERSION := 1.10
+
 BDIR := $(shell pwd)/build/
 $(shell mkdir -p $(BDIR))
 PROTO_TEXT := $(BDIR)/proto_text
