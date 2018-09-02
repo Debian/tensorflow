@@ -1,17 +1,24 @@
-
 include debian/flags.mk
+
+OP_NAMES := $(shell find tensorflow/core/ops/ -type f -name '*ops.cc')
+OP_NAMES := $(patsubst tensorflow/core/ops/%.cc,%, $(OP_NAMES))
+
+X_TF_CC_OP_GEN: $(addsuffix _gen, $(addprefix $(BDIR), $(OP_NAMES)))
 
 TF_CC_OP_GEN_SRCS := \
 	tensorflow/cc/framework/cc_op_gen.cc \
 	tensorflow/cc/framework/cc_op_gen_main.cc
 TF_CC_OP_GEN_OBJS := $(addprefix $(BDIR), $(TF_CC_OP_GEN_SRCS:.cc=.o))
 
-test: $(TF_CC_OP_GEN_OBJS)
+$(BDIR)%_gen: $(TF_CC_OP_GEN_OBJS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(LIBS) \
-		build/tensorflow/core/ops/array_ops.o \
-		$(TF_CC_OP_GEN_OBJS) $(TF_CORE) -o test \
+		build/tensorflow/core/ops/$(patsubst %_gen,%,$(shell basename $@)).o $(TF_CC_OP_GEN_OBJS) $(TF_CORE) \
 		$(BDIR)/tf_proto.a $(BDIR)/tf_proto_text.a \
-		tensorflow/core/lib/strings/proto_text_util.cc
+		tensorflow/core/lib/strings/proto_text_util.cc \
+		-o $@
+	$@ build/tensorflow/cc/ops/$(patsubst %_gen,%,$(shell basename $@)).h \
+	build/tensorflow/cc/ops/$(patsubst %_gen,%,$(shell basename $@)).cc \
+	0 tensorflow/core/api_def/base_api
 
 $(BDIR)%.o: %.cc
 	@mkdir -p $(dir $@)
