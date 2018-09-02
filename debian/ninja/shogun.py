@@ -71,12 +71,12 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
     return objs
 
 
-if __name__ == '__main__':
+def shogunProtoText(argv):
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, required=True)
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='proto_text.ninja')
     ag.add_argument('-B', help='build directory', type=str, default='.')
-    ag = ag.parse_args()
+    ag = ag.parse_args(argv)
 
     sourcelist = [l.strip() for l in open(ag.i, 'r').readlines()]
     sourcelist = filteroutExternal(sourcelist)
@@ -111,3 +111,16 @@ if __name__ == '__main__':
 
     print('Unprocessed files:', sourcelist)
 
+
+if __name__ == '__main__':
+
+    try:
+        sys.argv[1]
+    except IndexError as e:
+        print(e, 'you must specify a subcommand')
+        exit(1)
+
+    if sys.argv[1] == 'proto_text':
+        shogunProtoText(sys.argv[2:])
+    else:
+        raise NotImplementedError(sys.argv[1:])
