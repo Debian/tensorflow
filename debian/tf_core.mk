@@ -25,8 +25,8 @@ CORE_SRCS_EX := \
 	tensorflow/core/grappler/inputs/trivial_test_graph_input_yielder.cc \
 	tensorflow/core/kernels/adjust_contrast_op.cc \
 	tensorflow/core/kernels/conv_grad_ops_3d.cc \
-	tensorflow/core/kernels/debug_ops.cc
-	tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc \
+	tensorflow/core/kernels/debug_ops.cc \
+	tensorflow/core/kernels/sparse_tensor_dense_matmul_op.cc
 
 CORE_SRCS := \
 	$(wildcard tensorflow/core/*.cc) \
