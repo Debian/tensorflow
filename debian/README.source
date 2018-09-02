@@ -4,9 +4,8 @@ README.Debian
 Principles specific to this source package
 ------------------------------------------
 
-1. Don't use code from tensorflow/contrib as long as possible.
-
-   They are not officially supported by upstream.
+1. Use "bazel query" to dump source code and generated file
+   dependencies for the build targets.
 
 2. This source packages provides CPU-only verison of TF instead
    of CUDA version. Necessity of CPU-only Version:
@@ -18,95 +17,14 @@ Principles specific to this source package
    (2) CPU-only Version can stay in the main section. Once compiled
        with CUDA, the source must enter contrib section.
 
-   That being said, please don't remove CUDA related build from the
-   build system because that would be easier for maintainer to
-   synchronize the CUDA version and CPU version.
-
    src:caffe and src:caffe-contrib is an example for illustration.
 
-3. Build nothing from contrib as long as possible. Code in contrib
-   is not officially supported.
 
+Debian's Build System for TF
+----------------------------
 
-Debian's own cmake/make build
------------------------------
-
- Google is going to drop cmake build. This packaging project forked
- the CMake build system from TensorFlow v1.10.0 and modified it.
- See debian/cmake/README.md for detail.
-
- Building TF consumes much memory. A rough observation is that you
- need more than 32GB of memory for debuild -J8 (ppc64el), especially
- when linking multiple ELF biaries in parallel. Maybe this situation
- can be improved by tweaking the cmake build.
-
- Tensorflow's makefile build is also forked to debian/make. Different
- from CMake, this set of makefile only compiles the core library
- with the minimal functionality set as possible.
-
- CMake build is used for AMD64 and PPC64EL, which are able to train
- neural networks. Other architectures use Makefile to compile
- a tensorflow library with core functionality set, with which
- at least they can conduct the forward pass with pretrained neural
- networks. AArch64 uses Makefile because I don't have energy
- to care about Tegra or CUDA-AArch64.
-
-Debian's Native Makefile
-------------------------
-
-  1. bash debian/bazelQuery.sh
-  2. cat debian/flags.mk
-  3. make -f debian/proto_text.mk
-  4. make -f debian/tf_proto_text.mk
-  5. make -f debian/tf_proto.mk
-  6. make -f debian/tf_knl_ops.mk
-  ...
-
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::CudaRoot[abi:cxx11]()'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogTensorDeallocation const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::AddRunMeta(long long, std::unique_ptr<tensorflow::RunMetadata, std::default_delete<tensorflow::RunMetadata> >)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `util::Fingerprint128(char const*, unsigned long)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::ShowMultiGraphNode(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::tfprof::Options const&) const'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::SessionMgr::CreateSession(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::ServerDef const&, bool)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::graph_transforms::TransformFuncContext::GetOneBoolParameter(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool*) const'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::WriteComplexVectorToRawFloatFile(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::vector<std::complex<double>, std::allocator<std::complex<double> > >, std::allocator<std::vector<std::complex<double>, std::allocator<std::complex<double> > > > > const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::TFStats(std::unique_ptr<tensorflow::GraphDef, std::default_delete<tensorflow::GraphDef> >, std::unique_ptr<tensorflow::RunMetadata, std::default_delete<tensorflow::RunMetadata> >, std::unique_ptr<tensorflow::tfprof::OpLogProto, std::default_delete<tensorflow::tfprof::OpLogProto> >, std::unique_ptr<tensorflow::checkpoint::CheckpointReader, std::default_delete<tensorflow::checkpoint::CheckpointReader> >)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoDebugString[abi:cxx11](tensorflow::TensorProto const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogTensorOutput const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::NewServer(tensorflow::ServerDef const&, std::unique_ptr<tensorflow::ServerInterface, std::default_delete<tensorflow::ServerInterface> >*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::OpDef_ArgDef const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `rdft'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoDebugString[abi:cxx11](tensorflow::NodeDef const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::TensorShapeProto const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogTensorAllocation const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::NewRemoteDevices(tensorflow::Env*, tensorflow::WorkerCacheInterface*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::function<void (tensorflow::Status const&, std::vector<tensorflow::Device*, std::allocator<tensorflow::Device*> >*)>)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::CreateSummaryDbWriter(tensorflow::Sqlite*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::Env*, tensorflow::SummaryWriterInterface**)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::OpDef const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::BuildView(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::ConfigProto const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::SessionMgr::WorkerSessionForSession(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::shared_ptr<tensorflow::WorkerSession>*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::KernelDef const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogStep const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::EnumName_DataType(tensorflow::DataType)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoDebugString[abi:cxx11](tensorflow::Feature const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::SavedSliceMeta const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::GpuIdManager::TfToCudaGpuId(tensorflow::gtl::IntType<tensorflow::TfGpuId_tag_, int>, tensorflow::gtl::IntType<tensorflow::CudaGpuId_tag_, int>*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogRawAllocation const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::TensorProto const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::graph_transforms::GetTransformRegistry[abi:cxx11]()'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::eager::NewGrpcEagerClientCache(std::shared_ptr<tensorflow::GrpcChannelCache>)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::CreateSummaryFileWriter(int, int, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::Env*, tensorflow::SummaryWriterInterface**)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::SetupTensorboardSqliteDb(tensorflow::Sqlite*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::SerializeToString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::graph_transforms::TransformFuncContext::GetOneStringParameter(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*) const'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ReadCSVFileToComplexVectorOrDie(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::vector<std::complex<double>, std::allocator<std::complex<double> > >, std::allocator<std::vector<std::complex<double>, std::allocator<std::complex<double> > > > >*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::tfprof::TFStats::ShowGraphNode(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::tfprof::Options const&) const'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::VersionDef const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `typeinfo for tensorflow::GrpcServer'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoParseFromString(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tensorflow::AttrValue*)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `tensorflow::ProtoShortDebugString[abi:cxx11](tensorflow::MemoryLogRawDeallocation const&)'
-/usr/bin/ld: /home/lumin/tensorflow.pkg/tensorflow/build//libtensorflow.so: undefined reference to `util::Fingerprint64(char const*, unsigned long)'
-
+The build system is python3 plus ninja which builds stuff according
+to bazel dump.  See debian/ninja/README.md for detail.
 
 Ambiguous FFT2D license
 -----------------------
@@ -115,24 +33,20 @@ Ambiguous FFT2D license
  https://github.com/tensorflow/tensorflow/issues/21724
  Well, let's assume it's a free license.
 
+ There is only one kernel that use this file. If this license
+ is really problematic, we can disable the kernel and drop
+ this dependency.
 
 Things remain to be done
 ========================
 
-Exp-Stage A
------------
+Misc.
 
-Only C and C++ interface is provided.
+- [ ] remaining lintian warnings and errors.
+- [ ] traverse the 16000+ files in the source tree and complete d/copyright.  ummmmmmmmmm.............
+- [ ] upload to experimental.
 
-- [x] prevent the build system from downloading anything.
-- [x] deal with all the C/C++ lib dependencies.
-- [x] produce libtensorflow.so.1.10 and install it into .deb package.
-- [x] ambiguous FFT2D license.
-- [x] architectures that doesn't make cmake.
-- [x] sort out this confusing lintian E
-      source-is-missing tensorflow/compiler/aot/codegen_test_o.golden
-      Done: https://salsa.debian.org/lintian/lintian/commit/75a5b2d4ef35346200588ceaa8a4d26143f42195
-- [x] parallel ld triggers OOM killer. CXXFLAGS += -gsplit-dwarf
+C and C++ interface.
 
 - [ ] build tests files (googletest) and run the tests.
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
@@ -140,29 +54,8 @@ Only C and C++ interface is provided.
   - [ ] working on amd64?
   - [ ] working on ppc64el?
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
-- [ ] remaining lintian warnings and errors.
-- [ ] traverse the 16000+ files in the source tree and complete d/copyright.  ummmmmmmmmm.............
-- [ ] get rid of this error
-      /usr/bin/ld: error: benchmark_model(.debug_info) is too large (0x35a9f359 bytes)
-      /usr/bin/ld: error: benchmark_model(.debug_str) is too large (0x6a545d15 bytes)
-      /usr/bin/ld: error: benchmark_model(.debug_loc) is too large (0x1f5b1950 bytes)
-      make[3]: Leaving directory '/<<BUILDDIR>>/tensorflow-1.10.0+dfsg/obj-x86_64-linux-gnu'
-      [ 98%] Built target benchmark_model
-      /usr/bin/ld: error: compare_graphs(.debug_info) is too large (0x366f36be bytes)
-      /usr/bin/ld: error: compare_graphs(.debug_str) is too large (0x6a64010e bytes)
-      /usr/bin/ld: error: compare_graphs(.debug_loc) is too large (0x1fd19fe0 bytes)
-- [ ] (cmake) prevent "make install" from building everything again?
-- [ ] check the difference between makefile and cmake.
-  - [ ] We really need the CMake build?
-- [ ] cleanup the mess in cmake/makefile, removing useless stuff. make them easier to read.
-- [ ] we have three build systems now ... we must remove two.
 
-- [ ] upload to experimental.
-
-Exp-Stage B
------------
-
-Provide the Python interface.
+Python interface.
 
 - [ ] do we have all the required python dependencies?
 - [ ] build pywrap_tensorflow_internal.so
@@ -172,8 +65,6 @@ Provide the Python interface.
 - [ ] write autopkgtest with some mini python programs.
 - [ ] make sure nothing from contrib is built.
 - [ ] maintain cmake build.
-
-- [ ] bump debian revision to -B* and upload to experimental.
 
 Not Decided Yet
 ---------------
@@ -185,8 +76,7 @@ Not Decided Yet
 - [ ] Compile both AVX+ version and Generic version. Automatically
       choose the working one during postinst according to the machine's
       cpu capability.
-- [ ] core/debug
-- [ ] core/distributed_runtime
+- [ ] compile and provide documentation.
 
 Will Never Get Fixed
 --------------------
@@ -197,7 +87,6 @@ Will Never Get Fixed
 - [ ] Javascript binding tensorflow.js if no one works on it.
 - [ ] Go binding if no one works on it.
 - [ ] Java binding if no one works on it.
-- [ ] compile and provide documentation if no one works on it.
 - [ ] GPU (CUDA) support if no one works on it.
       .
       If you want the CUDA version, why not use TensorFlow official binaries?
