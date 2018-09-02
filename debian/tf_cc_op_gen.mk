@@ -16,6 +16,7 @@ $(BDIR)%_gen: $(TF_CC_OP_GEN_OBJS)
 		$(BDIR)/tf_proto.a $(BDIR)/tf_proto_text.a \
 		tensorflow/core/lib/strings/proto_text_util.cc \
 		-o $@
+	@mkdir -p $(BDIR)/tensorflow/cc/ops/
 	$@ build/tensorflow/cc/ops/$(patsubst %_gen,%,$(shell basename $@)).h \
 	build/tensorflow/cc/ops/$(patsubst %_gen,%,$(shell basename $@)).cc \
 	0 tensorflow/core/api_def/base_api
