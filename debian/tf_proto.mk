@@ -9,7 +9,7 @@ X_TF_PROTO: $(BDIR)/tf_proto.a $(BDIR)/tf_proto_text.a
 
 # -----------------------------------------------------------------------------
 
-TF_PROTO := $(shell cat tf_proto_files.txt)
+TF_PROTO := $(shell find tensorflow/core -type f -name '*.proto')
 TF_PROTO_H_GEN := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.h))
 TF_PROTO_CC_GEN := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.cc))
 TF_PROTO_OBJS := $(addprefix $(BDIR), $(TF_PROTO:.proto=.pb.o))
@@ -27,7 +27,8 @@ $(BDIR)%.pb.cc $(BDIR)%.pb.h: %.proto
 
 # -----------------------------------------------------------------------------
 
-PBT_H := $(shell cat tf_pb_text_files.txt)
+PBT_H := $(shell find tensorflow/core -type f -name '*.proto')
+PBT_H := $(PBT_H:.proto=.pb.h)
 PBT_H_GEN := $(addprefix $(BDIR), $(PBT_H))
 PBT_IMPL_GEN := $(addprefix $(BDIR), $(PBT_H:.pb_text.h=.pb_text-impl.h))
 PBT_CC_GEN := $(addprefix $(BDIR), $(PBT_H:.h=.cc))

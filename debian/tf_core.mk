@@ -6,19 +6,19 @@ TF_CORE := $(BDIR)/tf_core.a
 X_TF_CORE: $(TF_CORE)
 
 CORE_SRCS_EX := \
-	$(wildcard tensorflow/core/*/*test.cc) \
-	$(wildcard tensorflow/core/*/*/*test.cc) \
-	$(wildcard tensorflow/core/*/*testutil*) \
-	$(wildcard tensorflow/core/*/*/*testutil*) \
-	$(wildcard tensorflow/core/*/*testlib*) \
-	$(wildcard tensorflow/core/*/*/*testlib*) \
-	$(wildcard tensorflow/core/*/*main.cc) \
-	$(wildcard tensorflow/core/*/*/*main.cc) \
-	$(wildcard tensorflow/core/*/*_test_utils.cc) \
-	$(wildcard tensorflow/core/platform/default/cuda*.cc) \
 	$(wildcard tensorflow/core/*/*.cu.cc) \
 	$(wildcard tensorflow/core/*/*/*.cu.cc) \
 	$(wildcard tensorflow/core/*/*/*/*.cu.cc) \
+	$(wildcard tensorflow/core/*/*/*main.cc) \
+	$(wildcard tensorflow/core/*/*/*test.cc) \
+	$(wildcard tensorflow/core/*/*/*testlib*) \
+	$(wildcard tensorflow/core/*/*/*testutil*) \
+	$(wildcard tensorflow/core/*/*_test_utils.cc) \
+	$(wildcard tensorflow/core/*/*main.cc) \
+	$(wildcard tensorflow/core/*/*test.cc) \
+	$(wildcard tensorflow/core/*/*testlib*) \
+	$(wildcard tensorflow/core/*/*testutil*) \
+	$(wildcard tensorflow/core/platform/default/cuda*.cc) \
 	$(wildcard tensorflow/core/platform/stream_executor*) \
 	$(wildcard tensorflow/core/user_ops/*) \
 	tensorflow/core/grappler/inputs/file_input_yielder.cc \
