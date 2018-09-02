@@ -11,7 +11,15 @@ TF_CORE_COMPONENTS := \
 	$(BDIR)/tf_core_grappler.a
 
 $(TF_CORE): $(TF_CORE_COMPONENTS)
-	ar rcs $@ $(TF_CORE_COMPONENTS)
+	ar rcs $@ \
+		$(CORE_OPS_OBJS) \
+		$(CORE_KERNELS_OBJS) \
+		$(CORE_LIB_OBJS) \
+		$(CORE_PLATFORM_OBJS) \
+		$(CORE_GRAPH_OBJS) \
+		$(CORE_UTIL_OBJS) \
+		$(CORE_CR_OBJS) \
+		$(CORE_GR_OBJS)
 
 # core / ops ------------------------------------------------------------------
 

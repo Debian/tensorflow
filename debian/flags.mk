@@ -9,3 +9,7 @@ INCLUDES := -I/usr/include -I. -I$(BDIR) -Idebian/embedded/eigen -I/usr/include/
 CXXFLAGS := -pthread -DPLATFORM_POSIX -std=c++14 -fPIC
 LIBS := -lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion -ldl -lm -lz
 LDFLAGS := -Wl,--as-needed -Wl,--no-whole-archive
+
+TF_CORE := $(BDIR)/tf_core.a
+TF_CORE_LIB := $(BDIR)/tf_core_lib.a
+TF_CORE_FRAMEWORK := $(BDIR)/tf_core_framework.a
