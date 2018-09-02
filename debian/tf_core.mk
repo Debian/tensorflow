@@ -54,7 +54,16 @@ CORE_SRCS_EX := \
 	$(wildcard tensorflow/core/kernels/cuda*) \
 	$(wildcard tensorflow/core/platform/default/cuda*.cc) \
 	$(wildcard tensorflow/core/platform/stream_executor*) \
+	$(wildcard tensorflow/core/kernels/fuzzing/*) \
+	$(wildcard tensorflow/core/platform/cloud/*) \
+	$(wildcard tensorflow/core/platform/s3/*) \
+	$(wildcard tensorflow/core/platform/google/*/*) \
+	$(wildcard tensorflow/core/platform/google/*) \
+	$(wildcard tensorflow/core/platform/windows/*) \
 	$(wildcard tensorflow/core/user_ops/*) \
+	$(wildcard tensorflow/core/debug/*) \
+	$(wildcard tensorflow/core/platform/default/test_benchmark.*) \
+	$(wildcard tensorflow/core/kernels/hexagon/*) \
 	tensorflow/core/grappler/inputs/file_input_yielder.cc \
 	tensorflow/core/grappler/inputs/trivial_test_graph_input_yielder.cc \
 	tensorflow/core/kernels/adjust_contrast_op.cc \
