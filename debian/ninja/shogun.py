@@ -118,14 +118,37 @@ def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
     '''
     write ninja rules for to proto_text files. cur is ninja writer
     '''
-    cclist = []
+    protos, cclist, hdrlist = [], [], []
     for proto in protolist:
-        output = [re.sub('.proto$', '.pb_text.cc', proto),
-                re.sub('.proto$', '.pb_text.h', proto),
-                re.sub('.proto$', '.pb_text-impl.h', proto)]
-        cur.build(output, 'PROTO_TEXT', inputs=proto)
-        cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
-    return cclist
+        # proto is a proto_text-related file
+        if proto.endswith('.proto'):
+            protos.append(proto)
+            cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
+            hdrlist.append(re.sub('.proto$', '.pb_text.h', proto))
+            hdrlist.append(re.sub('.proto$', '.pb_text-impl.h', proto))
+        elif proto.endswith('.pb_text.cc'):
+            protos.append(re.sub('.pb_text.cc$', '.proto', proto))
+            cclist.append(proto)
+            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text.h', proto))
+            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text-impl.h', proto))
+        elif proto.endswith('.pb_text.h'):
+            protos.append(re.sub('.pb_text.h$', '.proto', proto))
+            cclist.append(re.sub('.pb_text.h$', '.pb_text.cc', proto))
+            hdrlist.append(proto)
+            hdrlist.append(re.sub('.pb_text.h$', '.pb_text-impl.h', proto))
+        elif proto.endswith('.pb_text-impl.h'):
+            protos.append(re.sub('.pb_text-impl.h$', '.proto', proto))
+            cclist.append(re.sub('.pb_text-impl.h$', '.pb_text.cc', proto))
+            hdrlist.append(re.sub('.pb_text-impl.h$', '.pb_text.h', proto))
+            hdrlist.append(proto)
+        else:
+            raise SyntaxError(f'what is {proto}?')
+    for p in list(set(protos)):
+        output = [re.sub('.proto$', '.pb_text.cc', p),
+                re.sub('.proto$', '.pb_text.h', p),
+                re.sub('.proto$', '.pb_text-impl.h', p)]
+        cur.build(output, 'PROTO_TEXT', inputs=p)
+    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
 
 
 def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
@@ -188,7 +211,8 @@ def shogunProtoText(argv):
     cursor.build('proto_text', 'CXX_EXEC', inputs=proto_text_objs)
 
     # fflush
-    print(yellow('Unprocessed files:'), srclist)
+    print(yellow('Unprocessed src files:'), srclist)
+    print(yellow('Unprocessed gen files:'), genlist)
     cursor.close()
 
 
@@ -197,40 +221,49 @@ def shogunTFCoreProto(argv):
     Build tf_core_proto.a
     '''
     ag = argparse.ArgumentParser()
+    ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='tf_core_proto.ninja')
     ag.add_argument('-B', help='build directory', type=str, default='.')
     ag = ag.parse_args(argv)
 
-    genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
-    genlist = mangleBazel(genlist)
+    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
+    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
+    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
+    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
 
     # Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
 
     # generate .pb.cc and .pb.h
-    protolist, genlist = eGrep('.*.pb.h', genlist)
-    protolist = [re.sub('.pb.h$', '.proto', x) for x in protolist]
-    ninjaProto(cursor, protolist)
-    _, genlist = eGrep('.*.pb.h', genlist)
-    pbcclist, genlist = eGrep('.*.pb.cc', genlist)
+    srcproto, srclist = eGrep('.*.proto$', srclist)
+    genpbh, genlist = eGrep('.*.pb.h', genlist)
+    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
+    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
+    proto_diff = set(srcproto).difference(set(protolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # generate .pb_text.cc .pb_text.h .pb_test-impl.h
-    protolist, genlist = eGrep('.*.pb_text.h', genlist)
-    pbtextcclist, genlist = eGrep('.*.pb_text.cc', genlist)
-    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    protolist = [re.sub('.pb_text.h$', '.proto', x) for x in protolist]
-    ninjaProtoText(cursor, protolist)
-    pbcclist.extend(pbtextcclist)
+    genpbth, genlist = eGrep('.*.pb_text.h', genlist)
+    genpbtimplh, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    genpbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
+    pbtprotolist, pbtcclist, pbthlist = ninjaProtoText(cursor,
+            genpbth + genpbtimplh + genpbtcc)
+    pbtproto_diff = set(srcproto).difference(set(pbtprotolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # compile .cc source
-    tf_core_pb_obj = ninjaCXXOBJ(cursor, pbcclist)
+    tf_core_pb_obj = ninjaCXXOBJ(cursor, genpbcc + genpbtcc)
 
     # link the final executable
     cursor.build('tf_core_proto.a', 'STATIC', inputs=tf_core_pb_obj)
 
     ## fflush
+    #print(yellow('Unprocessed src files:'), srclist) # Ignore
+    print(yellow('Unprocessed gen files:'), genlist)
     cursor.close()
 
 
