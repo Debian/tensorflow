@@ -1,5 +1,6 @@
 #!/usr/bin/python3.6
 # Copyright (C) 2018 Mo Zhou <lumin@debian.org>
+# Distribution Friendly Light-Weight Build for TensorFlow.
 # MIT/Expat License.
 
 '''
