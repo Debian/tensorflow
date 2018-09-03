@@ -287,19 +287,23 @@ def shogunTFFrame(argv):
     ninjaCommonHeader(cursor, ag)
 
     # generate .pb.cc and .pb.h
-    _, srclist = eGrep('.*.proto$', srclist)
-    protolist, genlist = eGrep('.*.pb.cc', genlist)
-    _, genlist = eGrep('.*.pb.h', genlist)
-    protolist = [re.sub('.pb.cc', '.proto', x) for x in protolist]
-    ninjaProto(cursor, protolist)
+    srcproto, srclist = eGrep('.*.proto$', srclist)
+    genpbh, genlist = eGrep('.*.pb.h', genlist)
+    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
+    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
+    proto_diff = set(srcproto).difference(set(protolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # generate .pb_text.cc .pb_text.h .pb_test-impl.h
-    _, srclist = eGrep('.*.proto$', srclist)
-    protolist, genlist = eGrep('.*.pb_text.cc', genlist)
-    _, genlist = eGrep('.*.pb_text.h', genlist)
-    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    protolist = [re.sub('.pb_text.cc$', '.proto', x) for x in protolist]
-    ninjaProtoText(cursor, protolist)
+    genpbth, genlist = eGrep('.*.pb_text.h', genlist)
+    genpbtimplh, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    genpbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
+    pbtprotolist, pbtcclist, pbthlist = ninjaProtoText(cursor,
+            genpbth + genpbtimplh + genpbtcc)
+    pbtproto_diff = set(srcproto).difference(set(pbtprotolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # generate version info, the last bit in list of generated files
     print(yellow('Unprocessed generated files:'), genlist)
@@ -315,7 +319,7 @@ def shogunTFFrame(argv):
 
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
-    tf_framework_objs = ninjaCXXOBJ(cursor, cclist)
+    tf_framework_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist)
 
     # link the final executable
     cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=tf_framework_objs)
