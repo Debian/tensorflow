@@ -404,7 +404,8 @@ def shogunTFLib(argv):
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow_android.ninja')
+    ag.add_argument('-o', help='where to write the ninja file', type=str,
+            default='libtensorflow.ninja')
     ag.add_argument('-B', help='build directory', type=str, default='.')
     ag = ag.parse_args(argv)
 
