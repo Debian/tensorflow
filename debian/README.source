@@ -69,8 +69,6 @@ Python interface.
 Not Decided Yet
 ---------------
 
-- [ ] re-enable GRPC support. (FTBFS since 1.13 -> 1.14 in experimental)
-      As long as TF doesn't FTBFS with it.
 - [ ] upload to unstable.
       Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
 - [ ] Compile both AVX+ version and Generic version. Automatically
