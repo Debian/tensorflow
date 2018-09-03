@@ -3,27 +3,25 @@ Section: science
 Homepage: https://tensorflow.org/
 # Upstream-Git: https://github.com/tensorflow/tensorflow
 Priority: optional
-Standards-Version: 4.2.0
+Standards-Version: 4.2.1
 Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
 Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
 Uploaders: Mo Zhou <cdluminate@gmail.com>,
 Build-Depends:
- cmake [amd64 ppc64el],
  debhelper (>= 11~),
-# dh-python,
+ dh-python,
  libdouble-conversion-dev (>= 3.0.0+git20180802.4e8b3b5~),
  libfarmhash-dev,
  libgemmlowp-dev,
  libgif-dev,
-# libgrpc++-dev (>= 1.13.1~),
-# libgrpc++-dev (<< 1.14.0~),
+ libgrpc++-dev,
  libgtest-dev,
  libhighwayhash-dev [amd64 ppc64el],
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
-# libmkldnn-dev [amd64],
+ libmkldnn-dev [amd64],
  libnsync-dev,
  libpng-dev,
  libprotobuf-dev (>= 3.6.0~),
@@ -32,9 +30,9 @@ Build-Depends:
  libsnappy-dev,
  libsqlite3-dev,
  libsuperlu-dev,
- protobuf-compiler (>= 3.6.0~),
  llvm-dev,
-# protobuf-compiler-grpc,
+ protobuf-compiler (>= 3.6.0~),
+ protobuf-compiler-grpc,
  python3,
  python3-all-dev,
  python3-numpy,
@@ -47,7 +45,6 @@ Section: metapackages
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends},
- libtensorflow1.10 (= ${binary:Version}),
  libtensorflow-bin (= ${binary:Version}),
 # python3-tensorflow (= ${binary:Version}), 
 Recommends:
@@ -69,6 +66,21 @@ Description: Computation using data flow graphs for scalable machine learning
  TensorFlow provides stable Python API and C APIs as well as without API
  backwards compatibility guarantee like C++, Go, Java, JavaScript and Swift.
 
+Package: libtensorflow-framework1.10
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, ${shlibs:Depends},
+Description: Computation using data flow graphs for scalable machine learning
+ TensorFlow is an open source software library for numerical computation
+ using data flow graphs. The graph nodes represent mathematical operations,
+ while the graph edges represent the multidimensional data arrays (tensors)
+ that flow between them. This flexible architecture enables you to deploy
+ computation to one or more CPUs or GPUs in a desktop, server, or mobile
+ device without rewriting code.
+ .
+ This package ships libtensorflow_framework.so.1.10
+
 Package: libtensorflow1.10
 Section: libs
 Architecture: any
@@ -82,13 +94,14 @@ Description: Computation using data flow graphs for scalable machine learning (l
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships the shared object of tensorflow.
+ This package ships libtensorflow.so.1.10
 
 Package: libtensorflow-dev
 Section: libdevel
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
+ libtensorflow-framework1.10 (= ${binary:Version}),
  libtensorflow1.10 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (dev)
  TensorFlow is an open source software library for numerical computation
@@ -100,26 +113,26 @@ Description: Computation using data flow graphs for scalable machine learning (d
  .
  This package ships C and C++ development files of tensorflow.
 
-Package: libtensorflow-bin
-Architecture: any
-Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow1.10 (= ${binary:Version}),
-Description: Computation using data flow graphs for scalable machine learning (bin)
- TensorFlow is an open source software library for numerical computation
- using data flow graphs. The graph nodes represent mathematical operations,
- while the graph edges represent the multidimensional data arrays (tensors)
- that flow between them. This flexible architecture enables you to deploy
- computation to one or more CPUs or GPUs in a desktop, server, or mobile
- device without rewriting code.
- .
- This package ships binary utilities of tensorflow.
+#Package: libtensorflow-bin
+#Architecture: any
+#Multi-Arch: foreign
+#Depends: ${misc:Depends}, ${shlibs:Depends},
+# libtensorflow1.10 (= ${binary:Version}),
+#Description: Computation using data flow graphs for scalable machine learning (bin)
+# TensorFlow is an open source software library for numerical computation
+# using data flow graphs. The graph nodes represent mathematical operations,
+# while the graph edges represent the multidimensional data arrays (tensors)
+# that flow between them. This flexible architecture enables you to deploy
+# computation to one or more CPUs or GPUs in a desktop, server, or mobile
+# device without rewriting code.
+# .
+# This package ships binary utilities of tensorflow.
 
 #Package: python3-tensorflow
 #Architecture: any
 #Multi-Arch: foreign
 #Depends: ${misc:Depends}, ${shlibs:Depends},
-# libtensorflow1.10 (>= ${source:Version}~),
+# libtensorflow-framework1.10 (>= ${source:Version}~),
 #Description: Computation using data flow graphs for scalable machine learning (Py3)
 # TensorFlow is an open source software library for numerical computation
 # using data flow graphs. The graph nodes represent mathematical operations,
