@@ -2,6 +2,13 @@
 # Copyright (C) 2018 Mo Zhou <lumin@debian.org>
 # MIT/Expat License.
 
+'''
+Shogun needs the bazel dumps from bazelQuery.sh .
+
+For extra compiler definitions .e.g TENSORFLOW_USE_JEMALLOC please lookup
+  tensorflow/core/platform/default/build_config.bzl
+'''
+
 from typing import *
 import sys
 import re
