@@ -55,6 +55,7 @@ bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' \
 #
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow_framework.so))' \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| grep -E -v 'core.kernels' | grep -E -v 'core.ops' \
 	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_framework_so.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so))' \
