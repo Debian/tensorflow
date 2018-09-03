@@ -1,15 +1,27 @@
 #!/usr/bin
 set -x
-SHOGUN="python3 shogun.py"
 
-$SHOGUN ProtoText -i tf_tool_proto_text.source_file.txt \
-	-g tf_tool_proto_text.generated_file.txt
+# Probe working directory
+if test -r ./shogun.py; then
+	export DNINJA="."
+elif test -r ./debian/ninja/shogun.py; then
+	export DNINJA="./debian/ninja"
+else
+	echo Please chdir to the root of source tree or debian/ninja!
+	exit 1
+fi
 
-$SHOGUN TFCoreProto -i tf_core_proto_text.source_file.txt \
-	-g tf_core_proto_text.generated_file.txt
+# shogun program
+SHOGUN="python3 $DNINJA/shogun.py"
 
-$SHOGUN TFFrame -i tf_libtensorflow_framework_so.source_file.txt \
-	-g tf_libtensorflow_framework_so.generated_file.txt
+$SHOGUN ProtoText -i $DNINJA/tf_tool_proto_text.source_file.txt \
+	-g $DNINJA/tf_tool_proto_text.generated_file.txt
+
+$SHOGUN TFCoreProto -i $DNINJA/tf_core_proto_text.source_file.txt \
+	-g $DNINJA/tf_core_proto_text.generated_file.txt
+
+$SHOGUN TFFrame -i $DNINJA/tf_libtensorflow_framework_so.source_file.txt \
+	-g $DNINJA/tf_libtensorflow_framework_so.generated_file.txt
 
 #$SHOGUN TFLibAndroid -i tf_core_android_tflib.source_file.txt \
 #	-g tf_core_android_tflib.generated_file.txt
