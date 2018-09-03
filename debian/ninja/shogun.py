@@ -438,6 +438,7 @@ def shogunCCOP(argv):
     _, genlist = eGrep('.*.pb_text.cc', genlist)
 
     # cc_op_gen
+    cursor.build('tensorflow/core/ops/user_ops.cc', 'COPY', inputs='tensorflow/core/user_ops/fact.cc')
     ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
     ccophdrs, genlist = eGrep('.*/cc/ops/.*.h', genlist)
     for ccop in (x for x in ccoplist if 'internal' not in x):
@@ -508,16 +509,8 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*.pbtxt$', srclist) # no need to process
 
     # cc_op_gen
-    cursor.build('tensorflow/core/ops/user_ops.cc', 'COPY', inputs='tensorflow/core/user_ops/fact.cc')
     ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
     ccophdrs, genlist = eGrep('.*/cc/ops/.*.h', genlist)
-    for ccop in (x for x in ccoplist if 'internal' not in x):
-        coreop = re.sub('/cc/', '/core/', ccop)
-        opname = os.path.basename(ccop).split('.')[0]
-        cursor.build(f'{opname}_gen_cc', 'CXX_CC_OP_EXEC', inputs=coreop)
-        cursor.build([ccop.replace('.cc', '.h'), ccop], 'CXX_CC_OP_GEN', inputs=f'./{opname}_gen_cc',
-                variables={'cc_op_gen_internal': '0' if opname != 'sendrecv_ops' else '1'},
-                implicit_outputs=[ccop.replace('.cc', '_internal.h'), ccop.replace('.cc', '_internal.cc')])
 
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
