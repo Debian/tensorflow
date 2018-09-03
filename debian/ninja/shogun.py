@@ -14,7 +14,15 @@ import sys
 import re
 import os
 import argparse
+from pprint import pprint
 from ninja_syntax import Writer
+
+
+def cyan(s: str) -> str:
+    return f'\033[1;36m{s}\033[0;m'
+
+def yellow(s: str) -> str:
+    return f'\033[1;33m{s}\033[0;m'
 
 
 def filteroutExternal(sourcelist: List[str]) -> List[str]:
@@ -29,7 +37,7 @@ def filteroutExternal(sourcelist: List[str]) -> List[str]:
             ret.append(src)
         else:
             external.update(x.groups())
-    print('Required external dependencies:', external)
+    print(cyan('Required Depends:'), external)
     return ret
 
 
@@ -82,14 +90,28 @@ def ninjaProto(cur, protolist: List[str]) -> List[str]:
     '''
     write ninja rules for the protofiles. cur is ninja writer
     '''
-    cclist, hdrlist = [], []
+    protos, cclist, hdrlist = [], [], []
     for proto in protolist:
-        output = [re.sub('.proto$', '.pb.cc', proto),
-                re.sub('.proto$', '.pb.h', proto)]
-        cur.build(output, 'PROTOC', inputs=proto)
-        cclist.append(re.sub('.proto$', '.pb.cc', proto))
-        hdrlist.append(re.sub('.proto$', '.pb.h', proto))
-    return cclist, hdrlist
+        # proto is a protobuf-related file.
+        if proto.endswith('.proto'):
+            protos.append(proto)
+            cclist.append(re.sub('.proto$', '.pb.cc', proto))
+            hdrlist.append(re.sub('.proto$', '.pb.h', proto))
+        elif proto.endswith('.pb.cc'):
+            protos.append(re.sub('.pb.cc$', '.proto', proto))
+            cclist.append(proto)
+            hdrlist.append(re.sub('.pb.cc$', '.pb.h', proto))
+        elif proto.endswith('.pb.h'):
+            protos.append(re.sub('.pb.h$', '.proto', proto))
+            cclist.append(re.sub('.pb.h$', '.pb.cc', proto))
+            hdrlist.append(proto)
+        else:
+            raise SyntaxError(f'what is {proto}?')
+    for p in list(set(protos)):
+        output = [re.sub('.proto$', '.pb.cc', p),
+                re.sub('.proto$', '.pb.h', p)]
+        cur.build(output, 'PROTOC', inputs=p)
+    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
 
 
 def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
@@ -130,24 +152,31 @@ def shogunProtoText(argv):
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
+    ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='proto_text.ninja')
     ag.add_argument('-B', help='build directory', type=str, default='.')
     ag = ag.parse_args(argv)
 
     srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
-    srclist = filteroutExternal(srclist)
-    srclist = mangleBazel(srclist)
+    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
+    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
+    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
 
     # Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
 
     # generate .pb.cc and .pb.h
-    protolist, srclist = eGrep('.*.proto$', srclist)
-    pbcclist, pbhlist = ninjaProto(cursor, protolist)
+    srcproto, srclist = eGrep('.*.proto$', srclist)
+    genpbh, genlist = eGrep('.*.pb.h', genlist)
+    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
+    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
+    proto_diff = set(srcproto).difference(set(protolist))
+    if len(proto_diff) > 0:
+        print('Warning: resulting proto lists different!', proto_diff)
 
     # ignore .h files and third_party, and windows source
-    hdrs_proto_text, srclist = eGrep('.*.h$', srclist)
+    srchdrs, srclist = eGrep('.*.h$', srclist)
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*windows/env_time.cc$', srclist)
 
@@ -159,8 +188,8 @@ def shogunProtoText(argv):
     cursor.build('proto_text', 'CXX_EXEC', inputs=proto_text_objs)
 
     # fflush
+    print(yellow('Unprocessed files:'), srclist)
     cursor.close()
-    print('Unprocessed files:', srclist)
 
 
 def shogunTFCoreProto(argv):
@@ -240,7 +269,7 @@ def shogunTFFrame(argv):
     ninjaProtoText(cursor, protolist)
 
     # generate version info, the last bit in list of generated files
-    print('Unprocessed generated files:', genlist)
+    print(yellow('Unprocessed generated files:'), genlist)
     assert(len(genlist) == 1)
     srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
 
@@ -260,7 +289,7 @@ def shogunTFFrame(argv):
 
     ## fflush
     cursor.close()
-    print('Unprocessed source files:', srclist)
+    print(yellow('Unprocessed source files:'), srclist)
 
 
 def shogunTFLibAndroid(argv):
@@ -298,7 +327,7 @@ def shogunTFLibAndroid(argv):
     ninjaProtoText(cursor, protolist)
 
     # generate version info, the last bit in list of generated files
-    print('Unprocessed generated files:', genlist)
+    print(yellow('Unprocessed generated files:'), genlist)
     assert(len(genlist) == 1)
     srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
 
@@ -318,7 +347,7 @@ def shogunTFLibAndroid(argv):
 
     ## fflush
     cursor.close()
-    print('Unprocessed source files:', srclist)
+    print(yellow('Unprocessed source files:'), srclist)
 
 
 if __name__ == '__main__':
