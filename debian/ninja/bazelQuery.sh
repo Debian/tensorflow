@@ -73,35 +73,6 @@ bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_li
 	> debian/ninja/tf_core_android_tflib.generated_file.txt
 
 #
-bazel query 'kind("source file", deps(//tensorflow/core:math_ops_op_lib))' \
-	| grep -v math_ops.cc \
-	> _tmp_op_lib.txt
-bazle query 'kind("source file", deps(//tensorflow/core:lib))' \
-	> _tmp_core_lib.txt
-bazle query 'kind("source file", deps(//tensorflow/core:framework))' \
-	> _tmp_core_frm.txt
-bazel query 'kind("source file", deps(/tensorflow/cc:cc_op_gen_main))' \
-	> _tmp_cc_op_gen.txt
-cat _tmp_op_lib.txt _tmp_op_lib.txt _tmp_core_frm.txt _tmp_cc_op_gen.txt \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-	| sort | uniq \
-	> debian/ninja/tf_cc_ops_XXX_gen_cc.source_file.txt
-
-bazel query 'kind("generated file", deps(//tensorflow/core:math_ops_op_lib))' \
-	| grep -v math_ops.cc \
-	> _tmp_op_lib.txt
-bazle query 'kind("generated file", deps(//tensorflow/core:lib))' \
-	> _tmp_core_lib.txt
-bazle query 'kind("generated file", deps(//tensorflow/core:framework))' \
-	> _tmp_core_frm.txt
-bazel query 'kind("generated file", deps(/tensorflow/cc:cc_op_gen_main))' \
-	> _tmp_cc_op_gen.txt
-cat _tmp_op_lib.txt _tmp_op_lib.txt _tmp_core_frm.txt _tmp_cc_op_gen.txt \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-	| sort | uniq \
-	> debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
-
-#
 bazel query 'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \

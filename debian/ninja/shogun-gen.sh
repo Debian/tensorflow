@@ -28,9 +28,6 @@ $SHOGUN TFFrame -i $DNINJA/tf_libtensorflow_framework_so.source_file.txt \
 $SHOGUN TFLibAndroid -i $DNINJA/tf_core_android_tflib.source_file.txt \
 	-g $DNINJA/tf_core_android_tflib.generated_file.txt
 
-$SHOGUN TFCCOpGen -i $DNINJA/tf_cc_ops_XXX_gen_cc.source_file.txt \
-	-g $DNINJA/tf_cc_ops_XXX_gen_cc.generated_file.txt
-
 $SHOGUN TFLib -i $DNINJA/tf_libtensorflow_so.source_file.txt \
 	-g $DNINJA/tf_libtensorflow_so.generated_file.txt
 
