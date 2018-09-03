@@ -99,7 +99,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
             + ' tensorflow/cc/framework/cc_op_gen.cc'
             + ' tensorflow/cc/framework/cc_op_gen_main.cc'
             + ' $in $CC_OP_INC_AND_LIB -o $out')
-    cursor.rule('CXX_CC_OP_GEN', f'LD_LIBRARY_PATH={ag.B} $in $cc_op_gen_internal' \
+    cursor.rule('CXX_CC_OP_GEN', f'LD_LIBRARY_PATH={ag.B} ./$in $out $cc_op_gen_internal' \
             + ' tensorflow/core/api_def/base_api')
     cursor.newline()
 
