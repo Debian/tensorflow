@@ -33,6 +33,7 @@ Build-Depends:
  libsqlite3-dev,
  libsuperlu-dev,
  protobuf-compiler (>= 3.6.0~),
+ llvm-dev,
 # protobuf-compiler-grpc,
  python3,
  python3-all-dev,
