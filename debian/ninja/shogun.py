@@ -29,7 +29,7 @@ def filteroutExternal(sourcelist: List[str]) -> List[str]:
             ret.append(src)
         else:
             external.update(x.groups())
-    print('The specified source list requires external deps:', external)
+    print('Required external dependencies:', external)
     return ret
 
 
@@ -82,13 +82,14 @@ def ninjaProto(cur, protolist: List[str]) -> List[str]:
     '''
     write ninja rules for the protofiles. cur is ninja writer
     '''
-    cclist = []
+    cclist, hdrlist = [], []
     for proto in protolist:
         output = [re.sub('.proto$', '.pb.cc', proto),
                 re.sub('.proto$', '.pb.h', proto)]
         cur.build(output, 'PROTOC', inputs=proto)
         cclist.append(re.sub('.proto$', '.pb.cc', proto))
-    return cclist
+        hdrlist.append(re.sub('.proto$', '.pb.h', proto))
+    return cclist, hdrlist
 
 
 def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
@@ -133,34 +134,33 @@ def shogunProtoText(argv):
     ag.add_argument('-B', help='build directory', type=str, default='.')
     ag = ag.parse_args(argv)
 
-    sourcelist = [l.strip() for l in open(ag.i, 'r').readlines()]
-    sourcelist = filteroutExternal(sourcelist)
-    sourcelist = mangleBazel(sourcelist)
+    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
+    srclist = filteroutExternal(srclist)
+    srclist = mangleBazel(srclist)
 
     # Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
 
     # generate .pb.cc and .pb.h
-    protolist, sourcelist = eGrep('.*.proto$', sourcelist)
-    ninjaProto(cursor, protolist)
+    protolist, srclist = eGrep('.*.proto$', srclist)
+    pbcclist, pbhlist = ninjaProto(cursor, protolist)
 
     # ignore .h files and third_party, and windows source
-    _, sourcelist = eGrep('.*.h$', sourcelist)
-    _, sourcelist = eGrep('^third_party', sourcelist)
-    _, sourcelist = eGrep('.*windows/env_time.cc$', sourcelist)
+    hdrs_proto_text, srclist = eGrep('.*.h$', srclist)
+    _, srclist = eGrep('^third_party', srclist)
+    _, srclist = eGrep('.*windows/env_time.cc$', srclist)
 
     # compile .cc source
-    cclist, sourcelist = eGrep('.*.cc', sourcelist)
-    proto_text_objs = ninjaCXXOBJ(cursor, cclist)
+    cclist, srclist = eGrep('.*.cc', srclist)
+    proto_text_objs = ninjaCXXOBJ(cursor, cclist + pbcclist)
 
     # link the final executable
     cursor.build('proto_text', 'CXX_EXEC', inputs=proto_text_objs)
 
     # fflush
     cursor.close()
-
-    print('Unprocessed files:', sourcelist)
+    print('Unprocessed files:', srclist)
 
 
 def shogunTFCoreProto(argv):
