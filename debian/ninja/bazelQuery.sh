@@ -34,34 +34,42 @@ EOF
 
 #
 bazel query 'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_tool_proto_text.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_tool_proto_text.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow/core:proto_text))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_core_proto_text.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_core_proto_text.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow_framework.so))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_framework_so.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_framework_so.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_core_android_tflib.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_core_android_tflib.generated_file.txt
 
 #
@@ -95,24 +103,30 @@ cat _tmp_op_lib.txt _tmp_op_lib.txt _tmp_core_frm.txt _tmp_cc_op_gen.txt \
 
 #
 bazel query 'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_test.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_test.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow.so))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_so.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow:libtensorflow.so))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_libtensorflow_so.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow/python:pywrap_tensorflow))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_python_pywrap_tensorflow.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/python:pywrap_tensorflow))' \
-	| sort \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_python_pywrap_tensorflow.generated_file.txt

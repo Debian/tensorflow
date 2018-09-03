@@ -94,4 +94,4 @@
 //tensorflow/core:util/saved_tensor_slice.pb.h
 //tensorflow/core:util/test_log.pb.cc
 //tensorflow/core:util/test_log.pb.h
-@protobuf_archive//:src/google/protobuf/compiler/js/well_known_types_embed.cc
+@protobuf_archive
