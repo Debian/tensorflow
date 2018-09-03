@@ -1,7 +1,9 @@
-# Must use [bazel release 0.15.0]]
+# Should probably use [bazel release 0.15.0]]
 #
 # If Bazel complain "util/hash not found blah blah blah", just remove the
 # corresponding line in bazel's BUILD file and try again.
+#
+# Ref: https://docs.bazel.build/versions/master/query-how-to.html
 
 cat > .bazelrc << EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
