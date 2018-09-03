@@ -240,9 +240,9 @@ def shogunTFFrame(argv):
     ninjaProtoText(cursor, protolist)
 
     # generate version info, the last bit in list of generated files
+    print('Unprocessed generated files:', genlist)
     assert(len(genlist) == 1)
     srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
-    #print('Unprocessed generated files:', genlist)
 
     # ignore .h files and third_party, and windows source
     _, srclist = eGrep('.*.h$', srclist)
@@ -298,9 +298,9 @@ def shogunTFLibAndroid(argv):
     ninjaProtoText(cursor, protolist)
 
     # generate version info, the last bit in list of generated files
+    print('Unprocessed generated files:', genlist)
     assert(len(genlist) == 1)
     srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
-    #print('Unprocessed generated files:', genlist)
 
     # ignore .h files and third_party, and windows source
     _, srclist = eGrep('.*.h$', srclist)
