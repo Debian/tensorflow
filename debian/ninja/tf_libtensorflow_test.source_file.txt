@@ -3607,6 +3607,9 @@
 //tensorflow/stream_executor:timer.h
 //tensorflow/stream_executor:trace_listener.h
 //tensorflow/tools/git:gen_git_source.py
+//tensorflow/tools/lib_package:concat_licenses.sh
+//tensorflow/tools/lib_package:libtensorflow_test.c
+//tensorflow/tools/lib_package:libtensorflow_test.sh
 //tensorflow/tools/proto_text:gen_proto_text_functions.cc
 //tensorflow/tools/proto_text:gen_proto_text_functions_lib.cc
 //tensorflow/tools/proto_text:gen_proto_text_functions_lib.h
@@ -3618,6 +3621,7 @@
 //third_party/eigen3:Eigen/LU
 //third_party/eigen3:Eigen/QR
 //third_party/eigen3:Eigen/SVD
+//third_party/eigen3:LICENSE
 //third_party/eigen3:unsupported/Eigen/CXX11/FixedPoint
 //third_party/eigen3:unsupported/Eigen/CXX11/Tensor
 //third_party/eigen3:unsupported/Eigen/CXX11/ThreadPool
@@ -3632,8 +3636,13 @@
 //third_party/eigen3:unsupported/Eigen/CXX11/src/FixedPoint/TypeCastingAVX512.h
 //third_party/eigen3:unsupported/Eigen/MatrixFunctions
 //third_party/eigen3:unsupported/Eigen/SpecialFunctions
+//third_party/fft2d:LICENSE
 //third_party/fft2d:fft.h
+//third_party/hadoop:LICENSE.txt
 //third_party/hadoop:hdfs.h
+//third_party/mkl:MKL_LICENSE
+//third_party/mkl_dnn:LICENSE
+@aws//:LICENSE
 @aws//:aws-cpp-sdk-core/include/aws/core/AmazonSerializableWebServiceRequest.h
 @aws//:aws-cpp-sdk-core/include/aws/core/AmazonStreamingWebServiceRequest.h
 @aws//:aws-cpp-sdk-core/include/aws/core/AmazonWebServiceRequest.h
@@ -4506,6 +4515,26 @@
 @bazel_tools//third_party/ijar:zip_main.cc
 @bazel_tools//third_party/ijar:zlib_client.cc
 @bazel_tools//third_party/ijar:zlib_client.h
+@bazel_tools//third_party/py/gflags:__init__.py
+@bazel_tools//third_party/py/gflags:gflags/__init__.py
+@bazel_tools//third_party/py/gflags:gflags/_helpers.py
+@bazel_tools//third_party/py/gflags:gflags/_helpers_test.py
+@bazel_tools//third_party/py/gflags:gflags/argument_parser.py
+@bazel_tools//third_party/py/gflags:gflags/exceptions.py
+@bazel_tools//third_party/py/gflags:gflags/flag.py
+@bazel_tools//third_party/py/gflags:gflags/flags_formatting_test.py
+@bazel_tools//third_party/py/gflags:gflags/flags_modules_for_testing/__init__.py
+@bazel_tools//third_party/py/gflags:gflags/flags_modules_for_testing/module_bar.py
+@bazel_tools//third_party/py/gflags:gflags/flags_modules_for_testing/module_baz.py
+@bazel_tools//third_party/py/gflags:gflags/flags_modules_for_testing/module_foo.py
+@bazel_tools//third_party/py/gflags:gflags/flags_unicode_literals_test.py
+@bazel_tools//third_party/py/gflags:gflags/flagvalues.py
+@bazel_tools//third_party/py/gflags:gflags/third_party/__init__.py
+@bazel_tools//third_party/py/gflags:gflags/third_party/pep257/__init__.py
+@bazel_tools//third_party/py/gflags:gflags/validators.py
+@bazel_tools//third_party/py/gflags:gflags2man.py
+@bazel_tools//third_party/py/gflags:setup.py
+@bazel_tools//third_party/py/six:six.py
 @bazel_tools//third_party/zlib:adler32.c
 @bazel_tools//third_party/zlib:compress.c
 @bazel_tools//third_party/zlib:crc32.c
@@ -4532,6 +4561,9 @@
 @bazel_tools//third_party/zlib:zlib.h
 @bazel_tools//third_party/zlib:zutil.c
 @bazel_tools//third_party/zlib:zutil.h
+@bazel_tools//tools/build_defs/pkg:archive.py
+@bazel_tools//tools/build_defs/pkg:build_tar.py
+@bazel_tools//tools/coverage:dummy_coverage_report_generator
 @bazel_tools//tools/cpp:build_interface_so
 @bazel_tools//tools/cpp:grep-includes.sh
 @bazel_tools//tools/cpp:link_dynamic_library.sh
@@ -4540,7 +4572,10 @@
 @bazel_tools//tools/genrule:genrule-setup.sh
 @bazel_tools//tools/launcher:launcher.exe
 @bazel_tools//tools/python:2to3.sh
+@bazel_tools//tools/test:collect_coverage.sh
+@bazel_tools//tools/test:test-setup.sh
 @bazel_tools//tools/zip:zipper/zipper
+@boringssl//:LICENSE
 @boringssl//:err_data.c
 @boringssl//:linux-x86_64/crypto/chacha/chacha-x86_64.S
 @boringssl//:linux-x86_64/crypto/cipher_extra/aes128gcmsiv-x86_64.S
@@ -5001,6 +5036,7 @@
 @boringssl//:src/ssl/tls13_server.cc
 @boringssl//:src/ssl/tls_method.cc
 @boringssl//:src/ssl/tls_record.cc
+@com_github_googlecloudplatform_google_cloud_cpp//:LICENSE
 @com_google_absl//absl/base:attributes.h
 @com_google_absl//absl/base:call_once.h
 @com_google_absl//absl/base:casts.h
@@ -5038,6 +5074,7 @@
 @com_google_absl//absl/base:policy_checks.h
 @com_google_absl//absl/base:port.h
 @com_google_absl//absl/base:thread_annotations.h
+@com_googlesource_code_re2//:LICENSE
 @com_googlesource_code_re2//:re2/bitmap256.h
 @com_googlesource_code_re2//:re2/bitstate.cc
 @com_googlesource_code_re2//:re2/compile.cc
@@ -5081,6 +5118,7 @@
 @com_googlesource_code_re2//:util/strutil.h
 @com_googlesource_code_re2//:util/utf.h
 @com_googlesource_code_re2//:util/util.h
+@cub_archive//:LICENSE.TXT
 @cub_archive//:cub/agent/agent_histogram.cuh
 @cub_archive//:cub/agent/agent_radix_sort_downsweep.cuh
 @cub_archive//:cub/agent/agent_radix_sort_upsweep.cuh
@@ -5166,6 +5204,7 @@
 @cub_archive//:cub/warp/specializations/warp_scan_smem.cuh
 @cub_archive//:cub/warp/warp_reduce.cuh
 @cub_archive//:cub/warp/warp_scan.cuh
+@curl//:COPYING
 @curl//:include/curl/curl.h
 @curl//:include/curl/curlver.h
 @curl//:include/curl/easy.h
@@ -5383,6 +5422,7 @@
 @curl//:lib/wildcard.c
 @curl//:lib/wildcard.h
 @curl//:lib/x509asn1.h
+@double_conversion//:LICENSE
 @double_conversion//:double-conversion/bignum-dtoa.cc
 @double_conversion//:double-conversion/bignum-dtoa.h
 @double_conversion//:double-conversion/bignum.cc
@@ -5401,6 +5441,7 @@
 @double_conversion//:double-conversion/strtod.cc
 @double_conversion//:double-conversion/strtod.h
 @double_conversion//:double-conversion/utils.h
+@eigen_archive//:COPYING.MPL2
 @eigen_archive//:Eigen/Cholesky
 @eigen_archive//:Eigen/CholmodSupport
 @eigen_archive//:Eigen/Core
@@ -5922,9 +5963,12 @@
 @embedded_jdk//:lib/server/libjsig.so
 @embedded_jdk//:lib/server/libjvm.so
 @embedded_jdk//:lib/tzdb.dat
+@farmhash_archive//:COPYING
 @farmhash_archive//:src/farmhash.cc
 @farmhash_archive//:src/farmhash.h
 @fft2d//:fft/fftsg.c
+@fft2d//:fft/readme.txt
+@gemmlowp//:LICENSE
 @gemmlowp//:fixedpoint/fixedpoint.h
 @gemmlowp//:fixedpoint/fixedpoint_avx.h
 @gemmlowp//:fixedpoint/fixedpoint_msa.h
@@ -5988,6 +6032,7 @@
 @gemmlowp//:public/gemmlowp.h
 @gemmlowp//:public/map.h
 @gemmlowp//:public/output_stages.h
+@gif_archive//:COPYING
 @gif_archive//:lib/dgif_lib.c
 @gif_archive//:lib/egif_lib.c
 @gif_archive//:lib/gif_err.c
@@ -5999,6 +6044,7 @@
 @gif_archive//:lib/gifalloc.c
 @gif_archive//:lib/openbsd-reallocarray.c
 @gif_archive//:lib/quantize.c
+@grpc//:LICENSE
 @grpc//:include/grpc++/alarm.h
 @grpc//:include/grpc++/channel.h
 @grpc//:include/grpc++/client_context.h
@@ -6914,11 +6960,13 @@
 @grpc//:src/cpp/util/status.cc
 @grpc//:src/cpp/util/string_ref.cc
 @grpc//:src/cpp/util/time_cc.cc
+@grpc//third_party/address_sorting:LICENSE
 @grpc//third_party/address_sorting:address_sorting.c
 @grpc//third_party/address_sorting:address_sorting_internal.h
 @grpc//third_party/address_sorting:address_sorting_posix.c
 @grpc//third_party/address_sorting:address_sorting_windows.c
 @grpc//third_party/address_sorting:include/address_sorting/address_sorting.h
+@grpc//third_party/nanopb:LICENSE.txt
 @grpc//third_party/nanopb:pb.h
 @grpc//third_party/nanopb:pb_common.c
 @grpc//third_party/nanopb:pb_common.h
@@ -6926,6 +6974,7 @@
 @grpc//third_party/nanopb:pb_decode.h
 @grpc//third_party/nanopb:pb_encode.c
 @grpc//third_party/nanopb:pb_encode.h
+@highwayhash//:LICENSE
 @highwayhash//:highwayhash/arch_specific.cc
 @highwayhash//:highwayhash/arch_specific.h
 @highwayhash//:highwayhash/compiler_specific.h
@@ -6933,6 +6982,7 @@
 @highwayhash//:highwayhash/sip_hash.cc
 @highwayhash//:highwayhash/sip_hash.h
 @highwayhash//:highwayhash/state_helpers.h
+@jemalloc//:COPYING
 @jemalloc//:include/jemalloc/internal/arena.h
 @jemalloc//:include/jemalloc/internal/assert.h
 @jemalloc//:include/jemalloc/internal/atomic.h
@@ -7008,6 +7058,7 @@
 @jemalloc//:src/tsd.c
 @jemalloc//:src/util.c
 @jemalloc//:src/witness.c
+@jpeg//:LICENSE.md
 @jpeg//:jaricom.c
 @jpeg//:jcapimin.c
 @jpeg//:jcapistd.c
@@ -7149,6 +7200,7 @@
 @jsoncpp_git//:src/lib_json/json_value.cpp
 @jsoncpp_git//:src/lib_json/json_valueiterator.inl
 @jsoncpp_git//:src/lib_json/json_writer.cpp
+@libxsmm_archive//:LICENSE.md
 @libxsmm_archive//:include/libxsmm_cpuid.h
 @libxsmm_archive//:include/libxsmm_dnn.h
 @libxsmm_archive//:include/libxsmm_frontend.h
@@ -7348,6 +7400,7 @@
 @libxsmm_archive//:src/template/libxsmm_spmdm_createSparseSlice_bfloat16_thread.tpl.c
 @libxsmm_archive//:src/template/libxsmm_spmdm_createSparseSlice_fp32_thread.tpl.c
 @libxsmm_archive//:version.txt
+@llvm//:LICENSE.TXT
 @llvm//:include/llvm-c/Analysis.h
 @llvm//:include/llvm-c/BitReader.h
 @llvm//:include/llvm-c/BitWriter.h
@@ -9875,6 +9928,7 @@
 @llvm//:utils/TableGen/X86ModRMFilters.h
 @llvm//:utils/TableGen/X86RecognizableInstr.cpp
 @llvm//:utils/TableGen/X86RecognizableInstr.h
+@lmdb//:LICENSE
 @lmdb//:lmdb.h
 @lmdb//:mdb.c
 @lmdb//:midl.c
@@ -9888,6 +9942,7 @@
 @local_config_git//:gen/branch_ref
 @local_config_git//:gen/head
 @local_config_git//:gen/spec.json
+@local_config_sycl//sycl:LICENSE.text
 @local_config_sycl//sycl:include/sycl.hpp
 @local_config_sycl//sycl:lib/libComputeCpp.so
 @mkl_darwin//:include/i_malloc.h
@@ -9912,6 +9967,7 @@
 @mkl_darwin//:include/mkl_vsl_types.h
 @mkl_darwin//:lib/libiomp5.dylib
 @mkl_darwin//:lib/libmklml.dylib
+@mkl_darwin//:license.txt
 @mkl_dnn//:include/mkldnn.h
 @mkl_dnn//:include/mkldnn.hpp
 @mkl_dnn//:include/mkldnn_debug.h
@@ -10024,6 +10080,7 @@
 @mkl_linux//:include/mkl_vsl_types.h
 @mkl_linux//:lib/libiomp5.so
 @mkl_linux//:lib/libmklml_intel.so
+@mkl_linux//:license.txt
 @mkl_windows//:include/i_malloc.h
 @mkl_windows//:include/mkl.h
 @mkl_windows//:include/mkl_blas.h
@@ -10046,6 +10103,8 @@
 @mkl_windows//:include/mkl_vsl_types.h
 @mkl_windows//:lib/libiomp5md.lib
 @mkl_windows//:lib/mklml.lib
+@mkl_windows//:license.txt
+@nasm//:LICENSE
 @nasm//:asm/assemble.c
 @nasm//:asm/assemble.h
 @nasm//:asm/directbl.c
@@ -10171,6 +10230,7 @@
 @nasm//:x86/regs.c
 @nasm//:x86/regs.h
 @nasm//:x86/regvals.c
+@nsync//:LICENSE
 @nsync//:internal/common.c
 @nsync//:internal/common.h
 @nsync//:internal/counter.c
@@ -10258,6 +10318,7 @@
 @org_sqlite//:sqlite3.h
 @org_sqlite//:sqlite3ext.h
 @org_tensorflow//third_party/llvm:expand_cmake_vars.py
+@png_archive//:LICENSE
 @png_archive//:png.c
 @png_archive//:png.h
 @png_archive//:pngconf.h
@@ -10282,6 +10343,7 @@
 @png_archive//:powerpc/filter_vsx_intrinsics.c
 @png_archive//:powerpc/powerpc_init.c
 @png_archive//:scripts/pnglibconf.h.prebuilt
+@protobuf_archive//:LICENSE
 @protobuf_archive//:src/google/protobuf/any.cc
 @protobuf_archive//:src/google/protobuf/any.h
 @protobuf_archive//:src/google/protobuf/any.pb.cc
@@ -10680,6 +10742,7 @@
 @protobuf_archive//:src/google/protobuf/wrappers.pb.cc
 @protobuf_archive//:src/google/protobuf/wrappers.pb.h
 @protobuf_archive//:src/google/protobuf/wrappers.proto
+@snappy//:COPYING
 @snappy//:snappy-internal.h
 @snappy//:snappy-sinksource.cc
 @snappy//:snappy-sinksource.h

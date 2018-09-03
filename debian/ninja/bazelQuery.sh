@@ -5,6 +5,8 @@
 #
 # Ref: https://docs.bazel.build/versions/master/query-how-to.html
 set -x
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
 
 cat > .bazelrc << EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
