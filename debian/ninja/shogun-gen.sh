@@ -23,8 +23,5 @@ $SHOGUN TFCoreProto -i $DNINJA/tf_core_proto_text.source_file.txt \
 $SHOGUN TFFrame -i $DNINJA/tf_libtensorflow_framework_so.source_file.txt \
 	-g $DNINJA/tf_libtensorflow_framework_so.generated_file.txt
 
-#$SHOGUN TFLibAndroid -i tf_core_android_tflib.source_file.txt \
-#	-g tf_core_android_tflib.generated_file.txt
-
-#tf_libtensorflow_so.generated_file.txt
-#tf_libtensorflow_so.source_file.txt
+$SHOGUN TFLibAndroid -i tf_core_android_tflib.source_file.txt \
+	-g tf_core_android_tflib.generated_file.txt

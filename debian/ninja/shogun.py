@@ -357,24 +357,23 @@ def shogunTFLibAndroid(argv):
     ninjaCommonHeader(cursor, ag)
 
     # generate .pb.cc and .pb.h
-    _, srclist = eGrep('.*.proto$', srclist)
-    protolist, genlist = eGrep('.*.pb.cc', genlist)
-    _, genlist = eGrep('.*.pb.h', genlist)
-    protolist = [re.sub('.pb.cc', '.proto', x) for x in protolist]
-    ninjaProto(cursor, protolist)
+    srcproto, srclist = eGrep('.*.proto$', srclist)
+    genpbh, genlist = eGrep('.*.pb.h', genlist)
+    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
+    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
+    proto_diff = set(srcproto).difference(set(protolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # generate .pb_text.cc .pb_text.h .pb_test-impl.h
-    _, srclist = eGrep('.*.proto$', srclist)
-    protolist, genlist = eGrep('.*.pb_text.cc', genlist)
-    _, genlist = eGrep('.*.pb_text.h', genlist)
-    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    protolist = [re.sub('.pb_text.cc$', '.proto', x) for x in protolist]
-    ninjaProtoText(cursor, protolist)
-
-    # generate version info, the last bit in list of generated files
-    print(yellow('Unprocessed generated files:'), genlist)
-    assert(len(genlist) == 1)
-    srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
+    genpbth, genlist = eGrep('.*.pb_text.h', genlist)
+    genpbtimplh, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    genpbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
+    pbtprotolist, pbtcclist, pbthlist = ninjaProtoText(cursor,
+            genpbth + genpbtimplh + genpbtcc)
+    pbtproto_diff = set(srcproto).difference(set(pbtprotolist))
+    if len(proto_diff) > 0:
+        print(yellow('Warning: resulting proto lists different!'), proto_diff)
 
     # ignore .h files and third_party, and windows source
     _, srclist = eGrep('.*.h$', srclist)
@@ -385,14 +384,17 @@ def shogunTFLibAndroid(argv):
 
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
-    tf_android_objs = ninjaCXXOBJ(cursor, cclist)
+    tf_android_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist)
 
     # link the final executable
-    cursor.build('libtensorflow_android.so', 'CXX_SHLIB', inputs=tf_android_objs)
+    cursor.build('libtensorflow_android.so', 'CXX_SHLIB', inputs=tf_android_objs,
+            variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
+                + ' -ldouble-conversion'})
 
     ## fflush
+    print(yellow('Unprocessed src files:'), srclist)
+    print(yellow('Unprocessed gen files:'), genlist)
     cursor.close()
-    print(yellow('Unprocessed source files:'), srclist)
 
 
 if __name__ == '__main__':
