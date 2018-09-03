@@ -411,6 +411,47 @@ def shogunTFLibAndroid(argv):
     cursor.close()
 
 
+def shogunCCOP(argv):
+    '''
+    Generate tensorflow/cc/ops/*.cc and *.h
+    '''
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-i', help='list of source files', type=str, required=True)
+    ag.add_argument('-g', help='list of generated files', type=str, required=True)
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='ccop.ninja')
+    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag = ag.parse_args(argv)
+
+    genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
+    genlist = mangleBazel(genlist)
+
+    # Instantiate ninja writer
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # filter unrelated files
+    _, genlist = eGrep('.*.pb.h', genlist)
+    _, genlist = eGrep('.*.pb.cc', genlist)
+    _, genlist = eGrep('.*.pb_text.h', genlist)
+    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    _, genlist = eGrep('.*.pb_text.cc', genlist)
+
+    # cc_op_gen
+    ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
+    ccophdrs, genlist = eGrep('.*/cc/ops/.*.h', genlist)
+    for ccop in (x for x in ccoplist if 'internal' not in x):
+        coreop = re.sub('/cc/', '/core/', ccop)
+        opname = os.path.basename(ccop).split('.')[0]
+        cursor.build(f'{opname}_gen_cc', 'CXX_CC_OP_EXEC', inputs=coreop)
+        cursor.build([ccop.replace('.cc', '.h'), ccop], 'CXX_CC_OP_GEN', inputs=f'./{opname}_gen_cc',
+                variables={'cc_op_gen_internal': '0' if opname != 'sendrecv_ops' else '1'},
+                implicit_outputs=[ccop.replace('.cc', '_internal.h'), ccop.replace('.cc', '_internal.cc')])
+
+    ## fflush
+    print(yellow('Unprocessed gen files:'), genlist)
+    cursor.close()
+
+
 def shogunTFLib(argv):
     '''
     Build libtensorflow.so
@@ -514,6 +555,8 @@ if __name__ == '__main__':
         shogunTFFrame(sys.argv[2:])
     elif sys.argv[1] == 'TFLibAndroid':
         shogunTFLibAndroid(sys.argv[2:])
+    elif sys.argv[1] == 'CCOP':
+        shogunCCOP(sys.argv[2:])
     elif sys.argv[1] == 'TFLib':
         shogunTFLib(sys.argv[2:])
     else:
