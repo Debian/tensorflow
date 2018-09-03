@@ -425,7 +425,8 @@ def shogunTFLib(argv):
     srcproto, srclist = eGrep('.*.proto$', srclist)
     genpbh, genlist = eGrep('.*.pb.h', genlist)
     genpbcc, genlist = eGrep('.*.pb.cc', genlist)
-    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
+    protolist, pbcclist, pbhlist = ninjaProto(cursor,
+            [x for x in (genpbh + genpbcc) if '.grpc.pb' not in x])
     proto_diff = set(srcproto).difference(set(protolist))
     if len(proto_diff) > 0:
         print(yellow('Warning: resulting proto lists different!'), proto_diff)
