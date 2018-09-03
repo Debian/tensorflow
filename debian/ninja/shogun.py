@@ -213,8 +213,68 @@ def shogunTFFrame(argv):
     print('Unprocessed source files:', srclist)
 
 
+def shogunTFLibAndroid(argv):
+    '''
+    Build libtensorflow_android.so
+    '''
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-i', help='list of source files', type=str, required=True)
+    ag.add_argument('-g', help='list of generated files', type=str, required=True)
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow_android.ninja')
+    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag = ag.parse_args(argv)
+
+    srclist = filteroutExternal([l.strip() for l in open(ag.i, 'r').readlines()])
+    genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
+    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
+
+    # Instantiate ninja writer
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # generate .pb.cc and .pb.h
+    _, srclist = eGrep('.*.proto$', srclist)
+    protolist, genlist = eGrep('.*.pb.cc', genlist)
+    _, genlist = eGrep('.*.pb.h', genlist)
+    protolist = [re.sub('.pb.cc', '.proto', x) for x in protolist]
+    ninjaProto(cursor, protolist)
+
+    # generate .pb_text.cc .pb_text.h .pb_test-impl.h
+    _, srclist = eGrep('.*.proto$', srclist)
+    protolist, genlist = eGrep('.*.pb_text.cc', genlist)
+    _, genlist = eGrep('.*.pb_text.h', genlist)
+    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    protolist = [re.sub('.pb_text.cc$', '.proto', x) for x in protolist]
+    ninjaProtoText(cursor, protolist)
+
+    # generate version info, the last bit in list of generated files
+    assert(len(genlist) == 1)
+    srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
+    #print('Unprocessed generated files:', genlist)
+
+    # ignore .h files and third_party, and windows source
+    _, srclist = eGrep('.*.h$', srclist)
+    _, srclist = eGrep('^third_party', srclist)
+    _, srclist = eGrep('.*windows/env_time.cc$', srclist)
+    _, srclist = eGrep('.*platform/windows.*', srclist)
+    _, srclist = eGrep('.*stream_executor.*', srclist) # due to CPU-only
+
+    # compile .cc source
+    cclist, srclist = eGrep('.*.cc', srclist)
+    tf_android_objs = ninjaCXXOBJ(cursor, cclist)
+
+    # link the final executable
+    cursor.build('libtensorflow_android.so', 'CXX_SHLIB', inputs=tf_android_objs)
+
+    ## fflush
+    cursor.close()
+    print('Unprocessed source files:', srclist)
+
+
 if __name__ == '__main__':
 
+    # A graceful argparse implementation with argparse subparser requries
+    # much more boring code than I would like to write.
     try:
         sys.argv[1]
     except IndexError as e:
@@ -222,9 +282,12 @@ if __name__ == '__main__':
         print([k for (k, v) in locals().items() if k.startswith('shogun')])
         exit(1)
 
+    # Targets sorted in dependency order.
     if sys.argv[1] == 'ProtoText':
         shogunProtoText(sys.argv[2:])
     elif sys.argv[1] == 'TFFrame':
         shogunTFFrame(sys.argv[2:])
+    elif sys.argv[1] == 'TFLibAndroid':
+        shogunTFLibAndroid(sys.argv[2:])
     else:
         raise NotImplementedError(sys.argv[1:])
