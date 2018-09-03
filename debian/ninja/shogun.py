@@ -75,27 +75,34 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $CXXFLAGS_terse $INCLUDES -c $in -o $out')
     cursor.rule('CXX_EXEC', f'g++ $CXXFLAGS $CXXFLAGS_terse $INCLUDES $LIBS $in -o $out')
     cursor.rule('CXX_SHLIB', f'g++ -shared -fPIC $CXXFLAGS $CXXFLAGS_terse $INCLUDES $LIBS $in -o $out')
+    cursor.rule('STATIC', f'ar rcs $out $in')
 
 
-def ninjaProto(cur, protolist: List[str]) -> None:
+def ninjaProto(cur, protolist: List[str]) -> List[str]:
     '''
     write ninja rules for the protofiles. cur is ninja writer
     '''
+    cclist = []
     for proto in protolist:
         output = [re.sub('.proto$', '.pb.cc', proto),
                 re.sub('.proto$', '.pb.h', proto)]
         cur.build(output, 'PROTOC', inputs=proto)
+        cclist.append(re.sub('.proto$', '.pb.cc', proto))
+    return cclist
 
 
-def ninjaProtoText(cur, protolist: List[str]) -> None:
+def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
     '''
     write ninja rules for to proto_text files. cur is ninja writer
     '''
+    cclist = []
     for proto in protolist:
         output = [re.sub('.proto$', '.pb_text.cc', proto),
                 re.sub('.proto$', '.pb_text.h', proto),
                 re.sub('.proto$', '.pb_text-impl.h', proto)]
         cur.build(output, 'PROTO_TEXT', inputs=proto)
+        cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
+    return cclist
 
 
 def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
@@ -154,6 +161,48 @@ def shogunProtoText(argv):
     cursor.close()
 
     print('Unprocessed files:', sourcelist)
+
+
+def shogunTFCoreProto(argv):
+    '''
+    Build tf_core_proto.a
+    '''
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-g', help='list of generated files', type=str, required=True)
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='tf_core_proto.ninja')
+    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag = ag.parse_args(argv)
+
+    genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
+    genlist = mangleBazel(genlist)
+
+    # Instantiate ninja writer
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # generate .pb.cc and .pb.h
+    protolist, genlist = eGrep('.*.pb.h', genlist)
+    protolist = [re.sub('.pb.h$', '.proto', x) for x in protolist]
+    ninjaProto(cursor, protolist)
+    _, genlist = eGrep('.*.pb.h', genlist)
+    pbcclist, genlist = eGrep('.*.pb.cc', genlist)
+
+    # generate .pb_text.cc .pb_text.h .pb_test-impl.h
+    protolist, genlist = eGrep('.*.pb_text.h', genlist)
+    pbtextcclist, genlist = eGrep('.*.pb_text.cc', genlist)
+    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    protolist = [re.sub('.pb_text.h$', '.proto', x) for x in protolist]
+    ninjaProtoText(cursor, protolist)
+    pbcclist.extend(pbtextcclist)
+
+    # compile .cc source
+    tf_core_pb_obj = ninjaCXXOBJ(cursor, pbcclist)
+
+    # link the final executable
+    cursor.build('tf_core_proto.a', 'STATIC', inputs=tf_core_pb_obj)
+
+    ## fflush
+    cursor.close()
 
 
 def shogunTFFrame(argv):
@@ -286,6 +335,8 @@ if __name__ == '__main__':
     # Targets sorted in dependency order.
     if sys.argv[1] == 'ProtoText':
         shogunProtoText(sys.argv[2:])
+    elif sys.argv[1] == 'TFCoreProto':
+        shogunTFCoreProto(sys.argv[2:])
     elif sys.argv[1] == 'TFFrame':
         shogunTFFrame(sys.argv[2:])
     elif sys.argv[1] == 'TFLibAndroid':
