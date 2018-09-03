@@ -79,17 +79,17 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.variable('CXXFLAGS', '-w -std=c++14 -O2 -fPIC -gsplit-dwarf -pthread')
     cursor.variable('LDFLAGS', '')
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen/ -I./third_party/eigen3/'
-            + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-6.0'
-            + ' -I/usr/include/llvm-6.0 -Ithird_party/toolchains/gpus/cuda/')
+            + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-7'
+            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/')
     cursor.variable('LIBS', '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion'
-	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-6.0')
+	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
     cursor.variable('PROTO_TEXT_ELF', f'{ag.B}/proto_text')
     cursor.newline()
     cursor.rule('PROTOC', f'protoc $in --cpp_out {ag.B}')
     cursor.rule('PROTOC_GRPC', f'protoc --grpc_out {ag.B} --cpp_out {ag.B} --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
     cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF {ag.B}/tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('GEN_VERSION_INFO', f'bash {ag.B}/tensorflow/tools/git/gen_git_source.sh $out')
-    cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $INCLUDES -c $in -o $out')
+    cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $INCLUDES -c $in -o $out $CXX_OBJ_EXTRA_DEFS')
     cursor.rule('CXX_EXEC', f'g++ $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
     cursor.rule('CXX_SHLIB', f'g++ -shared -fPIC $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
     cursor.rule('STATIC', f'ar rcs $out $in')
@@ -177,8 +177,9 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
     '''
     objs = []
     for cc in cclist:
+        ninjavars = {'CXX_OBJ_EXTRA_DEFS': '' if 'sparse_tensor_dense_matmul_op' not in cc else '-DEIGEN_AVOID_STL_ARRAY'}
         output = re.sub('.cc$', '.o', cc)
-        objs.append(cur.build(output, 'CXX_OBJ', inputs=cc)[0])
+        objs.append(cur.build(output, 'CXX_OBJ', inputs=cc, variables=ninjavars)[0])
     return objs
 
 
