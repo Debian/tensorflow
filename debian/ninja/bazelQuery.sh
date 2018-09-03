@@ -51,3 +51,8 @@ bazel query 'kind("source file", deps(//tensorflow:libtensorflow_framework.so))'
 	> debian/ninja/tf_libtensorflow_framework_so.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so))' \
 	> debian/ninja/tf_libtensorflow_framework_so.generated_file.txt
+
+bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
+	> debian/ninja/tf_core_android_tflib.source_file.txt
+bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
+	> debian/ninja/tf_core_android_tflib.generated_file.txt
