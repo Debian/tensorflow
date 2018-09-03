@@ -30,6 +30,8 @@ build:opt --define with_default_optimizations=true
 build --strip=always
 EOF
 
+# Following queries are arranged in Dependency order.
+
 bazel query 'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
 	| sort \
 	> debian/ninja/tf_tool_proto_text.source_file.txt
@@ -57,6 +59,18 @@ bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))
 bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
 	| sort \
 	> debian/ninja/tf_core_android_tflib.generated_file.txt
+
+# diff commands are used for correctness check
+bazel query 'kind("source file", deps(//tensorflow/cc:ops/math_ops_gen_cc))' \
+	| sort \
+	> debian/ninja/tf_cc_ops_XXX_gen_cc.source_file.txt
+bazel query 'kind("source file", deps(//tensorflow/cc:ops/array_ops_gen_cc))' | sort > _tmp1.txt
+diff -ru _tmp1.txt debian/ninja/tf_cc_ops_XXX_gen_cc.source_file.txt
+bazel query 'kind("generated file", deps(//tensorflow/cc:ops/math_ops_gen_cc))' \
+	| sort \
+	> debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
+bazel query 'kind("generated file", deps(//tensorflow/cc:ops/array_ops_gen_cc))' | sort > _tmp2.txt
+diff -ru _tmp2.txt debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
 
 bazel query 'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
 	| sort \
