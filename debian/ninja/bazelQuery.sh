@@ -32,6 +32,7 @@ EOF
 
 # Following queries are arranged in Dependency order.
 
+#
 bazel query 'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
 	| sort \
 	> debian/ninja/tf_tool_proto_text.source_file.txt
@@ -39,6 +40,7 @@ bazel query 'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto
 	| sort \
 	> debian/ninja/tf_tool_proto_text.generated_file.txt
 
+#
 bazel query 'kind("source file", deps(//tensorflow/core:proto_text))' \
 	| sort \
 	> debian/ninja/tf_core_proto_text.source_file.txt
@@ -46,6 +48,7 @@ bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' \
 	| sort \
 	> debian/ninja/tf_core_proto_text.generated_file.txt
 
+#
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow_framework.so))' \
 	| sort \
 	> debian/ninja/tf_libtensorflow_framework_so.source_file.txt
@@ -53,6 +56,7 @@ bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so
 	| sort \
 	> debian/ninja/tf_libtensorflow_framework_so.generated_file.txt
 
+#
 bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
 	| sort \
 	> debian/ninja/tf_core_android_tflib.source_file.txt
@@ -60,18 +64,36 @@ bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_li
 	| sort \
 	> debian/ninja/tf_core_android_tflib.generated_file.txt
 
-# diff commands are used for correctness check
-bazel query 'kind("source file", deps(//tensorflow/cc:ops/math_ops_gen_cc))' \
-	| sort \
+#
+bazel query 'kind("source file", deps(//tensorflow/core:math_ops_op_lib))' \
+	| grep -v math_ops.cc \
+	> _tmp_op_lib.txt
+bazle query 'kind("source file", deps(//tensorflow/core:lib))' \
+	> _tmp_core_lib.txt
+bazle query 'kind("source file", deps(//tensorflow/core:framework))' \
+	> _tmp_core_frm.txt
+bazel query 'kind("source file", deps(/tensorflow/cc:cc_op_gen_main))' \
+	> _tmp_cc_op_gen.txt
+cat _tmp_op_lib.txt _tmp_op_lib.txt _tmp_core_frm.txt _tmp_cc_op_gen.txt \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
 	> debian/ninja/tf_cc_ops_XXX_gen_cc.source_file.txt
-bazel query 'kind("source file", deps(//tensorflow/cc:ops/array_ops_gen_cc))' | sort > _tmp1.txt
-diff -ru _tmp1.txt debian/ninja/tf_cc_ops_XXX_gen_cc.source_file.txt
-bazel query 'kind("generated file", deps(//tensorflow/cc:ops/math_ops_gen_cc))' \
-	| sort \
-	> debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
-bazel query 'kind("generated file", deps(//tensorflow/cc:ops/array_ops_gen_cc))' | sort > _tmp2.txt
-diff -ru _tmp2.txt debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
 
+bazel query 'kind("generated file", deps(//tensorflow/core:math_ops_op_lib))' \
+	| grep -v math_ops.cc \
+	> _tmp_op_lib.txt
+bazle query 'kind("generated file", deps(//tensorflow/core:lib))' \
+	> _tmp_core_lib.txt
+bazle query 'kind("generated file", deps(//tensorflow/core:framework))' \
+	> _tmp_core_frm.txt
+bazel query 'kind("generated file", deps(/tensorflow/cc:cc_op_gen_main))' \
+	> _tmp_cc_op_gen.txt
+cat _tmp_op_lib.txt _tmp_op_lib.txt _tmp_core_frm.txt _tmp_cc_op_gen.txt \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
+	> debian/ninja/tf_cc_ops_XXX_gen_cc.generated_file.txt
+
+#
 bazel query 'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
 	| sort \
 	> debian/ninja/tf_libtensorflow_test.source_file.txt
@@ -79,6 +101,7 @@ bazel query 'kind("generated file", deps(//tensorflow/tools/lib_package:libtenso
 	| sort \
 	> debian/ninja/tf_libtensorflow_test.generated_file.txt
 
+#
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow.so))' \
 	| sort \
 	> debian/ninja/tf_libtensorflow_so.source_file.txt
@@ -86,6 +109,7 @@ bazel query 'kind("generated file", deps(//tensorflow:libtensorflow.so))' \
 	| sort \
 	> debian/ninja/tf_libtensorflow_so.generated_file.txt
 
+#
 bazel query 'kind("source file", deps(//tensorflow/python:pywrap_tensorflow))' \
 	| sort \
 	> debian/ninja/tf_python_pywrap_tensorflow.source_file.txt

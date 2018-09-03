@@ -449,10 +449,12 @@ def shogunTFCCOpGen(argv):
     _, srclist = eGrep('.*stream_executor.*', srclist) # due to CPU-only
     _, srclist = eGrep('.*.cu.cc$', srclist) # due to CPU-only
     _, srclist = eGrep('.*.pbtxt$', srclist) # no need to process
+    _, srclist = eGrep('.*/gpu/.*', srclist) # due to CPU-only
 
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
-    tf_android_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist)
+    cclist.append('debian/embedded/fft/fftsg.cc')
+    tf_android_objs = ninjaCXXOBJ(cursor, list(set(cclist + pbcclist + pbtcclist)))
 
     # link the final executable
     cursor.build('tf_cc_op_gen', 'CXX_EXEC', inputs=tf_android_objs)
