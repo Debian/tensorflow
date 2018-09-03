@@ -1,98 +1,28 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CFLAGS_MAINT_APPEND = #-Wall
-export DEB_CXXFLAGS_MAINT_APPEND = -gsplit-dwarf #-Wall
+export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-# Select buildsystem according to architecture.
-# - amd64, ppc64el: cmake
-# - others: makefile
-ifneq (,$(filter $(DEB_HOST_ARCH), amd64 ppc64el))
-export DEB_TFBSYS = makefile
-else
-export DEB_TFBSYS = makefile
-endif
-
-DEB_CMAKE_OPTS = \
-	-DCMAKE_BUILD_TYPE=Release \
-	-Dtensorflow_VERBOSE=ON \
-	-Dtensorflow_ENABLE_SSL_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_GRPC_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_HDFS_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_JEMALLOC_SUPPORT=OFF \
-	-Dtensorflow_BUILD_CC_EXAMPLE=OFF \
-	-Dtensorflow_BUILD_PYTHON_BINDINGS=OFF \
-	-Dtensorflow_BUILD_ALL_KERNELS=ON \
-	-Dtensorflow_BUILD_CONTRIB_KERNELS=OFF \
-	-Dtensorflow_BUILD_CC_TESTS=OFF \
-	-Dtensorflow_BUILD_PYTHON_TESTS=OFF \
-	-Dtensorflow_BUILD_MORE_PYTHON_TESTS=OFF \
-	-Dtensorflow_OPTIMIZE_FOR_NATIVE_ARCH=OFF \
-	-Dtensorflow_ENABLE_SNAPPY_SUPPORT=ON \
-	-Dtensorflow_DISABLE_EIGEN_FORCEINLINE=OFF \
-	-Dtensorflow_WIN_CPU_SIMD_OPTIONS=OFF \
-	-Dtensorflow_ENABLE_MKL_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_MKLDNN_SUPPORT=OFF \
-	-Dtensorflow_ENABLE_GPU=OFF \
-	-Dtensorflow_ENABLE_POSITION_INDEPENDENT_CODE=ON \
-	-DPYTHON_EXECUTABLE=/usr/bin/python3
-
-ifeq (,$(filter terse,$(DEB_BUILD_OPTIONS)))
-export DEB_CXXFLAGS_MAINT_APPEND += \
-	-Wno-ignored-attributes \
-	-Wno-unused-result \
-	-Wno-return-type
-DEB_CMAKE_OPTS += \
-	-DCMAKE_VERBOSE_MAKEFILE=OFF \
-	-Dtensorflow_VERBOSE=OFF
-endif
-
-# [Ubuntu] Don't use -O3 as default for ppc64el
-ifneq (,$(filter $(DEB_HOST_ARCH), ppc64el))
-export DEB_CXXFLAGS_MAINT_STRIP = -O3
-export DEB_CXXFLAGS_MAINT_PREPEND = -O2
-endif
-
-
 %:
-ifneq (,$(filter $(DEB_TFBSYS), cmake))
-	dh $@ -Scmake -Dtensorflow/contrib/cmake
-else
-	dh $@ -Smakefile
-endif
+	dh $@ -Sninja -D.
 
 override_dh_auto_clean:
-ifneq (,$(filter $(DEB_TFBSYS), cmake))
-	dh_auto_clean
-else
-	dh_auto_build -- -f debian/make/Makefile clean
-endif
+	true #FIXME
 
 override_dh_auto_configure:
-ifneq (,$(filter $(DEB_TFBSYS), cmake))
-	# Replace upstream CMake build with our modified one.
-	cp -rv debian/cmake tensorflow/contrib/
-	dh_auto_configure -- tensorflow/contrib/cmake $(DEB_CMAKE_OPTS)
-else
 	# prepare embedded source code
 	$(SHELL) debian/embedded.sh
-endif
+	# generate ninja builds with shogun.py
+	$(SHELL) debian/ninja/shogun-gen.sh
 
 override_dh_auto_build:
-ifneq (,$(filter $(DEB_TFBSYS), cmake))
-	dh_auto_build
-else
-	dh_auto_build -- -f debian/make/Makefile
-endif
+	dh_auto_build -- -f proto_text.ninja
+	dh_auto_build -- -f tf_core_proto.ninja
+	dh_auto_build -- -f libtensorflow_framework.ninja
 
 override_dh_auto_install:
-ifneq (,$(filter $(DEB_TFBSYS), cmake))
-	dh_auto_install
-else
-	dh_auto_build -- -f debian/make/Makefile install \
-		CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
-		CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
-endif
+	true # FIXME
 
 override_dh_auto_test:
 	true  #FIXME: temporary
