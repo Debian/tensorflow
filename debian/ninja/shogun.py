@@ -101,6 +101,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
             + ' $in $CC_OP_INC_AND_LIB -o $out')
     cursor.rule('CXX_CC_OP_GEN', f'LD_LIBRARY_PATH={ag.B} ./$in $out $cc_op_gen_internal' \
             + ' tensorflow/core/api_def/base_api')
+    cursor.rule('COPY', f'cp $in $out')
     cursor.newline()
 
 
@@ -507,6 +508,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*.pbtxt$', srclist) # no need to process
 
     # cc_op_gen
+    cursor.build('tensorflow/core/ops/user_ops.cc', 'COPY', inputs='tensorflow/core/user_ops/fact.cc')
     ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
     ccophdrs, genlist = eGrep('.*/cc/ops/.*.h', genlist)
     for ccop in (x for x in ccoplist if 'internal' not in x):
