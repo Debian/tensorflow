@@ -3,6 +3,28 @@
 # If Bazel complain "util/hash not found blah blah blah", just remove the
 # corresponding line in bazel's BUILD file and try again.
 
+cat > .bazelrc << EOF
+build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
+build --action_env PYTHON_LIB_PATH="/usr/lib/python3/dist-packages"
+build --python_path="/usr/bin/python3"
+build --define with_jemalloc=true
+build --define with_gcp_support=true
+build --define with_hdfs_support=true
+build --define with_aws_support=true
+build --define with_kafka_support=true
+build:xla --define with_xla_support=true
+build:gdr --define with_gdr_support=true
+build:verbs --define with_verbs_support=true
+build --action_env TF_NEED_OPENCL_SYCL="0"
+build --action_env TF_NEED_CUDA="0"
+build --action_env TF_DOWNLOAD_CLANG="0"
+build --define grpc_no_ares=true
+build:opt --copt=-march=native
+build:opt --host_copt=-march=native
+build:opt --define with_default_optimizations=true
+build --strip=always
+EOF
+
 bazel query 'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
 	> debian/ninja/tf_tool_proto_text.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
