@@ -77,7 +77,8 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.variable('CXXFLAGS', '-w -std=c++14 -O2 -fPIC -gsplit-dwarf -pthread')
     cursor.variable('LDFLAGS', '')
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen/ -I./third_party/eigen3/'
-            + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-6.0')
+            + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-6.0'
+            + ' -I/usr/include/llvm-6.0 -Ithird_party/toolchains/gpus/cuda/')
     cursor.variable('LIBS', '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion'
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-6.0')
     cursor.variable('PROTO_TEXT_ELF', f'{ag.B}/proto_text')
@@ -322,7 +323,6 @@ def shogunTFFrame(argv):
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*windows/env_time.cc$', srclist)
     _, srclist = eGrep('.*platform/windows.*', srclist)
-    _, srclist = eGrep('.*stream_executor.*', srclist) # due to CPU-only
 
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
