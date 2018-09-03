@@ -325,11 +325,16 @@ def shogunTFFrame(argv):
     tf_framework_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist)
 
     # link the final executable
-    cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=tf_framework_objs)
+    cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=tf_framework_objs,
+            variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
+            + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
+            + ' -lpthread'})
+    # XXX: jemalloc
 
     ## fflush
+    print(yellow('Unprocessed src files:'), srclist)
+    print(yellow('Unprocessed gen files:'), genlist)
     cursor.close()
-    print(yellow('Unprocessed source files:'), srclist)
 
 
 def shogunTFLibAndroid(argv):
