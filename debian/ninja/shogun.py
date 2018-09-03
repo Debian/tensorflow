@@ -15,6 +15,7 @@ import sys
 import re
 import os
 import argparse
+import json
 from pprint import pprint
 from ninja_syntax import Writer
 
@@ -38,7 +39,7 @@ def filteroutExternal(sourcelist: List[str]) -> List[str]:
             ret.append(src)
         else:
             external.update(x.groups())
-    print(cyan('Required Depends:'), external)
+    print(cyan('Required Depends:'), json.dumps(list(external), indent=4))
     return ret
 
 
@@ -181,13 +182,6 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
     return objs
 
 
-def ninjaGenVersionInfo(cur, target):
-    '''
-    generate version_info.cc
-    '''
-    return res
-
-
 def shogunProtoText(argv):
     '''
     Build proto_text
@@ -230,8 +224,8 @@ def shogunProtoText(argv):
     cursor.build('proto_text', 'CXX_EXEC', inputs=proto_text_objs)
 
     # fflush
-    print(yellow('Unprocessed src files:'), srclist)
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
@@ -282,7 +276,7 @@ def shogunTFCoreProto(argv):
 
     ## fflush
     #print(yellow('Unprocessed src files:'), srclist) # Ignore
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
@@ -347,8 +341,8 @@ def shogunTFFrame(argv):
     # XXX: jemalloc
 
     ## fflush
-    print(yellow('Unprocessed src files:'), srclist)
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
@@ -407,8 +401,8 @@ def shogunTFLibAndroid(argv):
                 + ' -ldouble-conversion'})
 
     ## fflush
-    print(yellow('Unprocessed src files:'), srclist)
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed src files:'), json.dump(srclist, indent=4))
+    print(yellow('Unprocessed gen files:'), json.dump(genlist, indent=4))
     cursor.close()
 
 
@@ -450,7 +444,7 @@ def shogunCCOP(argv):
                 implicit_outputs=[ccop.replace('.cc', '_internal.h'), ccop.replace('.cc', '_internal.cc')])
 
     ## fflush
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
@@ -525,8 +519,8 @@ def shogunTFLib(argv):
     # FIXME: jemalloc, mkl-dnn, grpc, xsmm
 
     ## fflush
-    print(yellow('Unprocessed src files:'), srclist)
-    print(yellow('Unprocessed gen files:'), genlist)
+    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
