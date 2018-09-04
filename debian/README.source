@@ -56,6 +56,7 @@ C and C++ interface.
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] build libtensorflow on top of libtensorflow_framework
 - [ ] findout how to build and run the tests.
+- [ ] add soname and soversion to the shared obj
 
 Python interface.
 
