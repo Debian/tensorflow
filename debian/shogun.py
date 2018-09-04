@@ -39,9 +39,10 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.newline()
     cursor.comment('-- compiler flags --')
     cursor.newline()
-    cursor.variable('CPPFLAGS', '')
-    cursor.variable('CXXFLAGS', '-w -std=c++14 -O2 -fPIC -gsplit-dwarf -pthread')
-    cursor.variable('LDFLAGS', '')
+    cursor.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + os.getenv('CPPFLAGS'))
+    cursor.variable('CXXFLAGS', '-std=c++14 -O2 -fPIC -gsplit-dwarf'
+        + '-fstack-protector-strong -w ' + os.getenv('CXXFLAGS'))
+    cursor.variable('LDFLAGS', '-Wl,-z,relro ' + os.getenv('LDFLAGS'))
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen/ -I./third_party/eigen3/'
             + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-7'
             + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/')
@@ -54,7 +55,9 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_EXTRA -c $in -o $out')
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api')
+    cursor.rule('COPY', f'cp $in $out')
     cursor.newline()
+    cursor.comment('old rules')
     cursor.rule('PROTOC', f'protoc $in --cpp_out .')
     cursor.rule('PROTOC_GRPC', f'protoc --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
     cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
@@ -69,7 +72,6 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
             + ' tensorflow/cc/framework/cc_op_gen.cc'
             + ' tensorflow/cc/framework/cc_op_gen_main.cc'
             + ' $in $CC_OP_INC_AND_LIB -o $out')
-    cursor.rule('COPY', f'cp $in $out')
     cursor.newline()
     cursor.comment('-- end common ninja header --')
     cursor.newline()
