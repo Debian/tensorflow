@@ -47,6 +47,7 @@ import os
 import argparse
 import json
 import glob
+import subprocess
 from pprint import pprint
 from ninja_syntax import Writer
 
