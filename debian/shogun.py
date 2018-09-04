@@ -43,7 +43,7 @@ def filteroutExternal(sourcelist: List[str]) -> List[str]:
             ret.append(src)
         else:
             external.update(x.groups())
-    print(cyan('Required Depends:'), json.dumps(list(external), indent=4))
+    print(cyan('Required Depends:'), external)
     return ret
 
 
@@ -83,7 +83,10 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.newline()
     cursor.variable('CXX', 'g++')
     cursor.variable('elf_PROTOC', '/usr/bin/protoc')
-    cursor.variable('PROTO_TEXT_ELF', f'{ag.B}/proto_text')
+    cursor.variable('elf_PROTO_TEXT', f'./proto_text')
+    cursor.variable('PROTO_TEXT_ELF', f'./proto_text')
+    cursor.comment('SHOGUN_EXTRA is used for adding specific flags for a specific target')
+    cursor.variable('SHOGUN_EXTRA', '')
     cursor.newline()
     cursor.comment('-- compiler flags --')
     cursor.newline()
@@ -92,16 +95,19 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.variable('LDFLAGS', '')
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen/ -I./third_party/eigen3/'
             + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-7'
-            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/ -I{ag.B}')
+            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/')
     cursor.variable('LIBS', '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion'
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
     cursor.newline()
     cursor.comment('-- compiling rules-- ')
-    cursor.rule('PROTOC', f'protoc $in --cpp_out {ag.B}')
-    cursor.rule('rule_PROTOC', f'$elf_PROTOC $in --cpp_out {ag.B}')
-    cursor.rule('PROTOC_GRPC', f'protoc --grpc_out {ag.B} --cpp_out {ag.B} --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
-    cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF {ag.B}/tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
-    cursor.rule('GEN_VERSION_INFO', f'bash {ag.B}/tensorflow/tools/git/gen_git_source.sh $out')
+    cursor.rule('PROTOC', f'protoc $in --cpp_out .')
+    cursor.rule('rule_PROTOC', f'$elf_PROTOC $in --cpp_out . $SHOGUN_EXTRA')
+    cursor.rule('rule_PROTO_TEXT', f'$elf_PROTO_TEXT ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
+    cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_ExTRA -c $in -o $out')
+    cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
+    cursor.rule('PROTOC_GRPC', f'protoc --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
+    cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
+    cursor.rule('GEN_VERSION_INFO', f'bash ./tensorflow/tools/git/gen_git_source.sh $out')
     cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $INCLUDES -c $in -o $out $CXX_OBJ_EXTRA_DEFS')
     cursor.rule('CXX_EXEC', f'g++ $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
     cursor.rule('CXX_SHLIB', f'g++ -shared -fPIC $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
@@ -113,7 +119,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
             + ' tensorflow/cc/framework/cc_op_gen.cc'
             + ' tensorflow/cc/framework/cc_op_gen_main.cc'
             + ' $in $CC_OP_INC_AND_LIB -o $out')
-    cursor.rule('CXX_CC_OP_GEN', f'LD_LIBRARY_PATH={ag.B} ./$in $out $cc_op_gen_internal' \
+    cursor.rule('CXX_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal' \
             + ' tensorflow/core/api_def/base_api')
     cursor.rule('COPY', f'cp $in $out')
     cursor.newline()
@@ -204,56 +210,6 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
     return objs
 
 
-def shogunProtoText(argv):
-    '''
-    Build a binary ELF executable named proto_text, which generates
-    XXX.pb_text{.cc,.h,-impl.h} files from a given XXX.proto file.
-
-    Depends: N/A
-    '''
-    ag = argparse.ArgumentParser()
-    ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='proto_text.ninja')
-    ag.add_argument('-B', help='build directory', type=str, default='.')
-    ag = ag.parse_args(argv)
-
-    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
-    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
-    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
-    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
-
-    # Instantiate ninja writer
-    cursor = Writer(open(ag.o, 'w'))
-    ninjaCommonHeader(cursor, ag)
-
-    # generate .pb.cc and .pb.h
-    srcproto, srclist = eGrep('.*.proto$', srclist)
-    genpbh, genlist = eGrep('.*.pb.h', genlist)
-    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
-    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
-    proto_diff = set(srcproto).difference(set(protolist))
-    if len(proto_diff) > 0:
-        print('Warning: resulting proto lists different!', proto_diff)
-
-    # ignore .h files and third_party, and windows source
-    srchdrs, srclist = eGrep('.*.h$', srclist)
-    _, srclist = eGrep('^third_party', srclist)
-    _, srclist = eGrep('.*windows/env_time.cc$', srclist)
-
-    # compile .cc source
-    cclist, srclist = eGrep('.*.cc', srclist)
-    proto_text_objs = ninjaCXXOBJ(cursor, cclist + pbcclist)
-
-    # link the final executable
-    cursor.build('proto_text', 'CXX_EXEC', inputs=proto_text_objs)
-
-    # fflush
-    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
-    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
-    cursor.close()
-
-
 def shogunAllProto(argv):
     '''
     Generate XXX.pb.{h,cc} files from all available XXX.proto
@@ -264,41 +220,79 @@ def shogunAllProto(argv):
     Output: .pb.cc, .pb.h
     '''
     ag = argparse.ArgumentParser()
-    ag.add_argument('-S', help='root of source tree', type=str, default='.')
-    ag.add_argument('-B', help='root of build dir', type=str, default='./build')
     ag.add_argument('-o', help='write ninja file', type=str, default='allproto.ninja')
     ag = ag.parse_args(argv)
     print(red(f'{ag}'))
-    if not os.path.exists(ag.B):
-        os.mkdir(ag.B)
 
-    # initialize ninja file
+    # (1) initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
 
-    # glob all proto
-    protos = glob.glob(f'{ag.S}/**/*.proto', recursive=True)
-    print(cyan('AllProto:'), f'globbed {len(protos)} .proto files from {ag.S}')
+    # (2) glob all proto
+    protos = glob.glob(f'**/*.proto', recursive=True)
+    print(cyan('AllProto:'), f'globbed {len(protos)} .proto files')
 
-    # generate .pb.cc, .pb.h
+    # (3) generate .pb.cc, .pb.h
     for proto in protos:
-        cursor.build([
-            os.path.join(ag.B, proto.replace('.proto', '.pb.cc')),
-            os.path.join(ag.B, proto.replace('.proto', '.pb.h')),
-            ], 'rule_PROTOC', proto)
+        cursor.build([ proto.replace('.proto', '.pb.cc'),
+            proto.replace('.proto', '.pb.h')], 'rule_PROTOC', proto)
 
     # done
     cursor.close()
 
 
-def shogunAllProtoText(argv):
+def shogunProtoText(argv):
     '''
-    Generate XXX.pb_text{.h,.cc,-impl.h} files from all available
-    XXX.proto files in the source directory.
+    Build a binary ELF executable named proto_text, which generates
+    XXX.pb_text{.cc,.h,-impl.h} files from a given XXX.proto file.
 
-    Depends: proto_text
+    Depends: shogunAllProto
+    Input: corresponding bazel dump
+    Output: proto_text
     '''
-    pass
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-i', help='list of source files', type=str, required=True)
+    ag.add_argument('-g', help='list of generated files', type=str, required=True)
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='prototext.ninja')
+    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag = ag.parse_args(argv)
+
+    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
+    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
+    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
+    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
+
+    # (1) Instantiate ninja writer
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # (2) deal with generated files
+    # (2.1) .pb.cc and .pb.h files are generated in shogunAllProto
+    _, genlist = eGrep('.*.pb.h$', genlist)
+    pbcclist, genlist = eGrep('.*.pb.cc$', genlist)
+    if len(genlist) > 0:
+        print(yellow('Remainders:'), genlist)
+
+    # (3) deal with source files
+    # (3.1) filter-out not needed files
+    _, srclist = eGrep('.*.h$', srclist) # we don't need to deal with header here
+    _, srclist = eGrep('^third_party', srclist) # no third_party stuff
+    _, srclist = eGrep('.*windows/.*', srclist) # no windoge source
+
+    # (3.2) compile .cc source
+    cclist, srclist = eGrep('.*.cc', srclist)
+    objlist = []
+    for cc in cclist + pbcclist:
+        obj = cc.replace('.cc', '.o')
+        objlist.append(cursor.build(obj, 'rule_CXX_OBJ', cc)[0])
+    if len(srclist) > 0:
+        print(yellow('Remainders:'), srclist)
+
+    # (4) link objects into the final ELF
+    cursor.build(f'proto_text', 'rule_CXX_EXEC', inputs=objlist)
+
+    # done
+    cursor.close()
 
 
 def shogunTFCoreProto(argv):
@@ -609,10 +603,12 @@ if __name__ == '__main__':
         exit(1)
 
     # Targets sorted in dependency order.
-    if sys.argv[1] == 'ProtoText':
-        shogunProtoText(sys.argv[2:])
     if sys.argv[1] == 'AllProto':
         shogunAllProto(sys.argv[2:])
+    elif sys.argv[1] == 'ProtoText':
+        shogunProtoText(sys.argv[2:])
+    elif sys.argv[1] == 'AllProtoText':
+        shogunAllProtoText(sys.argv[2:])
     elif sys.argv[1] == 'TFCoreProto':
         shogunTFCoreProto(sys.argv[2:])
     elif sys.argv[1] == 'TFFrame':
