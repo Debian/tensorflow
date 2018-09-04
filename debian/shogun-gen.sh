@@ -3,34 +3,30 @@ set -x
 
 # Probe working directory
 if test -r ./shogun.py; then
-	export DNINJA="."
-elif test -r ./debian/ninja/shogun.py; then
-	export DNINJA="./debian/ninja"
-elif test -r ./ninja/shogun.py; then
-	export DNINJA="./ninja"
+	SHOGUN="python3 shogun.py"
+	DATADIR="./bazelDumps/"
+elif test -r ./debian/shogun.py; then
+	SHOGUN="python3 debian/shogun.py"
+	DATADIR="./debian/bazelDumps/"
 else
-	echo Please chdir to the root of source tree or debian/ninja!
+	echo where are you?
 	exit 1
 fi
 
-# shogun program
-SHOGUN="python3 $DNINJA/shogun.py"
+$SHOGUN ProtoText -i $DATADIR/tf_tool_proto_text.source_file.txt \
+	-g $DATADIR/tf_tool_proto_text.generated_file.txt
 
-$SHOGUN ProtoText -i $DNINJA/tf_tool_proto_text.source_file.txt \
-	-g $DNINJA/tf_tool_proto_text.generated_file.txt
+$SHOGUN TFCoreProto -i $DATADIR/tf_core_proto_text.source_file.txt \
+	-g $DATADIR/tf_core_proto_text.generated_file.txt
 
-$SHOGUN TFCoreProto -i $DNINJA/tf_core_proto_text.source_file.txt \
-	-g $DNINJA/tf_core_proto_text.generated_file.txt
+$SHOGUN TFFrame -i $DATADIR/tf_libtensorflow_framework_so.source_file.txt \
+	-g $DATADIR/tf_libtensorflow_framework_so.generated_file.txt
 
-$SHOGUN TFFrame -i $DNINJA/tf_libtensorflow_framework_so.source_file.txt \
-	-g $DNINJA/tf_libtensorflow_framework_so.generated_file.txt
+$SHOGUN TFLibAndroid -i $DATADIR/tf_core_android_tflib.source_file.txt \
+	-g $DATADIR/tf_core_android_tflib.generated_file.txt
 
-$SHOGUN TFLibAndroid -i $DNINJA/tf_core_android_tflib.source_file.txt \
-	-g $DNINJA/tf_core_android_tflib.generated_file.txt
+$SHOGUN CCOP -i $DATADIR/tf_libtensorflow_so.source_file.txt \
+	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
 
-$SHOGUN CCOP -i $DNINJA/tf_libtensorflow_so.source_file.txt \
-	-g $DNINJA/tf_libtensorflow_so.generated_file.txt
-
-$SHOGUN TFLib -i $DNINJA/tf_libtensorflow_so.source_file.txt \
-	-g $DNINJA/tf_libtensorflow_so.generated_file.txt
-
+$SHOGUN TFLib -i $DATADIR/tf_libtensorflow_so.source_file.txt \
+	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
