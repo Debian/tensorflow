@@ -27,5 +27,6 @@ $SHOGUN CCOP \
 	-i $DATADIR/tf_libtensorflow_so.source_file.txt \
 	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
 
-#$SHOGUN TFLib -i $DATADIR/tf_libtensorflow_so.source_file.txt \
-#	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
+$SHOGUN TFLib \
+	-i $DATADIR/tf_libtensorflow_so.source_file.txt \
+	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
