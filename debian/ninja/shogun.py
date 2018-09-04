@@ -176,10 +176,16 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
     write ninja rules for building .cc files into object files
     '''
     objs = []
+    exception_eigen_avoid_std_array = [
+        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d',
+        'adjust_contrast_op' ]
     for cc in cclist:
-        ninjavars = {'CXX_OBJ_EXTRA_DEFS': '' if 'sparse_tensor_dense_matmul_op' not in cc else '-DEIGEN_AVOID_STL_ARRAY'}
         output = re.sub('.cc$', '.o', cc)
-        objs.append(cur.build(output, 'CXX_OBJ', inputs=cc, variables=ninjavars)[0])
+        if any(x in cc for x in exception_eigen_avoid_std_array):
+            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc,
+                variables={'CXX_OBJ_EXTRA_DEFS': '-DEIGEN_AVOID_STL_ARRAY'})[0])
+        else:
+            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc)[0])
     return objs
 
 
@@ -502,6 +508,8 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*platform/windows.*', srclist)
     _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
     _, srclist = eGrep('.*.pbtxt$', srclist) # no need to process
+    _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke this.
+    _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
 
     # cc_op_gen
     ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
