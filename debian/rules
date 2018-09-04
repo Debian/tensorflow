@@ -22,7 +22,7 @@ override_dh_auto_build:
 	dh_auto_build -- -f libtensorflow.ninja
 
 override_dh_auto_install:
-	true # FIXME
+	$(SHELL) debian/shogun-install.sh
 
 override_dh_auto_test:
 	true  #FIXME: temporary
