@@ -16,6 +16,7 @@ import re
 import os
 import argparse
 import json
+import glob
 from pprint import pprint
 from ninja_syntax import Writer
 
@@ -25,6 +26,9 @@ def cyan(s: str) -> str:
 
 def yellow(s: str) -> str:
     return f'\033[1;33m{s}\033[0;m'
+
+def red(s: str) -> str:
+    return f'\033[1;31m{s}\033[0;m'
 
 
 def filteroutExternal(sourcelist: List[str]) -> List[str]:
@@ -78,6 +82,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.comment('-- compiling tools --')
     cursor.newline()
     cursor.variable('CXX', 'g++')
+    cursor.variable('elf_PROTOC', '/usr/bin/protoc')
     cursor.variable('PROTO_TEXT_ELF', f'{ag.B}/proto_text')
     cursor.newline()
     cursor.comment('-- compiler flags --')
@@ -93,6 +98,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.newline()
     cursor.comment('-- compiling rules-- ')
     cursor.rule('PROTOC', f'protoc $in --cpp_out {ag.B}')
+    cursor.rule('rule_PROTOC', f'$elf_PROTOC $in --cpp_out {ag.B}')
     cursor.rule('PROTOC_GRPC', f'protoc --grpc_out {ag.B} --cpp_out {ag.B} --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
     cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF {ag.B}/tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('GEN_VERSION_INFO', f'bash {ag.B}/tensorflow/tools/git/gen_git_source.sh $out')
@@ -200,7 +206,10 @@ def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
 
 def shogunProtoText(argv):
     '''
-    Build proto_text
+    Build a binary ELF executable named proto_text, which generates
+    XXX.pb_text{.cc,.h,-impl.h} files from a given XXX.proto file.
+
+    Depends: N/A
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
@@ -245,10 +254,54 @@ def shogunProtoText(argv):
     cursor.close()
 
 
+def shogunAllProto(argv):
+    '''
+    Generate XXX.pb.{h,cc} files from all available XXX.proto
+    files in the source directory.
+
+    Depends: protoc (protobuf-compiler)
+    Input: .proto
+    Output: .pb.cc, .pb.h
+    '''
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-S', help='root of source tree', type=str, default='.')
+    ag.add_argument('-B', help='root of build dir', type=str, default='./build')
+    ag.add_argument('-o', help='write ninja file', type=str, default='allproto.ninja')
+    ag = ag.parse_args(argv)
+    print(red(f'{ag}'))
+    if not os.path.exists(ag.B):
+        os.mkdir(ag.B)
+
+    # initialize ninja file
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # glob all proto
+    protos = glob.glob(f'{ag.S}/**/*.proto', recursive=True)
+    print(cyan('AllProto:'), f'globbed {len(protos)} .proto files from {ag.S}')
+
+    # generate .pb.cc, .pb.h
+    for proto in protos:
+        cursor.build([
+            os.path.join(ag.B, proto.replace('.proto', '.pb.cc')),
+            os.path.join(ag.B, proto.replace('.proto', '.pb.h')),
+            ], 'rule_PROTOC', proto)
+
+    # done
+    cursor.close()
+
+
+def shogunAllProtoText(argv):
+    '''
+    Generate XXX.pb_text{.h,.cc,-impl.h} files from all available
+    XXX.proto files in the source directory.
+
+    Depends: proto_text
+    '''
+    pass
+
+
 def shogunTFCoreProto(argv):
-    '''
-    Build tf_core_proto.a
-    '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
@@ -558,6 +611,8 @@ if __name__ == '__main__':
     # Targets sorted in dependency order.
     if sys.argv[1] == 'ProtoText':
         shogunProtoText(sys.argv[2:])
+    if sys.argv[1] == 'AllProto':
+        shogunAllProto(sys.argv[2:])
     elif sys.argv[1] == 'TFCoreProto':
         shogunTFCoreProto(sys.argv[2:])
     elif sys.argv[1] == 'TFFrame':
