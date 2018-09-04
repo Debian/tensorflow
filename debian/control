@@ -19,11 +19,9 @@ Build-Depends:
  libgrpc++-dev,
  libgtest-dev,
  libhighwayhash-dev [amd64 ppc64el],
- libjemalloc-dev,
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
- libmkldnn-dev [amd64],
  libnsync-dev,
  libpng-dev,
  libprotobuf-dev (>= 3.6.0~),
@@ -42,6 +40,9 @@ Build-Depends:
  python3-numpy,
  swig,
  zlib1g-dev,
+# libjemalloc-dev,
+# libxsmm-dev,
+# libmkldnn-dev [amd64],
 
               
 Package: tensorflow
