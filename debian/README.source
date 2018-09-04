@@ -49,7 +49,9 @@ C and C++ interface.
   - [ ] write autopkgtest with some mini C/C++ programs.
   - [ ] find out the way to build tests (googletest).
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
-- [ ] findout how to build and run the tests.
+- [ ] what's this????? ppc64el specific.
+      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol `Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_'
+      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol `tensorflow::per_thread_max_parallism'
 - [ ] upload to experimental.
 
 Python interface.
