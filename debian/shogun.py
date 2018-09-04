@@ -1,13 +1,43 @@
 #!/usr/bin/python3.6
-# Copyright (C) 2018 Mo Zhou <lumin@debian.org>
-# Distribution Friendly Light-Weight Build for TensorFlow.
-# MIT/Expat License.
+# TF-Shogun: Distribution Friendly Light-Weight Build for TensorFlow.
+#
+#Copyright: 2018 Mo Zhou <lumin@debian.org>
+#License: Expat
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+# .
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+# .
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 '''
+TF-Shogun
+=========
+
+Distribution friendly light-weight build for TensorFlow.
+Especially written for Debian GNU/Linux.
+
 Shogun needs the bazel dumps from bazelQuery.sh .
 
-For extra compiler definitions .e.g TENSORFLOW_USE_JEMALLOC please lookup
-  tensorflow/core/platform/default/build_config.bzl
+References
+----------
+
+1. CMake build, tensorflow/contrib/cmake
+2. Makefile build, tensorflow/contrib/makefile
+3. TensorFlow's native Bazel build.
+4. For extra compiler definitions .e.g TENSORFLOW_USE_JEMALLOC please lookup
+   tensorflow/core/platform/default/build_config.bzl
 '''
 
 from typing import *
