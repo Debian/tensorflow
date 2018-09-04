@@ -1,24 +1,22 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-export DEB_CFLAGS_MAINT_APPEND = #-Wall
-export DEB_CXXFLAGS_MAINT_APPEND = #-Wall
+export DEB_CFLAGS_MAINT_APPEND =
+export DEB_CXXFLAGS_MAINT_APPEND =
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 %:
 	dh $@ -Sninja -D.
 
 override_dh_auto_clean:
-	true #FIXME
+	$(SHELL) debian/shogun-clean.sh
 
 override_dh_auto_configure:
-	# prepare embedded source code
 	$(SHELL) debian/embedded.sh
-	# generate ninja builds with shogun.py
-	$(SHELL) debian/ninja/shogun-gen.sh
+	$(SHELL) debian/shogun-gen.sh
 
 override_dh_auto_build:
+	dh_auto_build -- -f all_proto.ninja
 	dh_auto_build -- -f proto_text.ninja
-	dh_auto_build -- -f tf_core_proto.ninja
 	dh_auto_build -- -f libtensorflow_framework.ninja
 	dh_auto_build -- -f ccop.ninja
 	dh_auto_build -- -f libtensorflow.ninja
