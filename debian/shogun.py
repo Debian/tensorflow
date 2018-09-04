@@ -220,7 +220,7 @@ def shogunAllProto(argv):
     Output: .pb.cc, .pb.h
     '''
     ag = argparse.ArgumentParser()
-    ag.add_argument('-o', help='write ninja file', type=str, default='allproto.ninja')
+    ag.add_argument('-o', help='write ninja file', type=str, default='all_proto.ninja')
     ag = ag.parse_args(argv)
     print(red(f'{ag}'))
 
@@ -245,6 +245,7 @@ def shogunProtoText(argv):
     '''
     Build a binary ELF executable named proto_text, which generates
     XXX.pb_text{.cc,.h,-impl.h} files from a given XXX.proto file.
+    This binary file is for one-time use.
 
     Depends: shogunAllProto
     Input: corresponding bazel dump
@@ -253,9 +254,9 @@ def shogunProtoText(argv):
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='prototext.ninja')
-    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='proto_text.ninja')
     ag = ag.parse_args(argv)
+    print(red(f'{ag}'))
 
     srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
     genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
@@ -278,6 +279,7 @@ def shogunProtoText(argv):
     _, srclist = eGrep('.*.h$', srclist) # we don't need to deal with header here
     _, srclist = eGrep('^third_party', srclist) # no third_party stuff
     _, srclist = eGrep('.*windows/.*', srclist) # no windoge source
+    _, srclist = eGrep('.*.proto$', srclist) # already dealt with in (2)
 
     # (3.2) compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
@@ -289,57 +291,10 @@ def shogunProtoText(argv):
         print(yellow('Remainders:'), srclist)
 
     # (4) link objects into the final ELF
-    cursor.build(f'proto_text', 'rule_CXX_EXEC', inputs=objlist)
+    cursor.build(f'proto_text', 'rule_CXX_EXEC', inputs=objlist,
+            variables={'LIBS': '-lpthread -lprotobuf -ldouble-conversion'})
 
     # done
-    cursor.close()
-
-
-def shogunTFCoreProto(argv):
-    ag = argparse.ArgumentParser()
-    ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='tf_core_proto.ninja')
-    ag.add_argument('-B', help='build directory', type=str, default='.')
-    ag = ag.parse_args(argv)
-
-    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
-    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
-    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
-    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
-
-    # Instantiate ninja writer
-    cursor = Writer(open(ag.o, 'w'))
-    ninjaCommonHeader(cursor, ag)
-
-    # generate .pb.cc and .pb.h
-    srcproto, srclist = eGrep('.*.proto$', srclist)
-    genpbh, genlist = eGrep('.*.pb.h', genlist)
-    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
-    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
-    proto_diff = set(srcproto).difference(set(protolist))
-    if len(proto_diff) > 0:
-        print(yellow('Warning: resulting proto lists different!'), proto_diff)
-
-    # generate .pb_text.cc .pb_text.h .pb_test-impl.h
-    genpbth, genlist = eGrep('.*.pb_text.h', genlist)
-    genpbtimplh, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    genpbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
-    pbtprotolist, pbtcclist, pbthlist = ninjaProtoText(cursor,
-            genpbth + genpbtimplh + genpbtcc)
-    pbtproto_diff = set(srcproto).difference(set(pbtprotolist))
-    if len(proto_diff) > 0:
-        print(yellow('Warning: resulting proto lists different!'), proto_diff)
-
-    # compile .cc source
-    tf_core_pb_obj = ninjaCXXOBJ(cursor, genpbcc + genpbtcc)
-
-    # link the final executable
-    cursor.build('tf_core_proto.a', 'STATIC', inputs=tf_core_pb_obj)
-
-    ## fflush
-    #print(yellow('Unprocessed src files:'), srclist) # Ignore
-    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
