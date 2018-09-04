@@ -121,89 +121,6 @@ def bazelPreprocess(srclist: List[str]) -> List[str]:
     return retlist
 
 
-#def ninjaProto(cur, protolist: List[str]) -> List[str]:
-#    '''
-#    write ninja rules for the protofiles. cur is ninja writer
-#    '''
-#    protos, cclist, hdrlist = [], [], []
-#    for proto in protolist:
-#        # proto is a protobuf-related file.
-#        if proto.endswith('.proto'):
-#            protos.append(proto)
-#            cclist.append(re.sub('.proto$', '.pb.cc', proto))
-#            hdrlist.append(re.sub('.proto$', '.pb.h', proto))
-#        elif proto.endswith('.pb.cc'):
-#            protos.append(re.sub('.pb.cc$', '.proto', proto))
-#            cclist.append(proto)
-#            hdrlist.append(re.sub('.pb.cc$', '.pb.h', proto))
-#        elif proto.endswith('.pb.h'):
-#            protos.append(re.sub('.pb.h$', '.proto', proto))
-#            cclist.append(re.sub('.pb.h$', '.pb.cc', proto))
-#            hdrlist.append(proto)
-#        else:
-#            raise SyntaxError(f'what is {proto}?')
-#    for p in list(set(protos)):
-#        output = [re.sub('.proto$', '.pb.cc', p),
-#                re.sub('.proto$', '.pb.h', p)]
-#        cur.build(output, 'PROTOC', inputs=p)
-#    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
-#
-#
-#def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
-#    '''
-#    write ninja rules for to proto_text files. cur is ninja writer
-#    '''
-#    protos, cclist, hdrlist = [], [], []
-#    for proto in protolist:
-#        # proto is a proto_text-related file
-#        if proto.endswith('.proto'):
-#            protos.append(proto)
-#            cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
-#            hdrlist.append(re.sub('.proto$', '.pb_text.h', proto))
-#            hdrlist.append(re.sub('.proto$', '.pb_text-impl.h', proto))
-#        elif proto.endswith('.pb_text.cc'):
-#            protos.append(re.sub('.pb_text.cc$', '.proto', proto))
-#            cclist.append(proto)
-#            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text.h', proto))
-#            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text-impl.h', proto))
-#        elif proto.endswith('.pb_text.h'):
-#            protos.append(re.sub('.pb_text.h$', '.proto', proto))
-#            cclist.append(re.sub('.pb_text.h$', '.pb_text.cc', proto))
-#            hdrlist.append(proto)
-#            hdrlist.append(re.sub('.pb_text.h$', '.pb_text-impl.h', proto))
-#        elif proto.endswith('.pb_text-impl.h'):
-#            protos.append(re.sub('.pb_text-impl.h$', '.proto', proto))
-#            cclist.append(re.sub('.pb_text-impl.h$', '.pb_text.cc', proto))
-#            hdrlist.append(re.sub('.pb_text-impl.h$', '.pb_text.h', proto))
-#            hdrlist.append(proto)
-#        else:
-#            raise SyntaxError(f'what is {proto}?')
-#    for p in list(set(protos)):
-#        output = [re.sub('.proto$', '.pb_text.cc', p),
-#                re.sub('.proto$', '.pb_text.h', p),
-#                re.sub('.proto$', '.pb_text-impl.h', p)]
-#        cur.build(output, 'PROTO_TEXT', inputs=p)
-#    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
-#
-#
-#def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
-#    '''
-#    write ninja rules for building .cc files into object files
-#    '''
-#    objs = []
-#    exception_eigen_avoid_std_array = [
-#        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d',
-#        'adjust_contrast_op' ]
-#    for cc in cclist:
-#        output = re.sub('.cc$', '.o', cc)
-#        if any(x in cc for x in exception_eigen_avoid_std_array):
-#            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc,
-#                variables={'CXX_OBJ_EXTRA_DEFS': '-DEIGEN_AVOID_STL_ARRAY'})[0])
-#        else:
-#            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc)[0])
-#    return objs
-
-
 def shogunAllProto(argv):
     '''
     Generate XXX.pb.{h,cc} files from all available XXX.proto
@@ -347,7 +264,8 @@ def shogunTFLib_framework(argv):
     for cc in src_cc + gen_pbcc + gen_pbtcc + genlist:
         variables = {}
         if any(x in cc for x in ('posix/port.cc',)):
-            variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
+            #variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
+            pass
         obj = cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
 
@@ -355,7 +273,8 @@ def shogunTFLib_framework(argv):
     cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
-            + ' -lpthread -ljemalloc'})
+            + ' -lpthread'})
+    # XXX: -ljemalloc FTBFS
 
     # done
     cursor.close()
@@ -428,14 +347,17 @@ def shogunCCOP(argv):
 def shogunTFLib(argv):
     '''
     Build libtensorflow.so
+
+    Depends: all_proto, proto_text, CCOP
+    Input: bazel dump, source files
+    Output: libtensorflow.so
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str,
-            default='libtensorflow.ninja')
-    ag.add_argument('-B', help='build directory', type=str, default='.')
+    ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow.ninja')
     ag = ag.parse_args(argv)
+    print(red(f'{ag}'))
 
     srclist = filteroutExternal([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
@@ -490,6 +412,9 @@ def shogunTFLib(argv):
     # compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
     tf_android_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist + ccoplist)
+#    exception_eigen_avoid_std_array = [
+#        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d',
+#        'adjust_contrast_op' ]
 
     # link the final executable
     cursor.build('libtensorflow.so', 'CXX_SHLIB', inputs=tf_android_objs,
@@ -512,14 +437,12 @@ if __name__ == '__main__':
     try:
         sys.argv[1]
     except IndexError as e:
-        print(e, 'you must specify one of the following a subcommand:')
-        print([k for (k, v) in locals().items() if k.startswith('shogun')])
+        print('you must specify one of the following a subcommand:')
+        print([k.replace('shogun', '') for (k, v) in locals().items() if k.startswith('shogun')])
         exit(1)
 
     # Targets sorted in dependency order.
-    if sys.argv[1] in ('AllProto', 'ProtoText', 'TFLib_framework', 'CCOP'):
+    if sys.argv[1] in ('AllProto', 'ProtoText', 'TFLib_framework', 'CCOP', 'TFLib'):
         eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
-    elif sys.argv[1] == 'TFLib':
-        shogunTFLib(sys.argv[2:])
     else:
         raise NotImplementedError(sys.argv[1:])
