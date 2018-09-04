@@ -102,3 +102,6 @@ bazel query 'kind("generated file", deps(//tensorflow/python:pywrap_tensorflow))
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
 	> debian/ninja/tf_python_pywrap_tensorflow.generated_file.txt
+
+# FIXME
+bazel query 'kind(cc_.*, tests(//tensorflow/... -//tensorflow/contrib/... -//tensorflow/python/... -//tensorflow/java/...))' > /dev/null

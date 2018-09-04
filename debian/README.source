@@ -1,4 +1,4 @@
-README.Debian
+README.source
 =============
 
 Principles specific to this source package
@@ -8,23 +8,21 @@ Principles specific to this source package
    dependencies for the build targets.
 
 2. This source packages provides CPU-only verison of TF instead
-   of CUDA version. Necessity of CPU-only Version:
+   of CUDA version.
   
-   (1) Compilable on all architectures. CUDA is specific to amd64
-       and ppc64el, and aarch64. What's even worse, we don't have
-       available CUDA compiler for aarch64.
+   (1) CPU-only version is compilable on all architectures.
+       CUDA is specific to amd64 and ppc64el, and aarch64.
 
-   (2) CPU-only Version can stay in the main section. Once compiled
-       with CUDA, the source must enter contrib section.
+   (2) CPU-only version can stay in the main section.
+       Once compiled with CUDA, the source must enter contrib section.
 
    src:caffe and src:caffe-contrib is an example for illustration.
-
 
 Debian's Build System for TF
 ----------------------------
 
 The build system is python3 plus ninja which builds stuff according
-to bazel dump.  See debian/ninja/README.md for detail.
+to bazel dump. See debian/ninja/README.md for detail.
 
 Ambiguous FFT2D license
 -----------------------
@@ -36,6 +34,8 @@ Ambiguous FFT2D license
  There is only one kernel that use this file. If this license
  is really problematic, we can disable the kernel and drop
  this dependency.
+
+ - [ ] is it really problematic?
 
 Things remain to be done
 ========================
@@ -55,6 +55,7 @@ C and C++ interface.
   - [ ] working on ppc64el?
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] build libtensorflow on top of libtensorflow_framework
+- [ ] findout how to build and run the tests.
 
 Python interface.
 
@@ -63,6 +64,7 @@ Python interface.
 - [ ] figure out how to generate python API
 - [ ] is the resulting python package correct and working?
 - [ ] write autopkgtest with mini python programs.
+
 
 Not Decided Yet
 ---------------
