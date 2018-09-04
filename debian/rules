@@ -19,6 +19,7 @@ override_dh_auto_build:
 	dh_auto_build -- -f all_proto.ninja
 	dh_auto_build -- -f proto_text.ninja
 	dh_auto_build -- -f libtensorflow_framework.ninja
+	ln -sr libtensorflow_framework.so libtensorflow_framework.so.1.10  # temporary dirty fix
 	dh_auto_build -- -f ccop.ninja
 	dh_auto_build -- -f libtensorflow.ninja
 
