@@ -39,10 +39,10 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.newline()
     cursor.comment('-- compiler flags --')
     cursor.newline()
-    cursor.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + os.getenv('CPPFLAGS'))
+    cursor.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + str(os.getenv('CPPFLAGS', '')))
     cursor.variable('CXXFLAGS', '-std=c++14 -O2 -fPIC -gsplit-dwarf'
-        + '-fstack-protector-strong -w ' + os.getenv('CXXFLAGS'))
-    cursor.variable('LDFLAGS', '-Wl,-z,relro ' + os.getenv('LDFLAGS'))
+        + ' -fstack-protector-strong -w ' + str(os.getenv('CXXFLAGS', '')))
+    cursor.variable('LDFLAGS', '-Wl,-z,relro ' + str(os.getenv('LDFLAGS', '')))
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen/ -I./third_party/eigen3/'
             + ' -I/usr/include/gemmlowp -I/usr/include/jsoncpp -I/usr/include/llvm-c-7'
             + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/')
