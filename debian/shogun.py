@@ -31,34 +31,6 @@ def red(s: str) -> str:
     return f'\033[1;31m{s}\033[0;m'
 
 
-def filteroutExternal(sourcelist: List[str]) -> List[str]:
-    '''
-    Filter out external dependencies from bazel dependency dump
-    '''
-    external = set()
-    ret = []
-    for src in sourcelist:
-        x = re.match('^@(\w*).*', src)
-        if x is None:
-            ret.append(src)
-        else:
-            external.update(x.groups())
-    print(cyan('Required Depends:'), external)
-    return ret
-
-
-def mangleBazel(sourcelist: List[str]) -> List[str]:
-    '''
-    mangling source file path
-    '''
-    ret = []
-    for x in sourcelist:
-        x = re.sub('^//', '', x)
-        x = re.sub(':', '/', x)
-        ret.append(x)
-    return ret
-
-
 def eGrep(pat: str, sourcelist: List[str]) -> (List[str], List[str]):
     '''
     Just like grep -E
@@ -70,6 +42,27 @@ def eGrep(pat: str, sourcelist: List[str]) -> (List[str], List[str]):
         else:
             unmatch.append(item)
     return match, unmatch
+
+
+def bazelPreprocess(srclist: List[str]) -> List[str]:
+    '''
+    1. Filter out external dependencies from bazel dependency dump.
+    2. Mangle file path.
+    3. Report the depending libraries.
+    '''
+    deplist, retlist = set([]), []
+    for src in srclist:
+        if re.match('^@(\w*).*', src):
+            # It's an external dependency
+            deplist.update(re.match('^@(\w*).*', src).groups())
+        elif re.match('^..third_party.*', src):
+            pass # ignore
+        else:
+            # it's an tensorflow source
+            retlist.append(re.sub('^//', '', re.sub(':', '/', src)))
+    print(cyan('Required Depends:'), list(deplist))
+    print('Globbed', cyan(f'{len(srclist)}'), 'source files')
+    return retlist
 
 
 def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
@@ -100,11 +93,12 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
     cursor.newline()
     cursor.comment('-- compiling rules-- ')
-    cursor.rule('PROTOC', f'protoc $in --cpp_out .')
     cursor.rule('rule_PROTOC', f'$elf_PROTOC $in --cpp_out . $SHOGUN_EXTRA')
-    cursor.rule('rule_PROTO_TEXT', f'$elf_PROTO_TEXT ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
+    cursor.rule('rule_PROTO_TEXT', f'$elf_PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_ExTRA -c $in -o $out')
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
+    cursor.newline()
+    cursor.rule('PROTOC', f'protoc $in --cpp_out .')
     cursor.rule('PROTOC_GRPC', f'protoc --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
     cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('GEN_VERSION_INFO', f'bash ./tensorflow/tools/git/gen_git_source.sh $out')
@@ -248,7 +242,7 @@ def shogunProtoText(argv):
     This binary file is for one-time use.
 
     Depends: shogunAllProto
-    Input: corresponding bazel dump
+    Input: bazelDump, cxx source
     Output: proto_text
     '''
     ag = argparse.ArgumentParser()
@@ -258,10 +252,8 @@ def shogunProtoText(argv):
     ag = ag.parse_args(argv)
     print(red(f'{ag}'))
 
-    srclist = [l.strip() for l in open(ag.i, 'r').readlines()]
-    genlist = [l.strip() for l in open(ag.g, 'r').readlines()]
-    srclist, genlist = filteroutExternal(srclist), filteroutExternal(genlist)
-    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
+    srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
+    genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
 
     # (1) Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
@@ -298,69 +290,71 @@ def shogunProtoText(argv):
     cursor.close()
 
 
-def shogunTFFrame(argv):
+def shogunTFLib_framework(argv):
     '''
     Build libtensorflow_framework.so
+
+    Depends: proto_text
+    Input: bazelDump, cxx source
+    Output: libtensorflow_framework.so
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', help='list of source files', type=str, required=True)
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow_framework.ninja')
-    ag.add_argument('-B', help='build directory', type=str, default='.')
     ag = ag.parse_args(argv)
+    print(red(f'{ag}'))
 
-    srclist = filteroutExternal([l.strip() for l in open(ag.i, 'r').readlines()])
-    genlist = filteroutExternal([l.strip() for l in open(ag.g, 'r').readlines()])
-    srclist, genlist = mangleBazel(srclist), mangleBazel(genlist)
+    srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
+    genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
 
-    # Instantiate ninja writer
+    # (1) Initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
 
-    # generate .pb.cc and .pb.h
-    srcproto, srclist = eGrep('.*.proto$', srclist)
-    genpbh, genlist = eGrep('.*.pb.h', genlist)
-    genpbcc, genlist = eGrep('.*.pb.cc', genlist)
-    protolist, pbcclist, pbhlist = ninjaProto(cursor, genpbh + genpbcc)
-    proto_diff = set(srcproto).difference(set(protolist))
-    if len(proto_diff) > 0:
-        print(yellow('Warning: resulting proto lists different!'), proto_diff)
+    # (2) deal with generated files
+    # (2.1) .pb.h and .pb.cc are already generated by shogunAllProto
+    gen_pbh, genlist = eGrep('.*.pb.h', genlist)
+    gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
 
-    # generate .pb_text.cc .pb_text.h .pb_test-impl.h
-    genpbth, genlist = eGrep('.*.pb_text.h', genlist)
-    genpbtimplh, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    genpbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
-    pbtprotolist, pbtcclist, pbthlist = ninjaProtoText(cursor,
-            genpbth + genpbtimplh + genpbtcc)
-    pbtproto_diff = set(srcproto).difference(set(pbtprotolist))
-    if len(proto_diff) > 0:
-        print(yellow('Warning: resulting proto lists different!'), proto_diff)
+    # (2.2) .pb_text.*
+    pbtlist = [x for x in genlist if any(x.endswith(y) for y in ('.pb_text.h', '.pb_text.cc', '.pb_text-impl.h'))]
+    pbtlist = [x.replace('.pb_text.h', '.proto').replace('.pb_text.cc', '.proto').replace('.pb_text-impl.h', '.proto') for x in pbtlist]
+    gen_pbth, genlist = eGrep('.*.pb_text.h', genlist)
+    gen_pbtih, genlist = eGrep('.*.pb_text-impl.h', genlist)
+    gen_pbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
+    for pbt in list(set(pbtlist)):
+        cursor.build([
+            pbt.replace('.proto', '.pb_text.h'),
+            pbt.replace('.proto', '.pb_text.cc'),
+            pbt.replace('.proto', '.pb_text-impl.h')
+            ], 'rule_PROTO_TEXT', pbt)
+    if genlist:
+        print(yellow('Remainders:'), genlist)
+        assert(len(genlist) == 1)
 
-    # generate version info, the last bit in list of generated files
-    print(yellow('Unprocessed generated files:'), genlist)
-    assert(len(genlist) == 1)
-    srclist.extend(cursor.build(genlist[0], 'GEN_VERSION_INFO'))
-
-    # ignore .h files and third_party, and windows source
-    _, srclist = eGrep('.*.h$', srclist)
+    # (3) deal with source files
+    # (3.1) filter-out files from list
+    _, srclist = eGrep('.*.proto$', srclist) # done in (2)
+    src_hdrs, srclist = eGrep('.*.h$', srclist)
     _, srclist = eGrep('^third_party', srclist)
-    _, srclist = eGrep('.*windows/env_time.cc$', srclist)
-    _, srclist = eGrep('.*platform/windows.*', srclist)
+    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
 
-    # compile .cc source
-    cclist, srclist = eGrep('.*.cc', srclist)
-    tf_framework_objs = ninjaCXXOBJ(cursor, cclist + pbcclist + pbtcclist)
+    # (3.2) compile .cc source
+    src_cc, srclist = eGrep('.*.cc', srclist)
+    objlist = []
+    for cc in src_cc + gen_pbtcc + genlist:
+        obj = cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc)[0]
+        objlist.append(obj)
 
-    # link the final executable
-    cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=tf_framework_objs,
+    # (4) link the final executable
+    cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
             + ' -lpthread'})
-    # XXX: jemalloc
+    # FIXME: jemalloc
 
-    ## fflush
-    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
-    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
+    # done
     cursor.close()
 
 
@@ -558,16 +552,8 @@ if __name__ == '__main__':
         exit(1)
 
     # Targets sorted in dependency order.
-    if sys.argv[1] == 'AllProto':
-        shogunAllProto(sys.argv[2:])
-    elif sys.argv[1] == 'ProtoText':
-        shogunProtoText(sys.argv[2:])
-    elif sys.argv[1] == 'AllProtoText':
-        shogunAllProtoText(sys.argv[2:])
-    elif sys.argv[1] == 'TFCoreProto':
-        shogunTFCoreProto(sys.argv[2:])
-    elif sys.argv[1] == 'TFFrame':
-        shogunTFFrame(sys.argv[2:])
+    if sys.argv[1] in ('AllProto', 'ProtoText', 'TFLib_framework'):
+        eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
     elif sys.argv[1] == 'TFLibAndroid':
         shogunTFLibAndroid(sys.argv[2:])
     elif sys.argv[1] == 'CCOP':
