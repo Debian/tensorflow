@@ -118,6 +118,15 @@ def eGrep(pat: str, sourcelist: List[str]) -> (List[str], List[str]):
     return match, unmatch
 
 
+def getDpkgArchitecture(query: str) -> str:
+    '''
+    dpkg-architecture -qQUERY
+    '''
+    result = subprocess.Popen(['dpkg-architecture', f'-q{query}'],
+             stdout=subprocess.PIPE).communicate()[0].decode().strip()
+    return result
+
+
 def bazelPreprocess(srclist: List[str]) -> List[str]:
     '''
     1. Filter out external dependencies from bazel dependency dump.
