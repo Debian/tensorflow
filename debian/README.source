@@ -42,15 +42,15 @@ Things remain to be done
 
 Misc.
 
-- [ ] upload to experimental.
-
 C and C++ interface.
 
+- [ ] Does it FTBFS on amd64 and ppc64el?
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
   - [ ] find out the way to build tests (googletest).
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] findout how to build and run the tests.
+- [ ] upload to experimental.
 
 Python interface.
 
