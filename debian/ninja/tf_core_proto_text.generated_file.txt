@@ -113,7 +113,6 @@
 //tensorflow/core:lib/core/error_codes.pb.cc
 //tensorflow/core:lib/core/error_codes.pb.h
 //tensorflow/core:lib/core/error_codes.pb_text-impl.h
-//tensorflow/core:lib/core/error_codes.pb_text.cc
 //tensorflow/core:lib/core/error_codes.pb_text.h
 //tensorflow/core:protobuf/checkpointable_object_graph.pb.cc
 //tensorflow/core:protobuf/checkpointable_object_graph.pb.h
