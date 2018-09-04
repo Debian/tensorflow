@@ -1,2 +1,3 @@
 usr/include/tensorflow
 usr/lib/*/libtensorflow.so
+usr/lib/*/libtensorflow_framework.so

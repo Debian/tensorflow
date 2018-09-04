@@ -6,6 +6,8 @@ set -e
 
 dryrun=0
 destdir="debian/tmp/"
+version="1.10.1"
+soversion="1.10"
 
 # installation helper
 myinstall () {
@@ -29,7 +31,18 @@ for hdr in $(cat libtensorflow.hdrs); do
 	myinstall -m0644 $hdr $destdir/usr/include/$hdr
 done
 
-# install shared object
-for so in $(ls libtensorflow.so*); do
-	myinstall -m0644 $so $destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so
+# install libtensorflow_framework
+for so in $(ls libtensorflow_framework.so); do
+	fpath="$destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so"
+	myinstall -m0644 $so $fpath.version
+	ln -sr $fpath.version $fpath.soversion
+	ln -sr $fpath.version $fpath
+done
+
+# install libtensorflow
+for so in $(ls libtensorflow.so); do
+	fpath="$destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so"
+	myinstall -m0644 $so $fpath.version
+	ln -sr $fpath.version $fpath.soversion
+	ln -sr $fpath.version $fpath
 done
