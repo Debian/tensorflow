@@ -510,6 +510,8 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*.pbtxt$', srclist) # no need to process
     _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke this.
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
+    _, srclist = eGrep('.*_main.cc$', srclist) # don'e include any main function.
+    _, srclist = eGrep('.*cc_op_gen_main.cc$', srclist) # don't include main function.
 
     # cc_op_gen
     ccoplist, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
