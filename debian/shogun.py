@@ -409,7 +409,7 @@ def shogunCCOP(argv):
         ccopcc   = 'tensorflow/cc/ops/'   + opname + '.cc'
 
         # build corresponding elf executable
-        cursor.build(f'{opname}_gen_cc', 'rule_CXX_EXEC', inputs=coreopcc,
+        cursor.build(f'{opname}_gen_cc', 'rule_CXX_EXEC', inputs=[coreopcc] + main_obj,
             variables={'SHOGUN_EXTRA': '-I. -L. -ltensorflow_framework'})
 
         # generate file
