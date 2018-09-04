@@ -464,7 +464,13 @@ def shogunTFLib(argv):
                 + ' -ldouble-conversion -lz -lpng -lgif -lhighwayhash'
                 + ' -ljpeg -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
                 + ' -llmdb -lsnappy'})
-    # FIXME: jemalloc, mkl-dnn, grpc, xsmm
+    # FIXME: mkl-dnn, grpc, xsmm
+    # XXX: FTBFS with jemalloc
+
+    # (5) write down the related header files
+    allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
+    with open(ag.H, 'w') as f:
+        f.writelines([x + '\n' for x in sorted(allHdrs)])
 
     # done
     print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
