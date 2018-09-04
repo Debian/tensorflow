@@ -1,2 +1,3 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
+stub-version-info-cc.patch
