@@ -121,87 +121,87 @@ def bazelPreprocess(srclist: List[str]) -> List[str]:
     return retlist
 
 
-def ninjaProto(cur, protolist: List[str]) -> List[str]:
-    '''
-    write ninja rules for the protofiles. cur is ninja writer
-    '''
-    protos, cclist, hdrlist = [], [], []
-    for proto in protolist:
-        # proto is a protobuf-related file.
-        if proto.endswith('.proto'):
-            protos.append(proto)
-            cclist.append(re.sub('.proto$', '.pb.cc', proto))
-            hdrlist.append(re.sub('.proto$', '.pb.h', proto))
-        elif proto.endswith('.pb.cc'):
-            protos.append(re.sub('.pb.cc$', '.proto', proto))
-            cclist.append(proto)
-            hdrlist.append(re.sub('.pb.cc$', '.pb.h', proto))
-        elif proto.endswith('.pb.h'):
-            protos.append(re.sub('.pb.h$', '.proto', proto))
-            cclist.append(re.sub('.pb.h$', '.pb.cc', proto))
-            hdrlist.append(proto)
-        else:
-            raise SyntaxError(f'what is {proto}?')
-    for p in list(set(protos)):
-        output = [re.sub('.proto$', '.pb.cc', p),
-                re.sub('.proto$', '.pb.h', p)]
-        cur.build(output, 'PROTOC', inputs=p)
-    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
-
-
-def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
-    '''
-    write ninja rules for to proto_text files. cur is ninja writer
-    '''
-    protos, cclist, hdrlist = [], [], []
-    for proto in protolist:
-        # proto is a proto_text-related file
-        if proto.endswith('.proto'):
-            protos.append(proto)
-            cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
-            hdrlist.append(re.sub('.proto$', '.pb_text.h', proto))
-            hdrlist.append(re.sub('.proto$', '.pb_text-impl.h', proto))
-        elif proto.endswith('.pb_text.cc'):
-            protos.append(re.sub('.pb_text.cc$', '.proto', proto))
-            cclist.append(proto)
-            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text.h', proto))
-            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text-impl.h', proto))
-        elif proto.endswith('.pb_text.h'):
-            protos.append(re.sub('.pb_text.h$', '.proto', proto))
-            cclist.append(re.sub('.pb_text.h$', '.pb_text.cc', proto))
-            hdrlist.append(proto)
-            hdrlist.append(re.sub('.pb_text.h$', '.pb_text-impl.h', proto))
-        elif proto.endswith('.pb_text-impl.h'):
-            protos.append(re.sub('.pb_text-impl.h$', '.proto', proto))
-            cclist.append(re.sub('.pb_text-impl.h$', '.pb_text.cc', proto))
-            hdrlist.append(re.sub('.pb_text-impl.h$', '.pb_text.h', proto))
-            hdrlist.append(proto)
-        else:
-            raise SyntaxError(f'what is {proto}?')
-    for p in list(set(protos)):
-        output = [re.sub('.proto$', '.pb_text.cc', p),
-                re.sub('.proto$', '.pb_text.h', p),
-                re.sub('.proto$', '.pb_text-impl.h', p)]
-        cur.build(output, 'PROTO_TEXT', inputs=p)
-    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
-
-
-def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
-    '''
-    write ninja rules for building .cc files into object files
-    '''
-    objs = []
-    exception_eigen_avoid_std_array = [
-        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d',
-        'adjust_contrast_op' ]
-    for cc in cclist:
-        output = re.sub('.cc$', '.o', cc)
-        if any(x in cc for x in exception_eigen_avoid_std_array):
-            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc,
-                variables={'CXX_OBJ_EXTRA_DEFS': '-DEIGEN_AVOID_STL_ARRAY'})[0])
-        else:
-            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc)[0])
-    return objs
+#def ninjaProto(cur, protolist: List[str]) -> List[str]:
+#    '''
+#    write ninja rules for the protofiles. cur is ninja writer
+#    '''
+#    protos, cclist, hdrlist = [], [], []
+#    for proto in protolist:
+#        # proto is a protobuf-related file.
+#        if proto.endswith('.proto'):
+#            protos.append(proto)
+#            cclist.append(re.sub('.proto$', '.pb.cc', proto))
+#            hdrlist.append(re.sub('.proto$', '.pb.h', proto))
+#        elif proto.endswith('.pb.cc'):
+#            protos.append(re.sub('.pb.cc$', '.proto', proto))
+#            cclist.append(proto)
+#            hdrlist.append(re.sub('.pb.cc$', '.pb.h', proto))
+#        elif proto.endswith('.pb.h'):
+#            protos.append(re.sub('.pb.h$', '.proto', proto))
+#            cclist.append(re.sub('.pb.h$', '.pb.cc', proto))
+#            hdrlist.append(proto)
+#        else:
+#            raise SyntaxError(f'what is {proto}?')
+#    for p in list(set(protos)):
+#        output = [re.sub('.proto$', '.pb.cc', p),
+#                re.sub('.proto$', '.pb.h', p)]
+#        cur.build(output, 'PROTOC', inputs=p)
+#    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
+#
+#
+#def ninjaProtoText(cur, protolist: List[str]) -> List[str]:
+#    '''
+#    write ninja rules for to proto_text files. cur is ninja writer
+#    '''
+#    protos, cclist, hdrlist = [], [], []
+#    for proto in protolist:
+#        # proto is a proto_text-related file
+#        if proto.endswith('.proto'):
+#            protos.append(proto)
+#            cclist.append(re.sub('.proto$', '.pb_text.cc', proto))
+#            hdrlist.append(re.sub('.proto$', '.pb_text.h', proto))
+#            hdrlist.append(re.sub('.proto$', '.pb_text-impl.h', proto))
+#        elif proto.endswith('.pb_text.cc'):
+#            protos.append(re.sub('.pb_text.cc$', '.proto', proto))
+#            cclist.append(proto)
+#            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text.h', proto))
+#            hdrlist.append(re.sub('.pb_text.cc$', '.pb_text-impl.h', proto))
+#        elif proto.endswith('.pb_text.h'):
+#            protos.append(re.sub('.pb_text.h$', '.proto', proto))
+#            cclist.append(re.sub('.pb_text.h$', '.pb_text.cc', proto))
+#            hdrlist.append(proto)
+#            hdrlist.append(re.sub('.pb_text.h$', '.pb_text-impl.h', proto))
+#        elif proto.endswith('.pb_text-impl.h'):
+#            protos.append(re.sub('.pb_text-impl.h$', '.proto', proto))
+#            cclist.append(re.sub('.pb_text-impl.h$', '.pb_text.cc', proto))
+#            hdrlist.append(re.sub('.pb_text-impl.h$', '.pb_text.h', proto))
+#            hdrlist.append(proto)
+#        else:
+#            raise SyntaxError(f'what is {proto}?')
+#    for p in list(set(protos)):
+#        output = [re.sub('.proto$', '.pb_text.cc', p),
+#                re.sub('.proto$', '.pb_text.h', p),
+#                re.sub('.proto$', '.pb_text-impl.h', p)]
+#        cur.build(output, 'PROTO_TEXT', inputs=p)
+#    return list(set(protos)), list(set(cclist)), list(set(hdrlist))
+#
+#
+#def ninjaCXXOBJ(cur, cclist: List[str]) -> List[str]:
+#    '''
+#    write ninja rules for building .cc files into object files
+#    '''
+#    objs = []
+#    exception_eigen_avoid_std_array = [
+#        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d',
+#        'adjust_contrast_op' ]
+#    for cc in cclist:
+#        output = re.sub('.cc$', '.o', cc)
+#        if any(x in cc for x in exception_eigen_avoid_std_array):
+#            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc,
+#                variables={'CXX_OBJ_EXTRA_DEFS': '-DEIGEN_AVOID_STL_ARRAY'})[0])
+#        else:
+#            objs.append(cur.build(output, 'CXX_OBJ', inputs=cc)[0])
+#    return objs
 
 
 def shogunAllProto(argv):
@@ -345,15 +345,17 @@ def shogunTFLib_framework(argv):
     src_cc, srclist = eGrep('.*.cc', srclist)
     objlist = []
     for cc in src_cc + gen_pbcc + gen_pbtcc + genlist:
-        obj = cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc)[0]
+        variables = {}
+        if any(x in cc for x in ('posix/port.cc',)):
+            variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
+        obj = cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
 
     # (4) link the final executable
     cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
-            + ' -lpthread'})
-    # FIXME: build with jemalloc support
+            + ' -lpthread -ljemalloc'})
 
     # done
     cursor.close()

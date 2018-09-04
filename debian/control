@@ -19,6 +19,7 @@ Build-Depends:
  libgrpc++-dev,
  libgtest-dev,
  libhighwayhash-dev [amd64 ppc64el],
+ libjemalloc-dev,
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
