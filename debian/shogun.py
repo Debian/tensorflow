@@ -401,6 +401,8 @@ def shogunTFLib(argv):
         _, genlist = eGrep('.*/core/debug/.*', genlist)
         _, srclist = eGrep('.*/compiler/.*', srclist)
         _, genlist = eGrep('.*/compiler/.*', genlist)
+        _, srclist = eGrep('.*debug_ops.*', srclist)
+        _, genlist = eGrep('.*debug_ops.*', genlist)
 
     # (1) Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
