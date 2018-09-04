@@ -42,21 +42,15 @@ Things remain to be done
 
 Misc.
 
-- [ ] remaining lintian warnings and errors.
-- [ ] traverse the 16000+ files in the source tree and complete d/copyright.  ummmmmmmmmm.............
 - [ ] upload to experimental.
 
 C and C++ interface.
 
-- [ ] build tests files (googletest) and run the tests.
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
-  - [ ] working on amd64?
-  - [ ] working on ppc64el?
+  - [ ] find out the way to build tests (googletest).
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
-- [ ] build libtensorflow on top of libtensorflow_framework
 - [ ] findout how to build and run the tests.
-- [ ] add soname and soversion to the shared obj
 
 Python interface.
 
@@ -67,15 +61,16 @@ Python interface.
 - [ ] write autopkgtest with mini python programs.
 
 
-Not Decided Yet
----------------
+Postponed
+---------
 
 - [ ] upload to unstable.
-      Wait for protobuf, mkl-dnn, (and possibly grpc) to enter unstable.
+      Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
 - [ ] Compile both AVX+ version and Generic version. Automatically
       choose the working one during postinst according to the machine's
       cpu capability.
 - [ ] compile and provide documentation.
+- [ ] build libtensorflow on top of libtensorflow_framework?
 
 Will Never Get Fixed
 --------------------

@@ -59,11 +59,12 @@ Copyright: 2006-2013 Benoit Jacob <jacob@math.jussieu.fr>
            2008 Konstantinos Margaritis <markos@codex.gr>
 License:   MPL-2.0
 Comment:   Exceptions copied from /usr/share/doc/libeigen3-dev/copyright
+ .
  Files: unsupported/test/mpreal/* unsupported/Eigen/src/IterativeSolvers/* Eigen/src/SparseCholesky/SimplicialCholesky.h Eigen/src/OrderingMethods/Amd.h
  Copyright: 2002-2007 Yves Renard
             2008-2009 Gael Guennebaud <g.gael@free.fr>
  License: LGPL-2.1+ or MPL-2.0
- 
+ .
  Files: Eigen/src/Cholesky/LLT_LAPACKE.h Eigen/src/QR/HouseholderQR_LAPACKE.h Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h Eigen/src/LU/arch/Inverse_SSE.h Eigen/src/LU/PartialPivLU_LAPACKE.h Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h Eigen/src/Eigenvalues/RealSchur_LAPACKE.h Eigen/src/PardisoSupport/PardisoSupport.h Eigen/src/misc/lapacke.h Eigen/src/SVD/JacobiSVD_LAPACKE.h Eigen/src/Core/Assign_MKL.h Eigen/src/Core/products/GeneralMatrixMatrixTriangular_BLAS.h Eigen/src/Core/products/TriangularMatrixMatrix_BLAS.h Eigen/src/Core/products/TriangularMatrixVector_BLAS.h Eigen/src/Core/products/SelfadjointMatrixVector_BLAS.h Eigen/src/Core/products/TriangularSolverMatrix_BLAS.h Eigen/src/Core/products/GeneralMatrixVector_BLAS.h Eigen/src/Core/products/GeneralMatrixMatrix_BLAS.h Eigen/src/Core/products/SelfadjointMatrixMatrix_BLAS.h Eigen/src/Core/util/MKL_support.h doc/UsingBlasLapackBackends.dox doc/UsingIntelMKL.dox
  Copyright: 2011 Intel Corporation
  License: BSD-3-Clause
