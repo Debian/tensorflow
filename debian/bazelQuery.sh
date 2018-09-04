@@ -56,6 +56,7 @@ bazel query 'kind("generated file", deps(//tensorflow/core:proto_text))' \
 bazel query 'kind("source file", deps(//tensorflow:libtensorflow_framework.so))' \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| grep -E -v 'core.kernels' | grep -E -v 'core.ops' \
+	| grep -E -v 'proto_text.gen_proto_text_functions' \
 	| sort | uniq \
 	> debian/bazelDumps/tf_libtensorflow_framework_so.source_file.txt
 bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so))' \
@@ -64,14 +65,14 @@ bazel query 'kind("generated file", deps(//tensorflow:libtensorflow_framework.so
 	> debian/bazelDumps/tf_libtensorflow_framework_so.generated_file.txt
 
 #
-bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-	| sort | uniq \
-	> debian/bazelDumps/tf_core_android_tflib.source_file.txt
-bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-	| sort | uniq \
-	> debian/bazelDumps/tf_core_android_tflib.generated_file.txt
+#bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
+#	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+#	| sort | uniq \
+#	> debian/bazelDumps/tf_core_android_tflib.source_file.txt
+#bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
+#	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+#	| sort | uniq \
+#	> debian/bazelDumps/tf_core_android_tflib.generated_file.txt
 
 #
 bazel query 'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \

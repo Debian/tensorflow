@@ -774,9 +774,6 @@
 //tensorflow/stream_executor:timer.h
 //tensorflow/stream_executor:trace_listener.h
 //tensorflow/tools/git:gen_git_source.py
-//tensorflow/tools/proto_text:gen_proto_text_functions.cc
-//tensorflow/tools/proto_text:gen_proto_text_functions_lib.cc
-//tensorflow/tools/proto_text:gen_proto_text_functions_lib.h
 //tensorflow/tools/proto_text:placeholder.txt
 //tensorflow:tf_framework_version_script.lds
 //third_party/eigen3:Eigen/Cholesky
