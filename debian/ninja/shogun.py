@@ -408,8 +408,8 @@ def shogunTFLibAndroid(argv):
                 + ' -ldouble-conversion'})
 
     ## fflush
-    print(yellow('Unprocessed src files:'), json.dump(srclist, indent=4))
-    print(yellow('Unprocessed gen files:'), json.dump(genlist, indent=4))
+    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
+    print(yellow('Unprocessed gen files:'), json.dumps(genlist, indent=4))
     cursor.close()
 
 
