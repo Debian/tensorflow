@@ -54,17 +54,15 @@ C and C++ interface.
   - [ ] working on amd64?
   - [ ] working on ppc64el?
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
+- [ ] build libtensorflow on top of libtensorflow_framework
 
 Python interface.
 
+- [ ] build _pywrap_tensorflow_internal.so on top of libtensorflow and libtensorflow_framework
 - [ ] do we have all the required python dependencies?
-- [ ] build pywrap_tensorflow_internal.so
 - [ ] figure out how to generate python API
-- [ ] install python files
 - [ ] is the resulting python package correct and working?
-- [ ] write autopkgtest with some mini python programs.
-- [ ] make sure nothing from contrib is built.
-- [ ] maintain cmake build.
+- [ ] write autopkgtest with mini python programs.
 
 Not Decided Yet
 ---------------
