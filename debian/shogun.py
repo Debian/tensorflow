@@ -51,6 +51,9 @@ from pprint import pprint
 from ninja_syntax import Writer
 
 
+tf_soversion = '1.10'
+
+
 def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     '''
     Writes a common header to the ninja file. ag is parsed arguments.
@@ -85,6 +88,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('rule_PROTO_TEXT', f'$elf_PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_EXTRA -c $in -o $out')
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
+    cursor.rule('rule_CXX_SHLIB', f'$CXX -shared -fPIC $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api')
     cursor.rule('COPY', f'cp $in $out')
     cursor.newline()
@@ -94,7 +98,6 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('GEN_VERSION_INFO', f'bash ./tensorflow/tools/git/gen_git_source.sh $out')
     cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $INCLUDES -c $in -o $out $CXX_OBJ_EXTRA_DEFS')
     cursor.rule('CXX_EXEC', f'g++ $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
-    cursor.rule('CXX_SHLIB', f'g++ -shared -fPIC $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
     cursor.rule('STATIC', f'ar rcs $out $in')
     cursor.comment('CXX_CC_OP_EXEC: $in should be e.g. tensorflow/core/ops/array_ops.cc')
     cursor.rule('CXX_CC_OP_EXEC', '$CXX $CPPFLAGS $CXXFLAGS'
@@ -302,10 +305,11 @@ def shogunTFLib_framework(argv):
         objlist.append(obj)
 
     # (4) link the final executable
-    cursor.build('libtensorflow_framework.so', 'CXX_SHLIB', inputs=objlist,
+    cursor.build('libtensorflow_framework.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
-            + ' -lpthread'})
+            + ' -lpthread',
+            'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_framework.so.{tf_soversion}'})
     # XXX: -ljemalloc FTBFS
 
     # done
@@ -459,11 +463,12 @@ def shogunTFLib(argv):
         objlist.append(obj)
 
     # (4) link the final shared object
-    cursor.build('libtensorflow.so', 'CXX_SHLIB', inputs=objlist,
+    cursor.build('libtensorflow.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
                 + ' -ldouble-conversion -lz -lpng -lgif -lhighwayhash'
                 + ' -ljpeg -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
-                + ' -llmdb -lsnappy'})
+                + ' -llmdb -lsnappy',
+                'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'})
     # FIXME: mkl-dnn, grpc, xsmm
     # XXX: FTBFS with jemalloc
 
