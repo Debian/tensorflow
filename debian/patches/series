@@ -1,3 +1,2 @@
+bazel.patch
 fix-include-path-jsoncpp.patch
-#disable-grpc.patch
-#tf-cc-no-user-op.patch

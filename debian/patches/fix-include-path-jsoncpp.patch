@@ -1,3 +1,6 @@
+Description: mangle include path for jsoncpp
+Author: Mo Zhou
+Forward: no need
 diff --git a/tensorflow/contrib/cloud/kernels/gcs_config_ops.cc b/tensorflow/contrib/cloud/kernels/gcs_config_ops.cc
 index 648a219f..19deac08 100644
 --- a/tensorflow/contrib/cloud/kernels/gcs_config_ops.cc
