@@ -23,11 +23,9 @@ $SHOGUN TFLib_framework \
 	-i $DATADIR/tf_libtensorflow_framework_so.source_file.txt \
 	-g $DATADIR/tf_libtensorflow_framework_so.generated_file.txt
 
-#$SHOGUN TFLibAndroid -i $DATADIR/tf_core_android_tflib.source_file.txt \
-#	-g $DATADIR/tf_core_android_tflib.generated_file.txt
-#
-#$SHOGUN CCOP -i $DATADIR/tf_libtensorflow_so.source_file.txt \
-#	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
-#
+$SHOGUN CCOP \
+	-i $DATADIR/tf_libtensorflow_so.source_file.txt \
+	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
+
 #$SHOGUN TFLib -i $DATADIR/tf_libtensorflow_so.source_file.txt \
 #	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
