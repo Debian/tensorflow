@@ -51,6 +51,7 @@ from pprint import pprint
 from ninja_syntax import Writer
 
 
+# FIXME: don't forget to bump soversion when upstream version changes!
 tf_soversion = '1.10'
 
 
@@ -64,11 +65,9 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.comment('-- compiling tools --')
     cursor.newline()
     cursor.variable('CXX', 'g++')
-    cursor.variable('elf_PROTOC', '/usr/bin/protoc')
-    cursor.variable('elf_PROTO_TEXT', f'./proto_text')
-    cursor.variable('PROTO_TEXT_ELF', f'./proto_text')
-    cursor.comment('SHOGUN_EXTRA is used for adding specific flags for a specific target')
-    cursor.variable('SHOGUN_EXTRA', '')
+    cursor.variable('PROTOC', '/usr/bin/protoc')
+    cursor.variable('PROTO_TEXT', f'./proto_text')
+    cursor.variable('SHOGUN_EXTRA', '') # used for adding specific flags for a specific target
     cursor.newline()
     cursor.comment('-- compiler flags --')
     cursor.newline()
@@ -83,28 +82,14 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
     cursor.newline()
     cursor.comment('-- compiling rules-- ')
-    cursor.rule('rule_PROTOC', f'$elf_PROTOC $in --cpp_out . $SHOGUN_EXTRA')
-    cursor.rule('rule_PROTOC_GRPC', f'$elf_PROTOC --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
-    cursor.rule('rule_PROTO_TEXT', f'$elf_PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
+    cursor.rule('rule_PROTOC', f'$PROTOC $in --cpp_out . $SHOGUN_EXTRA')
+    cursor.rule('rule_PROTOC_GRPC', f'$PROTOC --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
+    cursor.rule('rule_PROTO_TEXT', f'$PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_EXTRA -c $in -o $out')
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CXX_SHLIB', f'$CXX -shared -fPIC $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api')
     cursor.rule('COPY', f'cp $in $out')
-    cursor.newline()
-    cursor.comment('old rules')
-    cursor.rule('PROTOC', f'protoc $in --cpp_out .')
-    cursor.rule('PROTO_TEXT', f'$PROTO_TEXT_ELF ./tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
-    cursor.rule('GEN_VERSION_INFO', f'bash ./tensorflow/tools/git/gen_git_source.sh $out')
-    cursor.rule('CXX_OBJ', f'g++ $CXXFLAGS $INCLUDES -c $in -o $out $CXX_OBJ_EXTRA_DEFS')
-    cursor.rule('CXX_EXEC', f'g++ $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $in -o $out')
-    cursor.rule('STATIC', f'ar rcs $out $in')
-    cursor.comment('CXX_CC_OP_EXEC: $in should be e.g. tensorflow/core/ops/array_ops.cc')
-    cursor.rule('CXX_CC_OP_EXEC', '$CXX $CPPFLAGS $CXXFLAGS'
-            + ' tensorflow/core/framework/op_gen_lib.cc'
-            + ' tensorflow/cc/framework/cc_op_gen.cc'
-            + ' tensorflow/cc/framework/cc_op_gen_main.cc'
-            + ' $in $CC_OP_INC_AND_LIB -o $out')
     cursor.newline()
     cursor.comment('-- end common ninja header --')
     cursor.newline()
