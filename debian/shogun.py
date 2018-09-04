@@ -390,8 +390,16 @@ def shogunTFLib(argv):
     ag = ag.parse_args(argv)
     print(red(f'{ag}'))
 
+    # (0) read bazel dump and process with hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+
+    if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
+        # the following stuff seems to be hard to compile
+        _, srclist = eGrep('.*/core/debug/.*', srclist)
+        _, genlist = eGrep('.*/core/debug/.*', genlist)
+        _, srclist = eGrep('.*/compiler/.*', srclist)
+        _, genlist = eGrep('.*/compiler/.*', genlist)
 
     # (1) Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
@@ -403,8 +411,10 @@ def shogunTFLib(argv):
     gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
 
     # XXX: temporary workaround for //tensorflow/core/debug:debug_service.grpc.pb.cc
-    cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
-        'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
+    if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
+        # This is amd64-only
+        cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
+            'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
 
     # (2.2) .pb_text.*
     pbtlist = [x for x in genlist if any(x.endswith(y) for y in ('.pb_text.h', '.pb_text.cc', '.pb_text-impl.h'))]
