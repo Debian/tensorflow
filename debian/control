@@ -48,10 +48,10 @@ Section: metapackages
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends},
- libtensorflow-bin (= ${binary:Version}),
-# python3-tensorflow (= ${binary:Version}), 
+ python3-tensorflow (= ${binary:Version})
+ | libtensorflow-dev (= ${binary:Version}),
 Recommends:
- libtensorflow-dev (= ${binary:Version}),
+ libtensorflow-bin (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
