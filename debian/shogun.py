@@ -160,7 +160,8 @@ def bazelPreprocess(srclist: List[str]) -> List[str]:
         else:
             # it's an tensorflow source
             retlist.append(re.sub('^//', '', re.sub(':', '/', src)))
-    print(cyan('Required Depends:'), list(deplist))
+    print(cyan('Required Depends:'))
+    pprint(deplist, indent=4, compact=True)
     print('Globbed', cyan(f'{len(srclist)}'), 'source files')
     return retlist
 
@@ -177,7 +178,8 @@ def shogunAllProto(argv):
     ag = argparse.ArgumentParser()
     ag.add_argument('-o', help='write ninja file', type=str, default='all_proto.ninja')
     ag = ag.parse_args(argv)
-    print(red(f'{ag}'))
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
 
     # (1) initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
@@ -211,7 +213,8 @@ def shogunProtoText(argv):
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='proto_text.ninja')
     ag = ag.parse_args(argv)
-    print(red(f'{ag}'))
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
 
     # (0) read bazel dump and apply hardcoded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
@@ -266,7 +269,8 @@ def shogunTFLib_framework(argv):
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow_framework.ninja')
     ag = ag.parse_args(argv)
-    print(red(f'{ag}'))
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
 
     # (0) read bazel dump and apply hardcoded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
@@ -346,7 +350,8 @@ def shogunCCOP(argv):
     ag.add_argument('-g', help='list of generated files', type=str, required=True)
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='ccop.ninja')
     ag = ag.parse_args(argv)
-    print(red(f'{ag}'))
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
 
     # (0) read bazel dump and apply hardcoded filters
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
@@ -412,7 +417,8 @@ def shogunTFLib(argv):
     ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow.ninja')
     ag.add_argument('-H', help='where to put the headers list', type=str, default='libtensorflow.hdrs')
     ag = ag.parse_args(argv)
-    print(red(f'{ag}'))
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
 
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
@@ -516,7 +522,8 @@ def shogunTFLib(argv):
         f.writelines([x + '\n' for x in sorted(allHdrs)])
 
     # done
-    print(yellow('Unprocessed src files:'), json.dumps(srclist, indent=4))
+    print(yellow('Remainders:'))
+    pprint(srclist, indent=4, compact=4)
     cursor.close()
 
 
@@ -525,14 +532,8 @@ if __name__ == '__main__':
     # A graceful argparse implementation with argparse subparser requries
     # much more boring code than I would like to write.
     try:
-        sys.argv[1]
-    except IndexError as e:
+        eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
+    except (IndexError, NameError) as e:
         print('you must specify one of the following a subcommand:')
         print([k.replace('shogun', '') for (k, v) in locals().items() if k.startswith('shogun')])
         exit(1)
-
-    # Targets sorted in dependency order.
-    if sys.argv[1] in ('AllProto', 'ProtoText', 'TFLib_framework', 'CCOP', 'TFLib'):
-        eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
-    else:
-        raise NotImplementedError(sys.argv[1:])
