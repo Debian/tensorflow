@@ -45,7 +45,7 @@ Build-Depends:
 # libxsmm-dev,
 # libmkldnn-dev [amd64],
 
-              
+
 Package: tensorflow
 Section: metapackages
 Architecture: any
@@ -55,7 +55,7 @@ Depends: ${misc:Depends},
  libtensorflow-dev (= ${binary:Version}),
 #Recommends:
 # libtensorflow-bin (= ${binary:Version}),
-Description: Computation using data flow graphs for scalable machine learning
+Description: Computation using data flow graphs for scalable machine learning (meta)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)
@@ -77,7 +77,7 @@ Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: Computation using data flow graphs for scalable machine learning
+Description: Computation using data flow graphs for scalable machine learning (frmwk)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)
@@ -92,7 +92,7 @@ Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: Computation using data flow graphs for scalable machine learning (libs)
+Description: Computation using data flow graphs for scalable machine learning (lib)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)

@@ -2,7 +2,7 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CFLAGS_MAINT_APPEND =
 export DEB_CXXFLAGS_MAINT_APPEND =
-# Warning: -Wl,--as-needed will cause FTBFS!!
+# XXX: Warning: -Wl,--as-needed will cause FTBFS!!
 export DEB_LDFLAGS_MAINT_APPEND =
 
 %:
@@ -27,4 +27,4 @@ override_dh_auto_install:
 	$(SHELL) debian/shogun-install.sh
 
 override_dh_auto_test:
-	true  #FIXME: temporary
+	true  #XXX: temporary

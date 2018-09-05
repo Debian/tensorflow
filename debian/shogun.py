@@ -123,6 +123,8 @@ def getDpkgArchitecture(query: str) -> str:
     '''
     dpkg-architecture -qQUERY
     '''
+    # XXX: I wish we don't need to use this function.
+    raise Exception("Please try to keep TF functionality the same across different architectures.")
     result = subprocess.Popen(['dpkg-architecture', f'-q{query}'],
              stdout=subprocess.PIPE).communicate()[0].decode().strip()
     return result
