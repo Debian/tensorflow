@@ -24,7 +24,7 @@ for hdr in $(cat libtensorflow.hdrs); do
 done
 
 # install libtensorflow_framework.so and libtensorflow.so
-for so in"libtensorflow_framework.so" "libtensorflow.so"; do
+for so in "libtensorflow_framework.so" "libtensorflow.so"; do
 	fpath="$destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so"
 	myinstall -m0644 $so $fpath
 	mv -v $fpath $fpath.$version
