@@ -262,6 +262,7 @@ def shogunTFLib_framework(argv):
     _, srclist = eGrep('.*core.ops.*', srclist)
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
+    _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
 
     # (1) Initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
@@ -409,7 +410,8 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
-    _, srclist = eGrep('.*cc_op_gen_main.cc$', srclist) # don't include main function.
+    _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
+    _, srclist = eGrep('.*gen_proto_text_functions.*', srclist)
 
     #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
     if False:
