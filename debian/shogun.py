@@ -403,6 +403,9 @@ def shogunTFLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+    srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
+    srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
+    srclist.append('debian/embedded/fft/fftsg.c')
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
     _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
@@ -410,8 +413,10 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
+    _, srclist = eGrep('.*test.*', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
     _, srclist = eGrep('.*gen_proto_text_functions.*', srclist)
+    srclist = list(set(srclist))
 
     #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
     if False:
