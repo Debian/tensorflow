@@ -47,6 +47,8 @@ C and C++ interface.
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
   - [ ] find out the way to build tests (googletest).
+- [ ] must we ship a copy of Eigen3?
+- [ ] install eigen headers from Eigen3 and third_party directory
 - [ ] upload to experimental.
 
 Python interface.

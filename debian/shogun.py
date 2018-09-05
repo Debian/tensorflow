@@ -260,6 +260,8 @@ def shogunTFLib_framework(argv):
     _, srclist = eGrep('.*proto_text.gen_proto_text_functions.*', srclist)
     _, srclist = eGrep('.*core.kernels.*', srclist)
     _, srclist = eGrep('.*core.ops.*', srclist)
+    _, srclist = eGrep('^third_party', srclist)
+    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
 
     # (1) Initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
@@ -289,11 +291,9 @@ def shogunTFLib_framework(argv):
         assert(len(genlist) == 1)
 
     # (3) deal with source files
-    # (3.1) filter-out files from list
+    # (3.1) filter-out headers
     _, srclist = eGrep('.*.proto$', srclist) # done in (2)
     src_hdrs, srclist = eGrep('.*.h$', srclist)
-    _, srclist = eGrep('^third_party', srclist)
-    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
 
     # (3.2) compile .cc source
     src_cc, srclist = eGrep('.*.cc', srclist)
@@ -402,6 +402,14 @@ def shogunTFLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+    _, srclist = eGrep('^third_party', srclist)
+    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
+    _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
+    _, srclist = eGrep('.*.pbtxt$', srclist) # not for us
+    _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
+    _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
+    _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
+    _, srclist = eGrep('.*cc_op_gen_main.cc$', srclist) # don't include main function.
 
     #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
     if False:
@@ -452,17 +460,9 @@ def shogunTFLib(argv):
         assert(len(genlist) == 1)
 
     # (3) deal with source files
-    # (3.1) filter-out files from list
+    # (3.1) filter-out headers
     _, srclist = eGrep('.*.proto$', srclist) # done in (2)
     src_hdrs, srclist = eGrep('.*.h$', srclist)
-    _, srclist = eGrep('^third_party', srclist)
-    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
-    _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
-    _, srclist = eGrep('.*.pbtxt$', srclist) # not for us
-    _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
-    _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
-    _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
-    _, srclist = eGrep('.*cc_op_gen_main.cc$', srclist) # don't include main function.
 
     # (3.2) compile .cc source
     src_cc, srclist = eGrep('.*.cc', srclist)
@@ -482,9 +482,9 @@ def shogunTFLib(argv):
     # (4) link the final shared object
     cursor.build('libtensorflow.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
-                + ' -ldouble-conversion -lz -lpng -lgif -lhighwayhash'
-                + ' -ljpeg -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
-                + ' -llmdb -lsnappy',
+                + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
+                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
+                + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'})
     # FIXME: mkl-dnn, grpc, xsmm
     # XXX: FTBFS with jemalloc

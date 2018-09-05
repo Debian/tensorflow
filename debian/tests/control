@@ -1,0 +1,2 @@
+Test-Command: sh debian/tests/tfcc1.sh
+Depends: libtensorflow-dev, build-essential,
