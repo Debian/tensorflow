@@ -61,17 +61,17 @@ Python interface.
 Postponed
 ---------
 
-      Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
 - [ ] Compile both AVX+ version and Generic version. Automatically
       choose the working one during postinst according to the machine's
       cpu capability.
-- [ ] compile and provide documentation.
+- [ ] compile documentation instead of providing the raw ones.
 - [ ] build libtensorflow on top of libtensorflow_framework?
 - [ ] (ppc64el) what's this????????
-      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol `Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_'
-      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol `tensorflow::per_thread_max_parallism'
+      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_
+      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol tensorflow::per_thread_max_parallism
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] upload to unstable.
+      Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
 
 Will Never Get Fixed
 --------------------
