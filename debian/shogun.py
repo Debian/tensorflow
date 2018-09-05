@@ -119,6 +119,29 @@ def eGrep(pat: str, sourcelist: List[str]) -> (List[str], List[str]):
     return match, unmatch
 
 
+def eGlob(pat: str, filters: Any = 'src') -> List[str]:
+    '''
+    Extended version of glob.glob .
+    if preset is a string, use preset regex group.
+    if preset is a list, use the given regex list.
+    '''
+    files = glob.glob(pat, recursive=True)
+    filterregexs = []
+    if isinstance(filters, str):
+        if not any(filters == x for x in ['src', 'test']):
+            raise ValueError(f'invalid eGlob filter: {filters}')
+        if filters == 'src':
+            filterregexs = ['.*test.*', '.*main.*']
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+    elif isinstance(filters, list):
+        raise NotImplementedError
+    else:
+        raise TypeError
+    return files
+
+
 def getDpkgArchitecture(query: str) -> str:
     '''
     dpkg-architecture -qQUERY
