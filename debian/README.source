@@ -44,14 +44,9 @@ Misc.
 
 C and C++ interface.
 
-- [ ] Does it FTBFS on amd64 and ppc64el?
 - [ ] is the resulting libtensorflow.so.1.10 correct and working?
   - [ ] write autopkgtest with some mini C/C++ programs.
   - [ ] find out the way to build tests (googletest).
-- [ ] make sure libtensorflow/amd64 is linked against libmkldnn
-- [ ] what's this????? ppc64el specific.
-      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol `Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_'
-      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol `tensorflow::per_thread_max_parallism'
 - [ ] upload to experimental.
 
 Python interface.
@@ -66,13 +61,17 @@ Python interface.
 Postponed
 ---------
 
-- [ ] upload to unstable.
       Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
 - [ ] Compile both AVX+ version and Generic version. Automatically
       choose the working one during postinst according to the machine's
       cpu capability.
 - [ ] compile and provide documentation.
 - [ ] build libtensorflow on top of libtensorflow_framework?
+- [ ] (ppc64el) what's this????????
+      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol `Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_'
+      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol `tensorflow::per_thread_max_parallism'
+- [ ] make sure libtensorflow/amd64 is linked against libmkldnn
+- [ ] upload to unstable.
 
 Will Never Get Fixed
 --------------------
