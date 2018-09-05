@@ -1,0 +1,7 @@
+tensorflow source: source-contains-prebuilt-binary tensorflow/compiler/aot/codegen_test_o.golden
+tensorflow source: source-contains-empty-directory tensorflow/core/lib/bmp/testdata/
+tensorflow source: source-contains-prebuilt-java-object tensorflow/contrib/lite/java/demo/gradle/wrapper/gradle-wrapper.jar
+tensorflow source: source-contains-prebuilt-java-object tensorflow/contrib/lite/java/ovic/demo/gradle/wrapper/gradle-wrapper.jar
+tensorflow source: source-contains-prebuilt-java-object tensorflow/examples/android/gradle/wrapper/gradle-wrapper.jar
+tensorflow source: unused-license-paragraph-in-dep5-copyright lgpl-2.1+ (paragraph at line 134)
+tensorflow source: debian-watch-does-not-check-gpg-signature
