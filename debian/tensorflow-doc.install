@@ -1,2 +1,2 @@
-tensorflow/docs_src/*
-tensorflow/security
+tensorflow/docs_src/*  usr/share/doc/tensorflow/
+tensorflow/security  usr/share/doc/tensorflow/

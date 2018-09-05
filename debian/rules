@@ -12,6 +12,8 @@ override_dh_auto_clean:
 	$(SHELL) debian/shogun-clean.sh
 
 override_dh_auto_configure:
+	-find . -type f -name '.gitignore' -delete
+	-find tensorflow/examples/ -type f -exec chmod a-x '{}' +
 	$(SHELL) debian/embedded.sh
 	$(SHELL) debian/shogun-gen.sh
 
