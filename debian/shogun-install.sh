@@ -28,21 +28,14 @@ myinstall () {
 
 # install headers
 for hdr in $(cat libtensorflow.hdrs); do
-	myinstall -m0644 $hdr $destdir/usr/include/$hdr
+	myinstall -m0644 $hdr $destdir/usr/include/$(dirname $hdr)
 done
 
-# install libtensorflow_framework
-for so in $(ls libtensorflow_framework.so); do
+# install libtensorflow_framework.so and libtensorflow.so
+for so in"libtensorflow_framework.so" "libtensorflow.so"; do
 	fpath="$destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so"
-	myinstall -m0644 $so $fpath.version
-	ln -sr $fpath.version $fpath.soversion
-	ln -sr $fpath.version $fpath
-done
-
-# install libtensorflow
-for so in $(ls libtensorflow.so); do
-	fpath="$destdir/usr/lib/$(dpkg-architecture -qDEB_HOST_MULTIARCH)/$so"
-	myinstall -m0644 $so $fpath.version
-	ln -sr $fpath.version $fpath.soversion
-	ln -sr $fpath.version $fpath
+	myinstall -m0644 $so $(dirname $fpath)
+	mv -v $fpath $fpath.$version
+	ln -vsr $fpath.$version $fpath.$soversion
+	ln -vsr $fpath.$version $fpath
 done
