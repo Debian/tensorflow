@@ -416,8 +416,8 @@ def shogunTFLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
-    srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
+    #srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
+    #srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
     srclist.append('debian/embedded/fft/fftsg.c')
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
