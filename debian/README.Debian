@@ -7,7 +7,7 @@ Principles specific to this source package
 1. Use "bazel query" to dump source code and generated file
    dependencies for the build targets.
 
-2. This source packages provides CPU-only verison of TF instead
+2. This source packages provides CPU-only version of TF instead
    of CUDA version.
   
    (1) CPU-only version is compilable on all architectures.
