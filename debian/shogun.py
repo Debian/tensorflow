@@ -29,6 +29,7 @@ Distribution friendly light-weight build for TensorFlow.
 Especially written for Debian GNU/Linux.
 
 Shogun needs the bazel dumps from bazelQuery.sh .
+And it tries to produce similar result to that from bazel.
 
 References
 ----------
