@@ -1,10 +1,10 @@
-tensorflow (1.10.1+dfsg-A1) UNRELEASED; urgency=medium
+tensorflow (1.10.1+dfsg-A1u25) experimental; urgency=medium
 
   * Initial release [1.10.1+dfsg]. (Closes: #804612)
   * Stage A (with Debian revision "A*") indicates that the source
     package only produces C and C++ library and development files.
   * Many thanks to Aron Xu <aron@debian.org> for his sponsorship
-    of the access to his build machine which helped a lot when
-    creating this package.
+    of the access to his build machine which helped a lot.
+  * Many thanks to Boyuan Yang <byang@debian.org> for FTBFS report.
 
- -- Mo Zhou <cdluminate@gmail.com>  Wed, 05 Sep 2018 01:00:19 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Wed, 05 Sep 2018 03:54:40 +0000
