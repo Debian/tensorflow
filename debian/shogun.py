@@ -334,7 +334,8 @@ def shogunTFLib_framework(argv):
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
             + ' -lpthread',
-            'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_framework.so.{tf_soversion}'})
+            'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_framework.so.{tf_soversion}'
+            + f' -Wl,--version-script tensorflow/tf_framework_version_script.lds'})
     # XXX: -ljemalloc FTBFS
 
     # done
