@@ -5,6 +5,9 @@ export DEB_CXXFLAGS_MAINT_APPEND =
 # XXX: Warning: -Wl,--as-needed will cause FTBFS!!
 export DEB_LDFLAGS_MAINT_APPEND =
 
+# colorized output reduces burden to my eye
+export NINJA_STATUS=[1;36m[%es (%p) %f/%t][0;m 
+
 %:
 	dh $@ -Sninja -D.
 
