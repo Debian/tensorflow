@@ -16,17 +16,17 @@ fi
 $SHOGUN AllProto
 
 $SHOGUN ProtoText \
-	-i $DATADIR/tf_tool_proto_text.source_file.txt \
-	-g $DATADIR/tf_tool_proto_text.generated_file.txt
+	-i $DATADIR/SRC__tensorflow_tools_proto_text_gen_proto_text_functions \
+	-g $DATADIR/GEN__tensorflow_tools_proto_text_gen_proto_text_functions
 
 $SHOGUN TFLib_framework \
-	-i $DATADIR/tf_libtensorflow_framework_so.source_file.txt \
-	-g $DATADIR/tf_libtensorflow_framework_so.generated_file.txt
+	-i $DATADIR/SRC__tensorflow_libtensorflow_framework.so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_framework.so
 
 $SHOGUN CCOP \
-	-i $DATADIR/tf_libtensorflow_so.source_file.txt \
-	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
+	-i $DATADIR/SRC__tensorflow_libtensorflow.so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow.so
 
 $SHOGUN TFLib \
-	-i $DATADIR/tf_libtensorflow_so.source_file.txt \
-	-g $DATADIR/tf_libtensorflow_so.generated_file.txt
+	-i $DATADIR/SRC__tensorflow_libtensorflow.so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow.so
