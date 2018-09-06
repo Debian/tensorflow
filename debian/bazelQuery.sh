@@ -42,13 +42,13 @@ bazelDump () {
 	bazel query "kind(\"source file\", deps($1))" \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
-	> $datadir/GEN$mq
+	> $datadir/SRC$mq
 
 	# query all required generated files
 	bazel query "kind(\"generated file\", deps($1))" \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
-	> $datadir/SRC$mq
+	> $datadir/GEN$mq
 }
 
 # Following queries are arranged in Dependency order.
