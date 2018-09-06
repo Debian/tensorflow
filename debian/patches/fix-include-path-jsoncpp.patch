@@ -10,7 +10,7 @@ index 648a219f..19deac08 100644
  #include <sstream>
  
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/framework/op_kernel.h"
  #include "tensorflow/core/framework/tensor_shape.h"
  #include "tensorflow/core/platform/cloud/curl_http_request.h"
@@ -23,7 +23,7 @@ index 84c52e36..9016aa65 100644
  # For the rest, we'll just add the build dir as an include dir.
  set(jsoncpp_HEADERS
 -    "${jsoncpp_INCLUDE_DIR}/include/json/json.h"
-+    "${jsoncpp_INCLUDE_DIR}/json/json.h"
++    "${jsoncpp_INCLUDE_DIR}/jsoncpp/json/json.h"
  )
  
  ExternalProject_Add(jsoncpp
@@ -36,7 +36,7 @@ index 3f7e67de..f91c05c4 100644
  
  #include "tensorflow/contrib/tpu/profiler/trace_events_to_json.h"
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/lib/strings/strcat.h"
  #include "tensorflow/core/lib/strings/stringprintf.h"
  
@@ -49,7 +49,7 @@ index e97989cc..c1bccf0a 100644
  
  #include "tensorflow/contrib/tpu/profiler/trace_events_to_json.h"
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/platform/protobuf.h"
  #include "tensorflow/core/platform/test.h"
  
@@ -62,7 +62,7 @@ index aa35e8a1..bc0c628b 100644
  #include <io.h>  // for _mktemp
  #endif
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/lib/core/errors.h"
  #include "tensorflow/core/lib/gtl/map_util.h"
  #include "tensorflow/core/lib/gtl/stl_util.h"
@@ -75,7 +75,7 @@ index 7e39b63e..3d195016 100644
  #endif
  #include <fstream>
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/lib/core/errors.h"
  #include "tensorflow/core/lib/io/path.h"
  #include "tensorflow/core/lib/strings/base64.h"
@@ -88,7 +88,7 @@ index 519d69ac..1e846d5f 100644
  
  #include <memory>
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/lib/core/status.h"
  #include "tensorflow/core/platform/cloud/http_request.h"
  #include "tensorflow/core/platform/env.h"
@@ -101,7 +101,7 @@ index baf3fb2b..3e9538cd 100644
  #define TENSORFLOW_CORE_PROFILER_INTERNAL_TFPROF_TIMELINE_H_
  
 -#include "include/json/json.h"
-+#include "json/json.h"
++#include "jsoncpp/json/json.h"
  #include "tensorflow/core/framework/graph.pb.h"
  #include "tensorflow/core/framework/step_stats.pb.h"
  #include "tensorflow/core/lib/strings/strcat.h"
