@@ -13,3 +13,8 @@ Restrictions: allow-stderr
 Test-Command: sh debian/tests/tf_ex_label_image.sh
 Depends: @, build-essential, protobuf-dev, curl,
 Restrictions: allow-stderr
+
+Test-Command: sh debian/tests/tf_tool_graph_transforms.sh
+Depends: @, build-essential, protobuf-dev, parallel, libgemmlowp-dev,
+Restrictions: allow-stderr
+
