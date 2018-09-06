@@ -66,6 +66,7 @@ C and C++ interface.
   - [ ] find out the way to build tests (googletest).
 - [ ] must we ship a copy of Eigen3?
 - [ ] install eigen headers from Eigen3 and third_party directory
+- [ ] add linker scripts
 - [ ] upload to experimental.
 
 Python interface.

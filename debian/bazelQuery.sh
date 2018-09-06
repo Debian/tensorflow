@@ -10,6 +10,8 @@ set -x
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
+datadir="debian/bazelDumps"
+
 cat > .bazelrc << EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
 build --action_env PYTHON_LIB_PATH="/usr/lib/python3/dist-packages"
@@ -33,77 +35,32 @@ build --strip=always
 EOF
 
 bazelDump () {
-	bazel query $1 \
+	# generate mangled query to be used as filename
+	local mq="$(echo $1 | sed -e 's#:#_#' -e 's#/#_#g')"
+
+	# query all required source files
+	bazel query "kind(\"source file\", deps($1))" \
 	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
-	> $2
+	> $datadir/GEN$mq
+
+	# query all required generated files
+	bazel query "kind(\"generated file\", deps($1))" \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq \
+	> $datadir/SRC$mq
 }
 
 # Following queries are arranged in Dependency order.
 
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
-	debian/bazelDumps/tf_tool_proto_text.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow/tools/proto_text:gen_proto_text_functions))' \
-	debian/bazelDumps/tf_tool_proto_text.generated_file.txt
-
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow/core:proto_text))' \
-	debian/bazelDumps/tf_core_proto_text.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow/core:proto_text))' \
-	debian/bazelDumps/tf_core_proto_text.generated_file.txt
-
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow:libtensorflow_framework.so))' \
-	debian/bazelDumps/tf_libtensorflow_framework_so.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow:libtensorflow_framework.so))' \
-	debian/bazelDumps/tf_libtensorflow_framework_so.generated_file.txt
-
-#
-#bazel query 'kind("source file", deps(//tensorflow/core:android_tensorflow_lib))' \
-#	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-#	| sort | uniq \
-#	> debian/bazelDumps/tf_core_android_tflib.source_file.txt
-#bazel query 'kind("generated file", deps(//tensorflow/core:android_tensorflow_lib))' \
-#	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
-#	| sort | uniq \
-#	> debian/bazelDumps/tf_core_android_tflib.generated_file.txt
-
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
-	debian/bazelDumps/tf_libtensorflow_test.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow/tools/lib_package:libtensorflow_test))' \
-	debian/bazelDumps/tf_libtensorflow_test.generated_file.txt
-
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow:libtensorflow.so))' \
-	debian/bazelDumps/tf_libtensorflow_so.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow:libtensorflow.so))' \
-	debian/bazelDumps/tf_libtensorflow_so.generated_file.txt
-
-#
-bazelDump \
-	'kind("source file", deps(//tensorflow/python:pywrap_tensorflow))' \
-	debian/bazelDumps/tf_python_pywrap_tensorflow.source_file.txt
-
-bazelDump \
-	'kind("generated file", deps(//tensorflow/python:pywrap_tensorflow))' \
-	debian/bazelDumps/tf_python_pywrap_tensorflow.generated_file.txt
+bazelDump //tensorflow/tools/proto_text:gen_proto_text_functions
+bazelDump //tensorflow/core:proto_text
+bazelDump //tensorflow/core:tensorflow
+bazelDump //tensorflow:libtensorflow_framework.so
+bazelDump //tensorflow/tools/lib_package:libtensorflow_test
+bazelDump //tensorflow:libtensorflow.so
+bazelDump //tensorflow:libtensorflow_cc.so
+bazelDump //tensorflow/python:pywrap_tensorflow
 
 # FIXME
-bazel query 'kind(cc_.*, tests(//tensorflow/... -//tensorflow/contrib/... -//tensorflow/python/... -//tensorflow/java/...))' > /dev/null
+#bazel query 'kind(cc_.*, tests(//tensorflow/... -//tensorflow/contrib/... -//tensorflow/python/... -//tensorflow/java/...))' > /dev/null
