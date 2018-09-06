@@ -223,6 +223,10 @@ def shogunProtoText(argv):
     # (0) read bazel dump and apply hardcoded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+    _, srclist = eGrep('.*.h$', srclist) # we don't need to deal with header here
+    _, srclist = eGrep('^third_party', srclist) # no third_party stuff
+    _, srclist = eGrep('.*windows/.*', srclist) # no windoge source
+    _, srclist = eGrep('.*.proto$', srclist) # already dealt with in (2)
 
     # (1) Instantiate ninja writer
     cursor = Writer(open(ag.o, 'w'))
@@ -236,13 +240,6 @@ def shogunProtoText(argv):
         print(yellow('Remainders:'), genlist)
 
     # (3) deal with source files
-    # (3.1) filter-out not needed files
-    _, srclist = eGrep('.*.h$', srclist) # we don't need to deal with header here
-    _, srclist = eGrep('^third_party', srclist) # no third_party stuff
-    _, srclist = eGrep('.*windows/.*', srclist) # no windoge source
-    _, srclist = eGrep('.*.proto$', srclist) # already dealt with in (2)
-
-    # (3.2) compile .cc source
     cclist, srclist = eGrep('.*.cc', srclist)
     objlist = []
     for cc in cclist + pbcclist:
@@ -665,7 +662,9 @@ def shogunTFCCLib(argv):
 if __name__ == '__main__':
 
     # A graceful argparse implementation with argparse subparser requries
-    # much more boring code than I would like to write.
+    # more code than present implementation. However an advantage of the
+    # current implementation is that you only need to define a new shogunXXX
+    # function and it would be automatically added here.
     try:
         eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
     except (IndexError, NameError) as e:
