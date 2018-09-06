@@ -505,7 +505,7 @@ def shogunTFLib(argv):
             pass
         elif any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
-        obj = cursor.build(re.sub('.c[c]?', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
+        obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
 
     # (4) link the final shared object
