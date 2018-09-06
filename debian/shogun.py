@@ -39,6 +39,10 @@ References
 3. TensorFlow's native Bazel build.
 4. For extra compiler definitions .e.g TENSORFLOW_USE_JEMALLOC please lookup
    tensorflow/core/platform/default/build_config.bzl
+5. ArchLinux PKGBUILD
+   https://git.archlinux.org/svntogit/community.git/tree/trunk/PKGBUILD?h=packages/tensorflow
+6. Gentoo ebuild
+   https://packages.gentoo.org/packages/sci-libs/tensorflow
 '''
 
 from typing import *
