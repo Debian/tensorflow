@@ -1,2 +1,7 @@
 Test-Command: sh debian/tests/tfcc1.sh
 Depends: libtensorflow-dev, build-essential,
+Restrictions: allow-stderr
+
+Test-Command: sh debian/tests/tf_cc_tutorial.sh
+Depends: @, build-essential, protobuf-dev
+Restructions: allow-stderr
