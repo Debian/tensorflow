@@ -1,3 +1,6 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
 stub-version-info-cc.patch
+
+# This patch is for embedded source and is manually applied
+# fft-cxx-no-mangle.patch

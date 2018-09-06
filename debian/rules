@@ -18,6 +18,7 @@ override_dh_auto_configure:
 	-find . -type f -name '.gitignore' -delete
 	-find tensorflow/examples/ -type f -exec chmod a-x '{}' +
 	$(SHELL) debian/embedded.sh
+	patch -p1 < debian/patches/fft-cxx-no-mangle.patch
 	$(SHELL) debian/shogun-gen.sh
 
 override_dh_auto_build:
