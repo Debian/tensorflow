@@ -30,3 +30,7 @@ $SHOGUN CCOP \
 $SHOGUN TFLib \
 	-i $DATADIR/SRC__tensorflow_libtensorflow.so \
 	-g $DATADIR/GEN__tensorflow_libtensorflow.so
+
+$SHOGUN TFCCLib \
+	-i $DATADIR/SRC__tensorflow_libtensorflow_cc.so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_cc.so
