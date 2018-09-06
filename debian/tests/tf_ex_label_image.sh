@@ -13,7 +13,7 @@ $cxx $cppflags $cxxflags $ldflags $incdir $libs \
 	-o tf_ex_label_image
 
 if ! test -r libtensorflow_cc.so.1.10; then
-	ln -sr libtensorflow_cc.so libtensorflow_cc.so.1.10
+	ln -sr libtensorflow_cc.so libtensorflow_cc.so.1.10 || true
 fi
 
 # according to tensorflow/examples/label_image
