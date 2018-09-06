@@ -9,3 +9,7 @@ Restrictions: allow-stderr
 Test-Command: sh debian/tests/tf_tool_benchmark_model.sh
 Depends: @, build-essential, protobuf-dev,
 Restrictions: allow-stderr
+
+Test-Command: sh debian/tests/tf_ex_label_image.sh
+Depends: @, build-essential, protobuf-dev, curl,
+Restrictions: allow-stderr
