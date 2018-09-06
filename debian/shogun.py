@@ -436,7 +436,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*test.*', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
     _, srclist = eGrep('.*gen_proto_text_functions.*', srclist) # not for this library
-    _, srclist = eGrep('.*bigquery_table_accessor.cc', srclist) # it wants GoogleAuthProvider
+    _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
 
