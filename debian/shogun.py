@@ -425,7 +425,7 @@ def shogunTFLib(argv):
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
     #srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
     #srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
-    srclist.append('debian/embedded/fft/fftsg.c')
+    tflib_extra_srcs = ['debian/embedded/fft/fftsg.c']
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
     _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
@@ -498,7 +498,7 @@ def shogunTFLib(argv):
     objlist = []
     exception_eigen_avoid_std_array = [
         'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d', 'adjust_contrast_op' ]
-    for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist:
+    for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
         variables = {}
         if any(x in cc for x in ('posix/port.cc',)):
             #variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
