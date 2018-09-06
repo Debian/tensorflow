@@ -9,7 +9,7 @@ cxxflags="-w -O2 -fPIE -pie"
 ldflags=""
 
 $cxx $cppflags $cxxflags $ldflags $incdir $libs \
-	debian/tests/tf_doc_api_guide_cc.sh \
+	debian/tests/tf_doc_api_guide_cc.cc \
 	-o tf_doc_api_guide_cc
 
 if ! test -r libtensorflow_cc.so.1.10; then
