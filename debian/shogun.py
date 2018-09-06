@@ -435,7 +435,9 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
     _, srclist = eGrep('.*test.*', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
-    _, srclist = eGrep('.*gen_proto_text_functions.*', srclist)
+    _, srclist = eGrep('.*gen_proto_text_functions.*', srclist) # not for this library
+    _, srclist = eGrep('.*bigquery_table_accessor.cc', srclist) # it wants GoogleAuthProvider
+    _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
 
     #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
