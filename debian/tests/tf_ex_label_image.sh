@@ -17,10 +17,9 @@ if ! test -r libtensorflow_cc.so.1.10; then
 fi
 
 # according to tensorflow/examples/label_image
-curl -L "https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz" |
-  tar -C tensorflow/examples/label_image/data -xz
+curl -L "https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz" | tar -C tensorflow/examples/label_image/data -xz
 
-LD_LIBRARY_PATH=. ./tf_ex_label_image
+LD_LIBRARY_PATH=. ./tf_ex_label_image --help || true
 
 exit 0
 
