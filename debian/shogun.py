@@ -142,7 +142,6 @@ def getDpkgArchitecture(query: str) -> str:
     dpkg-architecture -qQUERY
     '''
     # XXX: I wish we don't need to use this function.
-    raise Exception("Please try to keep TF functionality the same across different architectures.")
     result = subprocess.Popen(['dpkg-architecture', f'-q{query}'],
              stdout=subprocess.PIPE).communicate()[0].decode().strip()
     return result
@@ -425,8 +424,6 @@ def shogunTFLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    #srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
-    #srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
     tflib_extra_srcs = ['debian/embedded/fft/fftsg.c']
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
@@ -442,13 +439,10 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
 
-    #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
-    if False:
-        # the following stuff seems to be hard to compile
+    if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
+        # they FTBFS on non-amd64 arches
         _, srclist = eGrep('.*/core/debug/.*', srclist)
         _, genlist = eGrep('.*/core/debug/.*', genlist)
-        _, srclist = eGrep('.*/compiler/.*', srclist)
-        _, genlist = eGrep('.*/compiler/.*', genlist)
         _, srclist = eGrep('.*debug_ops.*', srclist)
         _, genlist = eGrep('.*debug_ops.*', genlist)
 
@@ -462,8 +456,7 @@ def shogunTFLib(argv):
     gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
 
     # XXX: temporary workaround for //tensorflow/core/debug:debug_service.grpc.pb.cc
-    #if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
-    if True:
+    if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
         # This is amd64-only
         cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
             'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
@@ -552,8 +545,6 @@ def shogunTFCCLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    #srclist.extend(glob.glob('tensorflow/c/**.cc', recursive=True))
-    #srclist.extend(glob.glob('tensorflow/cc/**.cc', recursive=True))
     tflib_extra_srcs = ['debian/embedded/fft/fftsg.c']
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
@@ -569,13 +560,10 @@ def shogunTFCCLib(argv):
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
 
-    #if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
-    if False:
-        # the following stuff seems to be hard to compile
+    if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
+        # they FTBFS on non-amd64 arches
         _, srclist = eGrep('.*/core/debug/.*', srclist)
         _, genlist = eGrep('.*/core/debug/.*', genlist)
-        _, srclist = eGrep('.*/compiler/.*', srclist)
-        _, genlist = eGrep('.*/compiler/.*', genlist)
         _, srclist = eGrep('.*debug_ops.*', srclist)
         _, genlist = eGrep('.*debug_ops.*', genlist)
 
@@ -589,8 +577,7 @@ def shogunTFCCLib(argv):
     gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
 
     # XXX: temporary workaround for //tensorflow/core/debug:debug_service.grpc.pb.cc
-    #if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
-    if True:
+    if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
         # This is amd64-only
         cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
             'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
