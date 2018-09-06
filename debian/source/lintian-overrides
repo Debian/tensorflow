@@ -5,3 +5,5 @@ tensorflow source: source-contains-prebuilt-java-object tensorflow/contrib/lite/
 tensorflow source: source-contains-prebuilt-java-object tensorflow/examples/android/gradle/wrapper/gradle-wrapper.jar
 tensorflow source: unused-license-paragraph-in-dep5-copyright lgpl-2.1+ (paragraph at line 134)
 tensorflow source: debian-watch-does-not-check-gpg-signature
+tensorflow source: duplicate-short-description libtensorflow-framework1.10 libtensorflow1.10 libtensorflow-cc1.10
+tensorflow source: file-contains-trailing-whitespace debian/rules (line 9)

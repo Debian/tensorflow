@@ -36,7 +36,7 @@ EOF
 
 bazelDump () {
 	# generate mangled query to be used as filename
-	local mq="$(echo $1 | sed -e 's#:#_#' -e 's#/#_#g')"
+	local mq="$(echo $1 | sed -e 's#:#_#' -e 's#/#_#g' -e 's#\.#_#g')"
 
 	# query all required source files
 	bazel query "kind(\"source file\", deps($1))" \
