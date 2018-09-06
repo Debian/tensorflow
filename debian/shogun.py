@@ -519,7 +519,8 @@ def shogunTFLib(argv):
                 + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
                 + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
                 + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
-                'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'})
+                'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'
+                + f' -Wl,-exported_symbols_list tensorflow/c/exported_symbols.lds'})
     # FIXME: mkl-dnn, grpc, xsmm
     # XXX: FTBFS with jemalloc
 
