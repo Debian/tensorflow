@@ -1,4 +1,4 @@
-tensorflow (1.10.1+dfsg-A1) experimental; urgency=medium
+tensorflow (1.10.1+dfsg-A1u35) UNREL; urgency=medium
 
   * Initial release [1.10.1+dfsg]. (Closes: #804612)
   * Stage A (with Debian revision "A*") indicates that the source
