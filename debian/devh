@@ -1,0 +1,22 @@
+#!/bin/sh
+set -xe
+
+
+case $1 in
+	clean)
+		sh debian/shogun-clean.sh
+		git clean -xdfq
+		;;
+	pre)
+		sh debian/embedded.sh
+		patch -p1 < debian/patches/fft-cxx-no-mangle.patch
+		sh debian/shogun-gen.sh
+		;;
+	post)
+		rm -rf debian/embedded/eigen3 debian/embedded/fft || true
+		;;
+	*)
+		echo Invalid command
+		;;
+esac
+
