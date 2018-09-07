@@ -53,12 +53,13 @@ Some Upstream Issues
 4. statically-linked lib causes symbol collision
  > https://github.com/tensorflow/tensorflow/issues/9525
 
+
 Things remain to be done
 ========================
 
 C and C++ interface.
 
-- [ ] solve the following problems
+- [ ] solve the following one problem
 - [ ] upload to experimental.
 
 ::
@@ -101,15 +102,6 @@ C and C++ interface.
 	l3_cache_size: 6291456
 	memory_size: 9676668928
 
-	Aborted
-
-::
-
-	+ LD_LIBRARY_PATH=. ./tf_c_api_test
-	[libprotobuf ERROR google/protobuf/descriptor_database.cc:58] File already exists in database: tensorflow/core/framework/tensor_shape.proto
-	[libprotobuf FATAL google/protobuf/descriptor.cc:1358] CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
-	terminate called after throwing an instance of 'google::protobuf::FatalException'
-	  what():  CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
 	Aborted
 
 
@@ -163,3 +155,18 @@ Will Never Get Fixed
       cuDNN, the GPU version will be pointless and useless.
       CUDA version of tensorflow is not planned yet. At the same
       time the CUDA version could also be linked against MKL.
+
+Maintainer Notes
+================
+
+These notes are written for myself and fellow developers.
+
+1. protobuf database collision::
+
+	[libprotobuf ERROR google/protobuf/descriptor_database.cc:58] File already exists in database: tensorflow/core/framework/tensor_shape.proto
+	[libprotobuf FATAL google/protobuf/descriptor.cc:1358] CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+	terminate called after throwing an instance of 'google::protobuf::FatalException'
+	  what():  CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+	Aborted
+
+   Solution: don't link against more than one tensorflow libraries at a time.
