@@ -23,7 +23,7 @@ Depends: @, build-essential, protobuf-dev, libgtest-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_lib_package_libtensorflow_test.sh
-Depends: @, build-essential,
+Depends: @, build-essential, protobuf-dev, libgrpc++-dev, llvm-7-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
