@@ -5,7 +5,10 @@ set -xe
 case $1 in
 	clean)
 		sh debian/shogun-clean.sh
+		;;
+	distclean)
 		git clean -xdfq
+		git checkout .
 		;;
 	pre)
 		sh debian/embedded.sh
