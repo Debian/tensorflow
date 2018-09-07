@@ -38,4 +38,10 @@ override_dh_auto_install:
 	install -Dm0644 debian/pkgconfig/tensorflow_framework.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_framework.pc
 
 override_dh_auto_test:
-	true  #XXX: temporary
+	# Some basic sanity tests
+	debian/tests/tf_lib_package_libtensorflow_test.sh
+	debian/tests/tf_ex_adding_an_op.sh
+	debian/tests/tf_cc_tutorial.sh
+	debian/tests/tf_doc_api_guide_cc.sh
+	nonet=y debian/tests/tf_ex_label_image.sh
+	# TODO: compile and run upstream gtest testsuites

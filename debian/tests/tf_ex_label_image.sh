@@ -17,7 +17,11 @@ if ! test -r libtensorflow_cc.so.1.10; then
 fi
 
 # according to tensorflow/examples/label_image
-curl -L "https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz" | tar -C tensorflow/examples/label_image/data -xz
+if test "$nonet" = "y"; then
+	echo will not download data for testing the resulting binary executable
+else
+	curl -L "https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz" | tar -C tensorflow/examples/label_image/data -xz
+fi
 
 LD_LIBRARY_PATH=. ./tf_ex_label_image --help || true
 
