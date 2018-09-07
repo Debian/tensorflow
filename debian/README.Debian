@@ -103,6 +103,15 @@ memory_size: 9676668928
 Aborted
 ```
 
+```
++ LD_LIBRARY_PATH=. ./tf_c_api_test
+[libprotobuf ERROR google/protobuf/descriptor_database.cc:58] File already exists in database: tensorflow/core/framework/tensor_shape.proto
+[libprotobuf FATAL google/protobuf/descriptor.cc:1358] CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+terminate called after throwing an instance of 'google::protobuf::FatalException'
+  what():  CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+Aborted
+```
+
 
 Postponed
 ---------
