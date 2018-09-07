@@ -58,7 +58,7 @@ Things remain to be done
 
 C and C++ interface.
 
-- [ ] solve the following problem
+- [ ] solve the following problems
 - [ ] upload to experimental.
 
 ```
@@ -127,6 +127,10 @@ Python interface.
 - [ ] is the resulting python package correct and working?
 - [ ] write autopkgtest with mini python programs.
 
+Definitions.
+
+- [ ] -DUSE_GEMM_FOR_CONV
+- [ ] -DTF_LEAN_BINARY
 
 Will Never Get Fixed
 --------------------
