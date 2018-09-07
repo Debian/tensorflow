@@ -103,7 +103,8 @@ Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: Computation using data flow graphs for scalable machine learning (lib)
+# I copied some detail about this shared object from tensorflow/BUILD
+Description: Computation using data flow graphs for scalable machine learning
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)
@@ -111,14 +112,32 @@ Description: Computation using data flow graphs for scalable machine learning (l
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships libtensorflow_framework.so.1.10
+ This package ships shared object libtensorflow_framework.so.1.10
+ .
+ A shared object which includes registration mechanisms for ops and
+ kernels. Does not include the implementations of any ops or kernels.
+ Instead, the library which loads libtensorflow_framework.so
+ (e.g. _pywrap_tensorflow_internal.so for Python, libtensorflow.so for the C
+ API) is responsible for registering ops with libtensorflow_framework.so. In
+ addition to this core set of ops, user libraries which are loaded (via
+ TF_LoadLibrary/tf.load_op_library) register their ops and kernels with this
+ shared object directly.
+ .
+ For example, from Python tf.load_op_library loads a custom op library (via
+ dlopen() on Linux), the library finds libtensorflow_framework.so (no
+ filesystem search takes place, since libtensorflow_framework.so has already
+ been loaded by pywrap_tensorflow) and registers its ops and kernels via
+ REGISTER_OP and REGISTER_KERNEL_BUILDER (which use symbols from
+ libtensorflow_framework.so), and pywrap_tensorflow can then use these
+ ops. Since other languages use the same libtensorflow_framework.so, op
+ libraries are language agnostic.
 
 Package: libtensorflow1.10
 Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: Computation using data flow graphs for scalable machine learning (lib)
+Description: Computation using data flow graphs for scalable machine learning (C)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)
@@ -126,14 +145,15 @@ Description: Computation using data flow graphs for scalable machine learning (l
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships libtensorflow.so.1.10
+ This package ships shared object libtensorflow.so.1.10, which exports
+ C API for TensorFlow (i.e. symbols named "*TF_*" or "*TFE_*").
 
 Package: libtensorflow-cc1.10
 Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
-Description: Computation using data flow graphs for scalable machine learning (lib)
+Description: Computation using data flow graphs for scalable machine learning (C++)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
  while the graph edges represent the multidimensional data arrays (tensors)
@@ -141,7 +161,8 @@ Description: Computation using data flow graphs for scalable machine learning (l
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships libtensorflow_cc.so.1.10
+ This package ships shared object libtensorflow_cc.so.1.10, which exports
+ C++ API for TensorFlow (i.e. *tensorflow* *TF_* *TFE_* *pywrap_xla*).
 
 Package: libtensorflow-dev
 Section: libdevel
@@ -150,6 +171,9 @@ Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
  libtensorflow-framework1.10 (= ${binary:Version}),
  libtensorflow1.10 (= ${binary:Version}),
+ libprotobuf-dev (>= 3.6.0~),
+ libgrpc++-dev (>= 1.14.1~),
+ llvm-7-dev (>= 1:7~+rc2-1~exp1~),
 Suggests:
  tensorflow-doc (= ${source:Version}),
 Description: Computation using data flow graphs for scalable machine learning (dev)
@@ -160,7 +184,7 @@ Description: Computation using data flow graphs for scalable machine learning (d
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships C and C++ development files of tensorflow.
+ This package ships C and C++ headers files for tensorflow.
 
 #Package: libtensorflow-bin
 #Architecture: any

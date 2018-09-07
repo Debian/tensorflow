@@ -58,6 +58,7 @@ Things remain to be done
 
 C and C++ interface.
 
+- [ ] build tf.so and tf_cc.so upon tf_frmwk.so?
 - [ ] solve the following problems
 - [ ] upload to experimental.
 
