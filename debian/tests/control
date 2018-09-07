@@ -1,35 +1,35 @@
 Test-Command: sh debian/tests/tf_doc_api_guide_cc.sh
-Depends: @, build-essential, protobuf-dev,
+Depends: @, build-essential, libprotobuf-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_cc_tutorial.sh
-Depends: @, build-essential, protobuf-dev,
+Depends: @, build-essential, libprotobuf-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_tool_benchmark_model.sh
-Depends: @, build-essential, protobuf-dev,
+Depends: @, build-essential, libprotobuf-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_ex_label_image.sh
-Depends: @, build-essential, protobuf-dev, curl,
+Depends: @, build-essential, libprotobuf-dev, curl,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_tool_graph_transforms.sh
-Depends: @, build-essential, protobuf-dev, parallel, libgemmlowp-dev,
+Depends: @, build-essential, libprotobuf-dev, parallel, libgemmlowp-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_c_api_test.sh
-Depends: @, build-essential, protobuf-dev, libgtest-dev,
+Depends: @, build-essential, libprotobuf-dev, libgtest-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_lib_package_libtensorflow_test.sh
-Depends: @, build-essential, protobuf-dev, libgrpc++-dev, llvm-7-dev,
+Depends: @, build-essential, libprotobuf-dev, libgrpc++-dev, llvm-7-dev,
 Restrictions: allow-stderr
 
 Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
-Depends: @, build-essential, protobuf-dev,
+Depends: @, build-essential, libprotobuf-dev,
 Restrictions: allow-stderr
 
 Test-Command: g++ debian/tests/capi/TF_Version.cc -ltensorflow -lgtest -lpthread -o TF_Version; ./TF_Version
-Depends: @, build-essential, protobuf-dev, libgtest-dev,
+Depends: @, build-essential, libprotobuf-dev, libgtest-dev,
 Restrictions: allow-stderr
