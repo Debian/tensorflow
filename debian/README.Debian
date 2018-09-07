@@ -61,8 +61,7 @@ Misc.
 
 C and C++ interface.
 
-- [ ] is the resulting libtensorflow.so.1.10 correct and working?
-  - [ ] find out the way to build tests (googletest).
+- [ ] find out the way to build tests (googletest).
 - [ ] upload to experimental.
 
 ```

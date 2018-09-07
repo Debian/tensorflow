@@ -32,8 +32,10 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	$(SHELL) debian/shogun-install.sh
-	bash tensorflow/c/generate-pc.sh -p /usr -v1.10.1 -l/usr/lib/$(DEB_HOST_MULTIARCH)
-	install -Dm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
+	cd debian/pkgconfig; $(SHELL) pc-gen.sh
+	install -Dm0644 debian/pkgconfig/tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
+	install -Dm0644 debian/pkgconfig/tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_cc.pc
+	install -Dm0644 debian/pkgconfig/tensorflow_framework.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_framework.pc
 
 override_dh_auto_test:
 	true  #XXX: temporary
