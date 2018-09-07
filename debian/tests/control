@@ -30,6 +30,6 @@ Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
 Depends: @, build-essential, libprotobuf-dev,
 Restrictions: allow-stderr
 
-Test-Command: g++ debian/tests/capi/TF_Version.cc -ltensorflow -lgtest -lpthread -o TF_Version; ./TF_Version
+Test-Command: sh debian/tests/capi.sh
 Depends: @, build-essential, libprotobuf-dev, libgtest-dev,
 Restrictions: allow-stderr
