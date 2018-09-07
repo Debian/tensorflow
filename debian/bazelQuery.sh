@@ -51,6 +51,22 @@ bazelDump () {
 	> $datadir/GEN$mq
 }
 
+bazelDumpNonPythonTestTargets () {
+	bazel query 'kind(cc_.*, tests(//tensorflow/... -//tensorflow/contrib/... -//tensorflow/python/... -//tensorflow/java/... -//tensorflow/compiler/...))' > $datadir/TEST$1
+	touch $datadir/TMPSRC$1
+	touch $datadir/TMPGEN$1
+	for target in $(cat $datadir/TEST$1); do
+		bazel query "kind(\"source file\", deps($target))" >> $datadir/TMPSRC$1
+		bazel query "kind(\"generated file\", deps($target))" >> $datadir/TMPGEN$1
+	done
+	cat $datadir/TMPSRC$1 \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq > $datadir/SRC$1
+	cat $datadir/TMPGEN$1 \
+	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| sort | uniq > $datadir/GEN$1
+}
+
 # Following queries are arranged in Dependency order.
 
 bazelDump //tensorflow/tools/proto_text:gen_proto_text_functions
@@ -62,5 +78,4 @@ bazelDump //tensorflow:libtensorflow.so
 bazelDump //tensorflow:libtensorflow_cc.so
 bazelDump //tensorflow/python:pywrap_tensorflow
 
-# FIXME
-#bazel query 'kind(cc_.*, tests(//tensorflow/... -//tensorflow/contrib/... -//tensorflow/python/... -//tensorflow/java/...))' > /dev/null
+bazelDumpNonPythonTestTargets __tf_alltest_nocontrib_nopy
