@@ -175,6 +175,7 @@ Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
  libtensorflow-framework1.10 (= ${binary:Version}),
  libtensorflow1.10 (= ${binary:Version}),
+ libtensorflow-cc1.10 (= ${binary:Version}),
  libprotobuf-dev (>= 3.6.0~),
  libgrpc++-dev (>= 1.14.1~),
  llvm-7-dev (>= 1:7~+rc2-1~exp1~),
