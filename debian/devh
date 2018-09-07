@@ -9,10 +9,12 @@ case $1 in
 		;;
 	pre)
 		sh debian/embedded.sh
+		quilt push -a
 		patch -p1 < debian/patches/fft-cxx-no-mangle.patch
 		sh debian/shogun-gen.sh
 		;;
 	post)
+		quilt pop -a
 		rm -rf debian/embedded/eigen3 debian/embedded/fft || true
 		;;
 	*)
