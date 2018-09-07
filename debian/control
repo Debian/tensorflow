@@ -34,6 +34,7 @@ Build-Depends:
  libsuperlu-dev,
  llvm-7-dev (>= 1:7~+rc2-1~exp1~),
  ninja-build,
+ parallel,
  protobuf-compiler (>= 3.6.0~),
  protobuf-compiler-grpc,
  python3,
