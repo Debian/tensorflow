@@ -78,7 +78,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.comment('-- compiler flags --')
     cursor.newline()
     cursor.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + str(os.getenv('CPPFLAGS', '')))
-    cursor.variable('CXXFLAGS', '-std=c++14 -O2 -fPIC -gsplit-dwarf -fvisibility=hidden'
+    cursor.variable('CXXFLAGS', '-std=c++14 -O2 -fPIC -gsplit-dwarf'
         + ' -fstack-protector-strong -w ' + str(os.getenv('CXXFLAGS', '')))
     cursor.variable('LDFLAGS', '-Wl,-z,relro ' + str(os.getenv('LDFLAGS', '')))
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/'
@@ -331,7 +331,8 @@ def shogunTFLib_framework(argv):
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
             + ' -lpthread',
             'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_framework.so.{tf_soversion}'
-            + f' -Wl,--version-script tensorflow/tf_framework_version_script.lds'})
+            + f' -Wl,--version-script tensorflow/tf_framework_version_script.lds'
+            + f'  -fvisibility=hidden'})
     # XXX: -ljemalloc FTBFS
 
     # done
@@ -510,7 +511,8 @@ def shogunTFLib(argv):
                 + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
                 + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'
-                + f' -Wl,--version-script tensorflow/c/version_script.lds'})
+                + f' -Wl,--version-script tensorflow/c/version_script.lds'
+                + f'  -fvisibility=hidden'})
     # FIXME: mkl-dnn, grpc, xsmm
     # XXX: FTBFS with jemalloc
 
@@ -631,7 +633,8 @@ def shogunTFCCLib(argv):
                 + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
                 + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_cc.so.{tf_soversion}'
-                + f' -Wl,--version-script tensorflow/tf_version_script.lds'})
+                + f' -Wl,--version-script tensorflow/tf_version_script.lds'
+                + f'  -fvisibility=hidden'})
     # FIXME: mkl-dnn, grpc, xsmm
     # XXX: FTBFS with jemalloc
 
