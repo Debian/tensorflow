@@ -29,3 +29,7 @@ Restrictions: allow-stderr
 Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
 Depends: @, build-essential, protobuf-dev,
 Restrictions: allow-stderr
+
+Test-Command: g++ debian/tests/capi/TF_Version.cc -ltensorflow -lgtest -lpthread -o TF_Version; ./TF_Version
+Depends: @, build-essential, protobuf-dev, libgtest-dev,
+Restrictions: allow-stderr
