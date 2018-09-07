@@ -2,7 +2,7 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CFLAGS_MAINT_APPEND =
 export DEB_CXXFLAGS_MAINT_APPEND =
-# XXX: Warning: -Wl,--as-needed will cause FTBFS!!
+# XXX: Warning: -Wl,--as-needed will trigger FTBFS!!
 export DEB_LDFLAGS_MAINT_APPEND =
 
 # colorized output reduces burden to my eye
@@ -38,10 +38,12 @@ override_dh_auto_install:
 	install -Dm0644 debian/pkgconfig/tensorflow_framework.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_framework.pc
 
 override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# Some basic sanity tests
-	debian/tests/tf_lib_package_libtensorflow_test.sh
-	debian/tests/tf_ex_adding_an_op.sh
-	debian/tests/tf_cc_tutorial.sh
-	debian/tests/tf_doc_api_guide_cc.sh
-	nonet=y debian/tests/tf_ex_label_image.sh
+	-$(SHELL) debian/tests/tf_lib_package_libtensorflow_test.sh
+	-$(SHELL) debian/tests/tf_ex_adding_an_op.sh
+	-$(SHELL) debian/tests/tf_cc_tutorial.sh
+	-$(SHELL) debian/tests/tf_doc_api_guide_cc.sh
+	-$(SHELL) debian/tests/tf_ex_label_image.sh
 	# TODO: compile and run upstream gtest testsuites
+endif
