@@ -25,3 +25,7 @@ Restrictions: allow-stderr
 Test-Command: sh debian/tests/tf_lib_package_libtensorflow_test.sh
 Depends: @, build-essential,
 Restrictions: allow-stderr
+
+Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
+Depends: @, build-essential, protobuf-dev,
+Restrictions: allow-stderr
