@@ -34,6 +34,9 @@ Build-Depends:
  libsuperlu-dev,
  llvm-7-dev (>= 1:7~+rc2-1~exp1~),
  ninja-build,
+# FIXME: parallel is a quite problematic dependency.
+# remove it and update test scripts before the first time upload......
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=905674
  parallel,
  protobuf-compiler (>= 3.6.0~),
  protobuf-compiler-grpc,
