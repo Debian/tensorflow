@@ -22,24 +22,8 @@ Debian's Build System for TF
 ----------------------------
 
 The build system is python3 plus ninja which builds stuff according
-to bazel dump. See debian/ninja/README.md for detail.
+to bazel dump. See debian/shogun.py for detail.
 
-* Missing Symbols
-
-  Shogun compiles shared objects. However when you are linking
-  some program against the resulting shared object you may notice
-  that the compiler complains about some missing symbols. To
-  fix the build problem just try to search in the code tree for
-  the missing symbols with tools e.g. ripgrep, and append the
-  corresponding .cc files to your compilation command.
-
-  If you look at the bazel build files you will figure out that
-  TF's code is highly modularized and it's not quite easy for
-  us to decide what .cc file to include in the final shared object
-  without the bazel dump. The simplest choice for us is to keep
-  the result as close to bazel's result as possible. As a result,
-  I'm not likely to add .cc files into the resulting shared object
-  by myself.
 
 Ambiguous FFT2D license
 -----------------------
@@ -57,11 +41,9 @@ Ambiguous FFT2D license
 Things remain to be done
 ========================
 
-Misc.
-
 C and C++ interface.
 
-- [ ] find out the way to build tests (googletest).
+- [ ] solve the following problem
 - [ ] upload to experimental.
 
 ```
@@ -107,15 +89,6 @@ Aborted
 ```
 
 
-Python interface.
-
-- [ ] build _pywrap_tensorflow_internal.so on top of libtensorflow and libtensorflow_framework
-- [ ] do we have all the required python dependencies?
-- [ ] figure out how to generate python API
-- [ ] is the resulting python package correct and working?
-- [ ] write autopkgtest with mini python programs.
-
-
 Postponed
 ---------
 
@@ -130,6 +103,15 @@ Postponed
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] upload to unstable.
       Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
+
+Python interface.
+
+- [ ] build _pywrap_tensorflow_internal.so on top of libtensorflow*
+- [ ] do we have all the required python dependencies?
+- [ ] figure out how to generate python API
+- [ ] is the resulting python package correct and working?
+- [ ] write autopkgtest with mini python programs.
+
 
 Will Never Get Fixed
 --------------------
