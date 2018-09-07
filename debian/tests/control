@@ -21,3 +21,7 @@ Restrictions: allow-stderr
 Test-Command: sh debian/tests/tf_c_api_test.sh
 Depends: @, build-essential, protobuf-dev, libgtest-dev,
 Restrictions: allow-stderr
+
+Test-Command: sh debian/tests/tf_lib_package_libtensorflow_test.sh
+Depends: @, build-essential,
+Restrictions: allow-stderr
