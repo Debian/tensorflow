@@ -44,5 +44,5 @@ if __name__ == '__main__':
         #    print(probe)
 
     #pprint(testprobe)
-    for x in sorted(testprobe):
+    for x in sorted(list(set(testprobe))):
         print(x)
