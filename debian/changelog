@@ -1,4 +1,4 @@
-tensorflow (1.10.1+dfsg-A1u41) UNREL; urgency=medium
+tensorflow (1.10.1+dfsg-A1) UNREL; urgency=medium
 
   * Initial release [1.10.1+dfsg]. (Closes: #804612)
   * Stage A (with Debian revision "A*") indicates that the source
@@ -7,4 +7,4 @@ tensorflow (1.10.1+dfsg-A1u41) UNREL; urgency=medium
     of the access to his build machine which helped a lot.
   * Many thanks to Boyuan Yang <byang@debian.org> for FTBFS report.
 
- -- Mo Zhou <cdluminate@gmail.com>  Sat, 08 Sep 2018 05:34:13 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Sat, 08 Sep 2018 08:34:43 +0000
