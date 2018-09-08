@@ -1,4 +1,9 @@
-cp test.ninja.in test.ninja
+#!/bin/sh
+set -ex
+
+NINJA_TEMPLATE="debian/tests/tf_core_test.ninja.in"
+NINJA=${NINJA_TEMPLATE%.in}
+cp $NINJA_TEMPLATE $NINJA
 
 testsrc=$(diff -ru debian/bazelDumps/SRC__tensorflow_libtensorflow_cc_so debian/bazelDumps/SRC__tf_alltest_nocontrib_nopy \
 	| grep -e '^+' | grep -v -e '^+@' | grep -v 'third_party' | grep -v debian \
@@ -33,19 +38,28 @@ testsrc=$(diff -ru debian/bazelDumps/SRC__tensorflow_libtensorflow_cc_so debian/
 	| grep -v graph_to_functiondef_test \
 	| grep -v graph_partition_test \
 	| grep -v presized_cuckoo_map_test \
+	| grep -v graph_constructor_test \
 	| grep -v distributed)
+testsrc="
+$testsrc
+tensorflow/core/kernels/ops_testutil.cc
+tensorflow/core/common_runtime/function_testlib.cc
+tensorflow/core/framework/function_testlib.cc
+tensorflow/core/api_def/excluded_ops.cc
+tensorflow/cc/framework/cc_op_gen.cc
+"
 
 for src in $testsrc; do
-	echo build $(echo $src | sed -e 's#.cc$#.o#'): cxxobj $src >> test.ninja
+	echo build $(echo $src | sed -e 's#.cc$#.o#'): cxxobj $src >> $NINJA
 done
 
-echo "build test: cxxexe $" >> test.ninja
+echo "build test: cxxexe $" >> $NINJA
 for src in $testsrc; do
-	echo " $(echo $src | sed -e 's#.cc$#.o#') $" >> test.ninja
+	echo " $(echo $src | sed -e 's#.cc$#.o#') $" >> $NINJA
 done
-echo " tensorflow/contrib/makefile/test/test_main.cc" >> test.ninja
-echo " libs = -Wl,--start-group -lgtest -ltensorflow_cc -ltensorflow_framework -lgtest -lprotobuf -lpthread -ljpeg -ldl -lm -lsqlite3 -Wl,--end-group" >> test.ninja
+echo " tensorflow/contrib/makefile/test/test_main.cc" >> $NINJA
+echo " libs = -Wl,--start-group -lgtest -ltensorflow_cc -lgtest -lprotobuf -lpthread -ljpeg -ldl -lm -lsqlite3 -Wl,--end-group" >> $NINJA
 
-ninja -f test.ninja -v
+ninja -f $NINJA -v
 
-#FIXME: undefined symbols
+#FIXME: undefined symbols?

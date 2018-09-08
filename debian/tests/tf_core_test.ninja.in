@@ -9,4 +9,4 @@ rule cxxobj
  command = $cxx $cppflags $cxxflags $ldflags $incdir $libs -c $in -o $out
 
 rule cxxexe
- command = $cxx $cppflags $cxxflags $ldflags $incdir $libs $in -o $out
+ command = $cxx $cppflags $cxxflags $ldflags $incdir $libs $in -o $out -lgtest
