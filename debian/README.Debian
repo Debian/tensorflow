@@ -38,22 +38,6 @@ Ambiguous FFT2D license
 
  - [ ] is it really problematic?
 
-Some Upstream Issues
---------------------
-
-1. -fvisibility=hidden
- > https://github.com/tensorflow/tensorflow/issues/9391#issuecomment-299039225
-
-2. File already exists in database: ***.proto
- > https://github.com/tensorflow/tensorflow/issues/8394
-
-3. cmake: tf shared lib
- > https://github.com/tensorflow/tensorflow/pull/9124
-
-4. statically-linked lib causes symbol collision
- > https://github.com/tensorflow/tensorflow/issues/9525
-
-
 Things remain to be done
 ========================
 
@@ -112,6 +96,7 @@ Will Never Get Fixed
       CUDA version of tensorflow is not planned yet. At the same
       time the CUDA version could also be linked against MKL.
 
+
 Maintainer Notes
 ================
 
@@ -126,3 +111,20 @@ These notes are written for myself and fellow developers.
 	Aborted
 
    Solution: don't link against more than one tensorflow libraries at a time.
+
+Some Upstream Issues
+--------------------
+
+1. -fvisibility=hidden
+ > https://github.com/tensorflow/tensorflow/issues/9391#issuecomment-299039225
+
+2. File already exists in database: ***.proto
+ > https://github.com/tensorflow/tensorflow/issues/8394
+
+3. cmake: tf shared lib
+ > https://github.com/tensorflow/tensorflow/pull/9124
+
+4. statically-linked lib causes symbol collision
+ > https://github.com/tensorflow/tensorflow/issues/9525
+
+
