@@ -40,10 +40,14 @@ override_dh_auto_install:
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# Some basic sanity tests
-	-$(SHELL) debian/tests/tf_lib_package_libtensorflow_test.sh
-	-$(SHELL) debian/tests/tf_ex_adding_an_op.sh
+	-$(SHELL) debian/tests/capi.sh
+	-$(SHELL) debian/tests/tf_c_api_test.sh
 	-$(SHELL) debian/tests/tf_cc_tutorial.sh
 	-$(SHELL) debian/tests/tf_doc_api_guide_cc.sh
+	-$(SHELL) debian/tests/tf_ex_adding_an_op.sh
 	-$(SHELL) debian/tests/tf_ex_label_image.sh
-	# TODO: compile and run upstream gtest testsuites
+	-$(SHELL) debian/tests/tf_lib_package_libtensorflow_test.sh
+	-$(SHELL) debian/tests/tf_tool_benchmark_model.sh
+	-$(SHELL) debian/tests/tf_tool_graph_transforms.sh
+	# TODO: compile and run more upstream gtest testsuites
 endif

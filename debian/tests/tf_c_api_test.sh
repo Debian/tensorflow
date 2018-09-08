@@ -29,7 +29,8 @@ export CXXFLAGS="$cppflags $cxxflags $incdir $libs"
 # compile an test op for unit tests
 $cxx tensorflow/c/test_op.cc \
 	-I/usr/include/tensorflow/ -I/usr/include/tensorflow/eigen3 \
-	-ltensorflow_cc -shared -fPIC -O2 \
+	-I. -Idebian/embedded/eigen3 \
+	-L. -ltensorflow_cc -shared -fPIC -O2 \
 	-o tensorflow/c/test_op.so
 
 # compile the unit test ELF executable
