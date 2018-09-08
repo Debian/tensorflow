@@ -275,12 +275,9 @@ def shogunTFLib_framework(argv):
     # (0) read bazel dump and apply hardcoded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    _, srclist = eGrep('.*proto_text.gen_proto_text_functions.*', srclist)
-    _, srclist = eGrep('.*core.kernels.*', srclist)
-    _, srclist = eGrep('.*core.ops.*', srclist)
+    _, srclist = eGrep('.*proto_text.gen_proto_text_functions.cc', srclist)
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
-    _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
 
     # (1) Initialize ninja file
     cursor = Writer(open(ag.o, 'w'))
@@ -435,7 +432,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
     _, srclist = eGrep('.*test.*', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
-    _, srclist = eGrep('.*gen_proto_text_functions.*', srclist) # not for this library
+    _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
     _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
@@ -557,7 +554,7 @@ def shogunTFCCLib(argv):
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
     _, srclist = eGrep('.*test.*', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
-    _, srclist = eGrep('.*gen_proto_text_functions.*', srclist) # not for this library
+    _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
     _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     srclist = list(set(srclist))
