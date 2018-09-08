@@ -1,12 +1,10 @@
 #!/bin/sh
 set -xe
 
-incdir="-I. -Idebian/embedded/eigen3 -I/usr/include/tensorflow/eigen3"
-libs="-L. -ltensorflow_cc -lpthread -lprotobuf -I/usr/include/gemmlowp"
+export CXXFLAGS=" -I. -Idebian/embedded/eigen3 -I/usr/include/tensorflow/eigen3"
+export CXXFLAGS=" $CXXFLAGS -L. -ltensorflow_cc -lpthread -lprotobuf -I/usr/include/gemmlowp"
 cxx="g++"
-cppflags=""
-cxxflags="-w -O2 -fPIE -pie"
-ldflags=""
+cxxflags=$CXXFLAGS
 
 lib="
 tensorflow/tools/graph_transforms/add_default_attributes.cc
@@ -39,9 +37,7 @@ tensorflow/tools/graph_transforms/transform_utils.cc
 objs=$(echo $lib | sed -e 's#\.cc#.o#g')
 
 # compile lib objects
-parallel \
-	"printf \" CXX %s\n\" {} ; $cxx $cppflags $cxxflags $ldflags $incdir $libs -c {} -o {.}.o" \
-	::: $lib
+./debian/parallel $lib
 
 $cxx $cppflags $cxxflags $ldflags $incdir $libs \
 	$objs \

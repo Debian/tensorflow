@@ -21,11 +21,10 @@ cxx="g++"
 cppflags=""
 cxxflags="-w -O2 -fPIC"
 ldflags=""
+export CXXFLAGS="$cppflags $cxxflags $incdir $libs"
 
 # compile lib objects
-parallel \
-	"printf \" CXX %s\n\" {} ; $cxx $cppflags $cxxflags $ldflags $incdir $libs -c {} -o {.}.o" \
-	::: $lib
+./debian/parallel $lib
 
 # compile an test op for unit tests
 $cxx tensorflow/c/test_op.cc \
