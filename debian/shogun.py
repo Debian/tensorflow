@@ -332,6 +332,13 @@ def shogunTFLib_framework(argv):
             + f'  -fvisibility=hidden'})
     # XXX: -ljemalloc FTBFS
 
+    # (5) a temporary shared object used by shogunCCOP
+    libccop = [x for x in objlist if all(y not in x for y in ('core/kernels', 'core/ops'))]
+    cursor.build('libtf_ccop.so', 'rule_CXX_SHLIB', inputs=libccop,
+            variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
+            + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
+            + ' -lpthread'})
+
     # done
     cursor.close()
 
@@ -391,7 +398,7 @@ def shogunCCOP(argv):
 
         # build corresponding elf executable
         cursor.build(f'{opname}_gen_cc', 'rule_CXX_EXEC', inputs=[coreopcc] + main_obj,
-            variables={'SHOGUN_EXTRA': '-I. -L. -ltensorflow_framework'})
+            variables={'SHOGUN_EXTRA': '-I. -L. -ltf_ccop'})
 
         # generate file
         cursor.build([ccopcc.replace('.cc', '.h'), ccopcc], 'rule_CC_OP_GEN', inputs=f'{opname}_gen_cc',
