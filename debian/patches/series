@@ -1,6 +1,7 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
 stub-version-info-cc.patch
+dirtyhack-fix-0-gflops.patch
 
 # This patch is for embedded source and is manually applied
 # fft-cxx-no-mangle.patch

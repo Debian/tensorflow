@@ -59,51 +59,7 @@ Things remain to be done
 
 C and C++ interface.
 
-- [ ] solve the following one problem
 - [ ] upload to experimental.
-
-::
-
-	lumin@Asuna:~/packages/tensorflow.pkg/tensorflow$ LD_LIBRARY_PATH=. ./tf_benchmark_model --graph=../tensorflow_inception_graph.pb --show_flops --input_layer=input --input_layer_type=float
-	2018-09-06 14:40:04.693215: I tensorflow/tools/benchmark/benchmark_model.cc:469] Graph: [../tensorflow_inception_graph.pb]
-	2018-09-06 14:40:04.693261: I tensorflow/tools/benchmark/benchmark_model.cc:470] Init ops:
-	2018-09-06 14:40:04.693266: I tensorflow/tools/benchmark/benchmark_model.cc:471] Input layers: [input]
-	2018-09-06 14:40:04.693270: I tensorflow/tools/benchmark/benchmark_model.cc:472] Input shapes: [1,224,224,3]
-	2018-09-06 14:40:04.693273: I tensorflow/tools/benchmark/benchmark_model.cc:473] Input types: [float]
-	2018-09-06 14:40:04.693276: I tensorflow/tools/benchmark/benchmark_model.cc:474] Output layers: [output:0]
-	2018-09-06 14:40:04.693279: I tensorflow/tools/benchmark/benchmark_model.cc:475] Target layers: []
-	2018-09-06 14:40:04.693285: I tensorflow/tools/benchmark/benchmark_model.cc:476] Num runs: [1000]
-	2018-09-06 14:40:04.693288: I tensorflow/tools/benchmark/benchmark_model.cc:477] Inter-inference delay (seconds): [-1.0]
-	2018-09-06 14:40:04.693294: I tensorflow/tools/benchmark/benchmark_model.cc:478] Inter-benchmark delay (seconds): [-1.0]
-	2018-09-06 14:40:04.693317: I tensorflow/tools/benchmark/benchmark_model.cc:480] Num threads: [-1]
-	2018-09-06 14:40:04.693322: I tensorflow/tools/benchmark/benchmark_model.cc:481] Benchmark name: []
-	2018-09-06 14:40:04.693325: I tensorflow/tools/benchmark/benchmark_model.cc:482] Output prefix: []
-	2018-09-06 14:40:04.693331: I tensorflow/tools/benchmark/benchmark_model.cc:483] Show sizes: [0]
-	2018-09-06 14:40:04.693334: I tensorflow/tools/benchmark/benchmark_model.cc:484] Warmup runs: [1]
-	2018-09-06 14:40:04.693339: I tensorflow/tools/benchmark/benchmark_model.cc:251] Loading TensorFlow.
-	2018-09-06 14:40:04.693351: I tensorflow/tools/benchmark/benchmark_model.cc:258] Got config, 0 devices
-	2018-09-06 14:40:04.693462: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE3 SSE4.1 SSE4.2 AVX AVX2 FMA
-	2018-09-06 14:40:04.758646: I tensorflow/tools/benchmark/benchmark_model.cc:496] Initialized session in 0.065293s
-	2018-09-06 14:40:04.758721: I tensorflow/tools/benchmark/benchmark_model.cc:327] Running benchmark for max 1 iterations, max -1 seconds without detailed stat logging, with -1s sleep between inferences
-	2018-09-06 14:40:04.893198: F tensorflow/core/grappler/costs/op_level_cost_estimator.cc:404] Check failed: 0 < gflops (0 vs. 0)type: "CPU"
-	vendor: "GenuineIntel"
-	model: "110"
-	num_cores: 4
-	environment {
-	  key: "cpu_instruction_set"
-	  value: "SSE, SSE2"
-	}
-	environment {
-	  key: "eigen"
-	  value: "3.3.90"
-	}
-	l1_cache_size: 32768
-	l2_cache_size: 262144
-	l3_cache_size: 6291456
-	memory_size: 9676668928
-
-	Aborted
-
 
 Postponed
 ---------

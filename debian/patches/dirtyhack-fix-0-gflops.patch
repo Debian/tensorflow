@@ -1,0 +1,19 @@
+Description: fixes 2018-09-06 14:40:04.893198: F tensorflow/core/grappler/costs/op_level_cost_estimator.cc:404] Check failed: 0 < gflops (0 vs. 0)type: "CPU"
+ I don't know why device.frequency() returned zero but in
+ tensorflow/core/protobuf/device_properties.proto
+ the frequency in MHz is stored in int64 type. What if my CPU works in 0.9GHz?
+Author: Mo Zhou
+Forward: not yet.
+diff --git a/tensorflow/core/grappler/costs/op_level_cost_estimator.cc b/tensorflow/core/grappler/costs/op_level_cost_estimator.cc
+index d34eecd0..a0283a7f 100644
+--- a/tensorflow/core/grappler/costs/op_level_cost_estimator.cc
++++ b/tensorflow/core/grappler/costs/op_level_cost_estimator.cc
+@@ -365,7 +365,7 @@ OpLevelCostEstimator::DeviceInfo OpLevelCostEstimator::GetDeviceInfo(
+     // Check if vector instructions are available, and refine performance
+     // prediction based on this.
+     // Frequencies are stored in MHz in the DeviceProperties.
+-    gflops = device.num_cores() * device.frequency() * 1e-3;
++    gflops = device.num_cores() * 4e+3;
+     if (gb_per_sec < 0) {
+       if (device.bandwidth() > 0) {
+         gb_per_sec = device.bandwidth() / 1e6;
