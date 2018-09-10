@@ -1,0 +1,120 @@
+
+             Maintainer Notes for Debian's TensorFlow Package
+
+                     Mo Zhou <lumin@debian.org>
+                           September 2018
+
+
+--- Table Of Content ----------------------------------------------------------
+
+Maintainer Part
+
+* Ambiguous FFT2D License
+* Things remains to be done.
+* Common Issue
+
+-------------------------------------------------------------------------------
+
+Ambiguous FFT2D license
+-----------------------
+
+ https://lists.debian.org/debian-legal/2018/08/msg00005.html
+ https://github.com/tensorflow/tensorflow/issues/21724
+ Well, let's assume it's a free license.
+
+ There is only one kernel that use this file. If this license
+ is really problematic, we can disable the kernel and drop
+ this dependency.
+
+ - [ ] is it really problematic?
+
+Things remain to be done
+========================
+
+C and C++ interface.
+
+- [ ] upload to experimental.
+
+Postponed
+---------
+
+- [ ] Compile both AVX+ version and Generic version. Automatically
+      choose the working one during postinst according to the machine's
+      cpu capability.
+- [ ] compile documentation instead of providing the raw ones.
+- [ ] build libtensorflow on top of libtensorflow_framework?
+- [ ] (ppc64el) what's this????????
+      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_
+      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol tensorflow::per_thread_max_parallism
+- [ ] make sure libtensorflow/amd64 is linked against libmkldnn
+- [ ] build tf.so and tf_cc.so upon tf_frmwk.so?
+- [ ] upload to unstable.
+      Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
+
+Python interface.
+
+- [ ] build _pywrap_tensorflow_internal.so on top of libtensorflow*
+- [ ] do we have all the required python dependencies?
+- [ ] figure out how to generate python API
+- [ ] is the resulting python package correct and working?
+- [ ] write autopkgtest with mini python programs.
+
+Definitions.
+
+- [ ] -DUSE_GEMM_FOR_CONV
+- [ ] -DTF_LEAN_BINARY
+- [ ] Jemalloc?
+- [ ] mkl-dnn?
+- [ ] sycl?
+- [ ] ...
+
+Will Never Get Fixed
+--------------------
+
+- [ ] 32-bit architecture support, if it FTBFS.
+- [ ] weak architecture support (incl. mips*, arm*, etc), if it FTBFS.
+- [ ] symbols control file. C++ symbols is a nightmare.
+- [ ] Javascript binding tensorflow.js if no one works on it.
+- [ ] Go binding if no one works on it.
+- [ ] Java binding if no one works on it.
+- [ ] If you want the CUDA version, why not use TensorFlow official binaries?
+      GPU (CUDA) support will be not added if no one works on it.
+      GPU version requires us to prepare another copy of source code and
+      rename it to tensorflow-cuda. (just like what I've done for
+      src:caffe and src:caffe-contrib). Apart from that, without
+      cuDNN, the GPU version will be pointless and useless.
+      CUDA version of tensorflow is not planned yet. At the same
+      time the CUDA version could also be linked against MKL.
+
+
+Maintainer Notes
+================
+
+These notes are written for myself and fellow developers.
+
+1. protobuf database collision::
+
+	[libprotobuf ERROR google/protobuf/descriptor_database.cc:58] File already exists in database: tensorflow/core/framework/tensor_shape.proto
+	[libprotobuf FATAL google/protobuf/descriptor.cc:1358] CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+	terminate called after throwing an instance of 'google::protobuf::FatalException'
+	  what():  CHECK failed: GeneratedDatabase()->Add(encoded_file_descriptor, size): 
+	Aborted
+
+   Solution: don't link against more than one tensorflow libraries at a time.
+
+Some Upstream Issues
+--------------------
+
+1. -fvisibility=hidden
+ > https://github.com/tensorflow/tensorflow/issues/9391#issuecomment-299039225
+
+2. File already exists in database: ***.proto
+ > https://github.com/tensorflow/tensorflow/issues/8394
+
+3. cmake: tf shared lib
+ > https://github.com/tensorflow/tensorflow/pull/9124
+
+4. statically-linked lib causes symbol collision
+ > https://github.com/tensorflow/tensorflow/issues/9525
+
+
