@@ -317,8 +317,7 @@ def shogunTFLib_framework(argv):
     for cc in src_cc + gen_pbcc + gen_pbtcc + genlist:
         variables = {}
         if any(x in cc for x in ('posix/port.cc',)):
-            #variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
-            pass
+            variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
         obj = cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
 
@@ -326,11 +325,10 @@ def shogunTFLib_framework(argv):
     cursor.build('libtensorflow_framework.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lfarmhash -lhighwayhash -lsnappy -lgif'
             + ' -ldouble-conversion -lz -lprotobuf -ljpeg -lnsync -lnsync_cpp'
-            + ' -lpthread',
+            + ' -lpthread -ljemalloc',
             'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_framework.so.{tf_soversion}'
             + f' -Wl,--version-script tensorflow/tf_framework_version_script.lds'
             + f'  -fvisibility=hidden'})
-    # XXX: -ljemalloc FTBFS
 
     # (5) a temporary shared object used by shogunCCOP
     libccop = [x for x in objlist if all(y not in x for y in ('core/kernels', 'core/ops'))]
@@ -501,8 +499,7 @@ def shogunTFLib(argv):
     for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
         variables = {}
         if any(x in cc for x in ('posix/port.cc',)):
-            #variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
-            pass
+            variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
         elif any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
         obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
@@ -512,13 +509,12 @@ def shogunTFLib(argv):
     cursor.build('libtensorflow.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
                 + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
-                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
+                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl -ljemalloc'
                 + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'
                 + f' -Wl,--version-script tensorflow/c/version_script.lds'
                 + f'  -fvisibility=hidden'})
     # FIXME: mkl-dnn, grpc, xsmm
-    # XXX: FTBFS with jemalloc
 
     # (5) write down the related header files
     allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
@@ -623,8 +619,7 @@ def shogunTFCCLib(argv):
     for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
         variables = {}
         if any(x in cc for x in ('posix/port.cc',)):
-            #variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
-            pass
+            variables = {'SHOGUN_EXTRA': '-DTENSORFLOW_USE_JEMALLOC'}
         elif any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
         obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
@@ -634,13 +629,12 @@ def shogunTFCCLib(argv):
     cursor.build('libtensorflow_cc.so', 'rule_CXX_SHLIB', inputs=objlist,
             variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
                 + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
-                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
+                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl -ljemalloc'
                 + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_cc.so.{tf_soversion}'
                 + f' -Wl,--version-script tensorflow/tf_version_script.lds'
                 + f'  -fvisibility=hidden'})
     # FIXME: mkl-dnn, grpc, xsmm
-    # XXX: FTBFS with jemalloc
 
     # (5) write down the related header files
     allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
