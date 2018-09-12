@@ -44,6 +44,9 @@ References
 6. Gentoo ebuild
    https://packages.gentoo.org/packages/sci-libs/tensorflow
 '''
+# FIXME: libtensorflow.so and libtensorflow_cc.so are still not linked
+# against mkl-dnn, xsmm .
+# FIXME: how to use blas/mkl to improve speed?
 
 from typing import *
 import sys
@@ -510,7 +513,6 @@ def shogunTFLib(argv):
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'
                 + f' -Wl,--version-script tensorflow/c/version_script.lds'
                 + f'  -fvisibility=hidden'})
-    # FIXME: mkl-dnn, grpc, xsmm
 
     # (5) write down the related header files
     allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
@@ -628,7 +630,6 @@ def shogunTFCCLib(argv):
                 'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_cc.so.{tf_soversion}'
                 + f' -Wl,--version-script tensorflow/tf_version_script.lds'
                 + f'  -fvisibility=hidden'})
-    # FIXME: mkl-dnn, grpc, xsmm
 
     # (5) write down the related header files
     allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
