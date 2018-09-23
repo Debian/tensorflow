@@ -1,7 +1,6 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
 stub-version-info-cc.patch
-dirtyhack-fix-0-gflops.patch
 
 # the jemalloc patch is left for reference
 # jemalloc.patch
