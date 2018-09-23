@@ -321,7 +321,10 @@ def shogunTFLib_framework(argv):
 
 def shogunTFLib(argv):
     '''
-    Build libtensorflow.so or libtensorflow_cc.so
+    Build any one of the following libraries:
+    * libtensorflow.so
+    * libtensorflow_cc.so
+    * pywrap_tensorflow_internal.so
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', type=str, required=True,
@@ -357,6 +360,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
     Rheaders, srclist = eGrep('.*.h$', srclist) # nothing to do
     _, srclist = eGrep('.*.proto$', srclist) # nothing to do
+    _, srclist = eGrep('.*.i$', srclist) # SWIG files aren't for us
 
     if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
         # they FTBFS on non-amd64 arches
@@ -378,6 +382,8 @@ def shogunTFLib(argv):
         variables = {}
         if any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
+        elif 'python' in cc:
+            variables = {'SHOGUN_EXTRA': f'-I{py_incdir} -L{py_libdir}'}
         cursor.build(obj, 'rule_CXX_OBJ', cc, variables=variables)
         objlist.append(obj)
 
@@ -393,6 +399,9 @@ def shogunTFLib(argv):
         extra.append('-Wl,--version-script tensorflow/c/version_script.lds')
     elif 'libtensorflow_cc.so' in ag.O:
         extra.append('-Wl,--version-script tensorflow/tf_version_script.lds')
+    elif 'pywrap' in ag.O:
+        print(f'pywrap_tensorflow_internal will be built with python{py_ver}')
+        extra.append(f'-I{py_incdir} -L{py_libdir}')
     extra = ' '.join(x for x in extra)
     cursor.build(ag.O, 'rule_CXX_SHLIB', objlist,
             variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
