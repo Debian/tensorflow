@@ -300,7 +300,7 @@ def shogunTFLib_framework(argv):
         variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
 
     # (3) link the byproduct for tf_cc_op_gen
-    libtfccopgen, _ = eGrep(['.*core/kernels.*', '.*core/ops.*'], objlist)
+    _, libtfccopgen = eGrep(['.*core/kernels.*', '.*core/ops.*'], objlist)
     cursor.build(ag.b, 'rule_CXX_SHLIB', libtfccopgen,
             variables={'LIBS': libs})
 
@@ -379,7 +379,10 @@ def shogunTFLib(argv):
     libs = ' '.join(f'-l{x}' for x in libs)
     extra = f'''-Wl,--soname={ag.O}.{tf_soversion} -fvisibility=hidden
              '''.split()
-    extra.append('-Wl,--version-script tensorflow/c/version_script.lds')
+    if 'libtensorflow.so' in ag.O:
+        extra.append('-Wl,--version-script tensorflow/c/version_script.lds')
+    elif 'libtensorflow_cc.so' in ag.O:
+        extra.append('-Wl,--version-script tensorflow/tf_version_script.lds')
     extra = ' '.join(x for x in extra)
     cursor.build(ag.O, 'rule_CXX_SHLIB', objlist,
             variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
