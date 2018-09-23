@@ -51,3 +51,7 @@ $SHOGUN TFLib \
 	-o libtensorflow_cc.ninja \
 	-H libtensorflow_cc.hdrs \
 	-O libtensorflow_cc.so
+
+$SHOGUN Generator \
+	-g $DATADIR/GEN__tensorflow_python_pywrap_tensorflow \
+	-o pywrap_tensorflow_internal.gen.ninja

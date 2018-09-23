@@ -78,4 +78,4 @@ bazelDump //tensorflow:libtensorflow.so
 bazelDump //tensorflow:libtensorflow_cc.so
 bazelDump //tensorflow/python:pywrap_tensorflow
 
-bazelDumpNonPythonTestTargets __tf_alltest_nocontrib_nopy
+#bazelDumpNonPythonTestTargets __tf_alltest_nocontrib_nopy

@@ -59,9 +59,16 @@ import subprocess
 from pprint import pprint
 from ninja_syntax import Writer
 
+import numpy
+import distutils.sysconfig
+
 
 # FIXME: don't forget to bump soversion when upstream version changes!
 tf_soversion = '1.10'
+py_incdir = distutils.sysconfig.get_python_inc()
+py_libdir = distutils.sysconfig.get_python_lib()
+py_ver    = distutils.sysconfig.get_python_version()
+py_numpy_incdir = numpy.get_include()
 
 
 def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
@@ -99,6 +106,9 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('rule_CXX_SHLIB', f'$CXX -shared -fPIC $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api')
     cursor.rule('COPY', f'cp $in $out')
+    cursor.rule('rule_ANYi', f'$ANY $in')
+    cursor.rule('rule_ANYo', f'$ANY $out')
+    cursor.rule('rule_ANY', '$ANY')
     cursor.newline()
     cursor.comment('-- end common ninja header --')
     cursor.newline()
@@ -476,6 +486,18 @@ def shogunGenerator(argv):
         cursor.build([ccoph, ccopcc], 'rule_CC_OP_GEN', f'{op}_gen_cc',
                 variables={'cc_op_gen_internal': '0' if op != 'sendrecv_ops' else '1'},
                 implicit_outputs=[ccopinh, ccopincc])
+
+    # (3) SWIG Wrapper
+    Rpywrap, Rall = eGrep('.*pywrap_tensorflow_internal.*', Rall)
+    if Rpywrap:
+        pywrap = 'tensorflow/python/pywrap_tensorflow_internal.py'
+        ccwrap = 'tensorflow/python/pywrap_tensorflow_internal.cc'
+        cursor.build([pywrap, ccwrap], 'rule_ANYi', 'tensorflow/python/tensorflow.i',
+            variables={'ANY': ' '.join('''swig -python -c++ -I.
+            -module pywrap_tensorflow_internal
+            -outdir tensorflow/python
+            -o tensorflow/python/pywrap_tensorflow_internal.cc
+            -globals "" '''.split()) })
 
     # (.) finish
     cursor.close()
