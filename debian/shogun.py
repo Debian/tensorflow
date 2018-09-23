@@ -340,7 +340,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
-    _, srclist = eGrep('.*test.*', srclist) # don't include any test
+    _, srclist = eGrep('.*_test.cc$', srclist) # don't include any test
     _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
     _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
     _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
@@ -361,7 +361,7 @@ def shogunTFLib(argv):
         ]
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
-    cclist, srclist = eGrep('.*.cc', srclist)
+    cclist, srclist = eGrep(['.*.cc$', '.*.c$'], srclist)
     objlist = []
     for cc in cclist:
         obj = re.sub('.c[c]?$', '.o', cc)
