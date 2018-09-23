@@ -22,10 +22,15 @@ $SHOGUN ProtoText \
 	-g $DATADIR/GEN__tensorflow_tools_proto_text_gen_proto_text_functions \
 	-o proto_text.ninja
 
-#$SHOGUN TFLib_framework \
-#	-i $DATADIR/SRC__tensorflow_libtensorflow_framework_so \
-#	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so
-#
+$SHOGUN Generator \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so \
+	-o libtensorflow_framework.gen.ninja
+
+$SHOGUN TFLib_framework \
+	-i $DATADIR/SRC__tensorflow_libtensorflow_framework_so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so \
+	-o libtensorflow_framework.ninja
+
 #$SHOGUN CCOP \
 #	-i $DATADIR/SRC__tensorflow_libtensorflow_so \
 #	-g $DATADIR/GEN__tensorflow_libtensorflow_so
