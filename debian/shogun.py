@@ -183,38 +183,6 @@ def bazelPreprocess(srclist: List[str]) -> List[str]:
     return retlist
 
 
-def shogunAllProto(argv):
-    '''
-    Generate XXX.pb.{h,cc} files from all available XXX.proto
-    files in the source directory.
-
-    Depends: protoc (protobuf-compiler)
-    Input: .proto
-    Output: .pb.cc, .pb.h
-    '''
-    ag = argparse.ArgumentParser()
-    ag.add_argument('-o', help='write ninja file', type=str, default='all_proto.ninja')
-    ag = ag.parse_args(argv)
-    print(red('Argument Dump:'))
-    pprint(vars(ag))
-
-    # (1) initialize ninja file
-    cursor = Writer(open(ag.o, 'w'))
-    ninjaCommonHeader(cursor, ag)
-
-    # (2) glob all proto
-    protos = glob.glob(f'**/*.proto', recursive=True)
-    print(cyan('AllProto:'), f'globbed {len(protos)} .proto files')
-
-    # (3) generate .pb.cc, .pb.h
-    for proto in protos:
-        cursor.build([ proto.replace('.proto', '.pb.cc'),
-            proto.replace('.proto', '.pb.h')], 'rule_PROTOC', proto)
-
-    # done
-    cursor.close()
-
-
 def shogunProtoText(argv):
     '''
     Build a binary ELF executable named proto_text, which generates
