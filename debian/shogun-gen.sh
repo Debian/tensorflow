@@ -16,7 +16,6 @@ fi
 $SHOGUN Generator \
 	-g $DATADIR/GEN__tensorflow_tools_proto_text_gen_proto_text_functions \
 	-o proto_text.gen.ninja
-
 $SHOGUN ProtoText \
 	-i $DATADIR/SRC__tensorflow_tools_proto_text_gen_proto_text_functions \
 	-g $DATADIR/GEN__tensorflow_tools_proto_text_gen_proto_text_functions \
@@ -25,20 +24,27 @@ $SHOGUN ProtoText \
 $SHOGUN Generator \
 	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so \
 	-o libtensorflow_framework.gen.ninja
-
 $SHOGUN TFLib_framework \
 	-i $DATADIR/SRC__tensorflow_libtensorflow_framework_so \
 	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so \
 	-o libtensorflow_framework.ninja
 
-#$SHOGUN CCOP \
-#	-i $DATADIR/SRC__tensorflow_libtensorflow_so \
-#	-g $DATADIR/GEN__tensorflow_libtensorflow_so
-#
-#$SHOGUN TFLib \
-#	-i $DATADIR/SRC__tensorflow_libtensorflow_so \
-#	-g $DATADIR/GEN__tensorflow_libtensorflow_so
-#
-#$SHOGUN TFCCLib \
-#	-i $DATADIR/SRC__tensorflow_libtensorflow_cc_so \
-#	-g $DATADIR/GEN__tensorflow_libtensorflow_cc_so
+$SHOGUN Generator \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_so \
+	-o libtensorflow.gen.ninja
+$SHOGUN TFLib \
+	-i $DATADIR/SRC__tensorflow_libtensorflow_so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_so \
+	-o libtensorflow.ninja \
+	-H libtensorflow.hdrs \
+	-O libtensorflow.so
+
+$SHOGUN Generator \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_cc_so \
+	-o libtensorflow_cc.gen.ninja
+$SHOGUN TFLib \
+	-i $DATADIR/SRC__tensorflow_libtensorflow_cc_so \
+	-g $DATADIR/GEN__tensorflow_libtensorflow_cc_so \
+	-o libtensorflow_cc.ninja \
+	-H libtensorflow_cc.hdrs \
+	-O libtensorflow_cc.so

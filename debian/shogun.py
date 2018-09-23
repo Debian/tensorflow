@@ -259,6 +259,8 @@ def shogunTFLib_framework(argv):
             help='list of generated files')
     ag.add_argument('-o', type=str, default='libtensorflow_framework.ninja',
             help='where to write the ninja file', )
+    ag.add_argument('-H', type=str, default='libtensorflow_framework.hdrs',
+            help='a list of header files')
     ag = ag.parse_args(argv)
     print(red('Argument Dump:'))
     pprint(vars(ag))
@@ -285,15 +287,16 @@ def shogunTFLib_framework(argv):
 
     # (2) link the shared object
     libs = '''farmhash highwayhash snappy gif double-conversion
-              z protobuf jpeg nsync nsync_cpp pthread'''.split()
+              z protobuf jpeg nsync nsync_cpp pthread
+              '''.split()
     libs = ' '.join(f'-l{x}' for x in libs)
+    extra = f'''-Wl,--soname=libtensorflow_framework.so.{tf_soversion}
+                -Wl,--version-script tensorflow/tf_framework_version_script.lds
+                -fvisibility=hidden
+             '''.split()
+    extra = ' '.join(x for x in extra)
     cursor.build('libtensorflow_framework.so', 'rule_CXX_SHLIB', inputs=objlist,
-        variables={
-        'LIBS': libs,
-        'SHOGUN_EXTRA':
-            f' -Wl,--soname=libtensorflow_framework.so.{tf_soversion}' +
-            f' -Wl,--version-script tensorflow/tf_framework_version_script.lds' +
-            f' -fvisibility=hidden'})
+        variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
 
     # (3) link the byproduct for tf_cc_op_gen
     libtfccopgen, _ = eGrep(['.*core/kernels.*', '.*core/ops.*'], objlist)
@@ -305,85 +308,21 @@ def shogunTFLib_framework(argv):
     eComplain(srclist)
 
 
-def shogunCCOP(argv):
-    '''
-    Generate tensorflow cc ops : tensorflow/cc/ops/*.cc and *.h
-
-    Depends: AllProto, proto_text, libtensorflow_framework
-    Input: cc source, bazel dump
-    Output: one-time-use binary "XXX_gen_cc" and generated .cc .h files.
-    '''
-    ag = argparse.ArgumentParser()
-    ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='ccop.ninja')
-    ag = ag.parse_args(argv)
-    print(red('Argument Dump:'))
-    pprint(vars(ag))
-
-    # (0) read bazel dump and apply hardcoded filters
-    genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-
-    # (1) Instantiate ninja writer
-    cursor = Writer(open(ag.o, 'w'))
-    ninjaCommonHeader(cursor, ag)
-
-    # (2) filter unrelated files, we only want cc_op related files.
-    _, genlist = eGrep('.*.pb.h', genlist)
-    _, genlist = eGrep('.*.pb.cc', genlist)
-    _, genlist = eGrep('.*.pb_text.h', genlist)
-    _, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    _, genlist = eGrep('.*.pb_text.cc', genlist)
-
-    # (3) XXX_gen_cc
-    # (3.1) deal with a missing source
-    cursor.build('tensorflow/core/ops/user_ops.cc', 'COPY', inputs='tensorflow/core/user_ops/fact.cc')
-
-    # (3.2) build several common objects
-    main_cc = ['tensorflow/core/framework/op_gen_lib.cc',
-        'tensorflow/cc/framework/cc_op_gen.cc',
-        'tensorflow/cc/framework/cc_op_gen_main.cc',
-        ]
-    main_obj = [x.replace('.cc', '.o') for x in main_cc]
-    for cc in main_cc:
-        cursor.build(cc.replace('.cc', '.o'), 'rule_CXX_OBJ', inputs=cc)
-
-    # (3.2) build executables and generate file with executable
-    gen_ccopcc, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
-    gen_ccoph, genlist = eGrep('.*/cc/ops/.*.h', genlist)
-    opnamelist = list(set(os.path.basename(x.replace('.cc', '').replace('.h', ''))
-        for x in (gen_ccopcc + gen_ccoph) if 'internal' not in x ))
-
-    for opname in opnamelist:
-        coreopcc = 'tensorflow/core/ops/' + opname + '.cc'
-        ccopcc   = 'tensorflow/cc/ops/'   + opname + '.cc'
-
-        # build corresponding elf executable
-        cursor.build(f'{opname}_gen_cc', 'rule_CXX_EXEC', inputs=[coreopcc] + main_obj,
-            variables={'SHOGUN_EXTRA': '-I. -L. -ltf_ccop'})
-
-        # generate file
-        cursor.build([ccopcc.replace('.cc', '.h'), ccopcc], 'rule_CC_OP_GEN', inputs=f'{opname}_gen_cc',
-                variables={'cc_op_gen_internal': '0' if opname != 'sendrecv_ops' else '1'},
-                implicit_outputs=[ccopcc.replace('.cc', '_internal.h'), ccopcc.replace('.cc', '_internal.cc')])
-
-    ## done
-    cursor.close()
-
-
 def shogunTFLib(argv):
     '''
-    Build libtensorflow.so
-
-    Depends: all_proto, proto_text, CCOP
-    Input: bazel dump, source files
-    Output: libtensorflow.so
+    Build libtensorflow.so or libtensorflow_cc.so
     '''
     ag = argparse.ArgumentParser()
-    ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow.ninja')
-    ag.add_argument('-H', help='where to put the headers list', type=str, default='libtensorflow.hdrs')
+    ag.add_argument('-i', type=str, required=True,
+            help='list of source files')
+    ag.add_argument('-g', type=str, required=True,
+            help='list of generated files')
+    ag.add_argument('-o', type=str, required=True,
+            help='where to write the ninja file')
+    ag.add_argument('-O', type=str, required=True,
+            help='the file name shared object')
+    ag.add_argument('-H', type=str, required=True,
+            help='where to put the headers list')
     ag = ag.parse_args(argv)
     print(red('Argument Dump:'))
     pprint(vars(ag))
@@ -391,7 +330,8 @@ def shogunTFLib(argv):
     # (0) read bazel dump and apply hard-coded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    tflib_extra_srcs = ['debian/embedded/fft/fftsg.c']
+    extra_srcs = ['debian/embedded/fft/fftsg.c']
+    srclist = list(set(srclist + genlist + extra_srcs))
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
     _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
@@ -404,205 +344,52 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
     _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
-    srclist = list(set(srclist))
+    Rheaders, srclist = eGrep('.*.h$', srclist) # nothing to do
+    _, srclist = eGrep('.*.proto$', srclist) # nothing to do
 
     if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
         # they FTBFS on non-amd64 arches
         _, srclist = eGrep('.*/core/debug/.*', srclist)
-        _, genlist = eGrep('.*/core/debug/.*', genlist)
         _, srclist = eGrep('.*debug_ops.*', srclist)
-        _, genlist = eGrep('.*debug_ops.*', genlist)
 
-    # (1) Instantiate ninja writer
+    # (1) Instantiate ninja writer and compile objects
+    exception_eigen_avoid_std_array = [
+        'sparse_tensor_dense_matmul_op',
+        'conv_grad_ops_3d',
+        'adjust_contrast_op'
+        ]
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
-
-    # (2) deal with generated files
-    # (2.1) .pb.h and .pb.cc are already generated by shogunAllProto
-    gen_pbh, genlist = eGrep('.*.pb.h', genlist)
-    gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
-
-    # XXX: temporary workaround for //tensorflow/core/debug:debug_service.grpc.pb.cc
-    if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
-        # This is amd64-only
-        cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
-            'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
-
-    # (2.2) .pb_text.*
-    pbtlist = [x for x in genlist if any(x.endswith(y) for y in ('.pb_text.h', '.pb_text.cc', '.pb_text-impl.h'))]
-    pbtlist = [x.replace('.pb_text.h', '.proto').replace('.pb_text.cc', '.proto').replace('.pb_text-impl.h', '.proto') for x in pbtlist]
-    gen_pbth, genlist = eGrep('.*.pb_text.h', genlist)
-    gen_pbtih, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    gen_pbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
-    for pbt in list(set(pbtlist)):
-        cursor.build([
-            pbt.replace('.proto', '.pb_text.h'),
-            pbt.replace('.proto', '.pb_text.cc'),
-            pbt.replace('.proto', '.pb_text-impl.h')
-            ], 'rule_PROTO_TEXT', pbt)
-
-    # (2.3) cc_op_gen
-    gen_ccopcc, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
-    gen_ccoph, genlist = eGrep('.*/cc/ops/.*.h', genlist)
-
-    # (2.4) finish dealing with generated files
-    if genlist:
-        print(yellow('Remainders:'), genlist)
-        assert(len(genlist) == 1)
-
-    # (3) deal with source files
-    # (3.1) filter-out headers
-    _, srclist = eGrep('.*.proto$', srclist) # done in (2)
-    src_hdrs, srclist = eGrep('.*.h$', srclist)
-
-    # (3.2) compile .cc source
-    src_cc, srclist = eGrep('.*.cc', srclist)
+    cclist, srclist = eGrep('.*.cc', srclist)
     objlist = []
-    exception_eigen_avoid_std_array = [
-        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d', 'adjust_contrast_op' ]
-    for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
+    for cc in cclist:
+        obj = re.sub('.c[c]?$', '.o', cc)
         variables = {}
         if any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
-        obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
+        cursor.build(obj, 'rule_CXX_OBJ', cc, variables=variables)
         objlist.append(obj)
 
-    # (4) link the final shared object
-    cursor.build('libtensorflow.so', 'rule_CXX_SHLIB', inputs=objlist,
-            variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
-                + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
-                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
-                + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
-                'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow.so.{tf_soversion}'
-                + f' -Wl,--version-script tensorflow/c/version_script.lds'
-                + f'  -fvisibility=hidden'})
+    # (2) link the final shared object
+    libs = '''pthread protobuf nsync nsync_cpp double-conversion jpeg png
+              gif highwayhash farmhash jsoncpp sqlite3 re2 curl lmdb snappy
+              dl z m LLVM-7 grpc++
+              '''.split()
+    libs = ' '.join(f'-l{x}' for x in libs)
+    extra = f'''-Wl,--soname={ag.O}.{tf_soversion} -fvisibility=hidden
+             '''.split()
+    extra.append('-Wl,--version-script tensorflow/c/version_script.lds')
+    extra = ' '.join(x for x in extra)
+    cursor.build(ag.O, 'rule_CXX_SHLIB', objlist,
+            variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
 
-    # (5) write down the related header files
-    allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
+    # (3) write down the related header files
     with open(ag.H, 'w') as f:
-        f.writelines([x + '\n' for x in sorted(allHdrs)])
+        f.writelines([x + '\n' for x in eUniq('', '', Rheaders)])
 
-    # done
-    print(yellow('Remainders:'))
-    pprint(srclist, indent=4, compact=4)
+    # (.) finish
     cursor.close()
-
-
-def shogunTFCCLib(argv):
-    '''
-    Build libtensorflow_cc.so
-
-    Depends: all_proto, proto_text, CCOP
-    Input: bazel dump, source files
-    Output: libtensorflow_cc.so
-    '''
-    ag = argparse.ArgumentParser()
-    ag.add_argument('-i', help='list of source files', type=str, required=True)
-    ag.add_argument('-g', help='list of generated files', type=str, required=True)
-    ag.add_argument('-o', help='where to write the ninja file', type=str, default='libtensorflow_cc.ninja')
-    ag.add_argument('-H', help='where to put the headers list', type=str, default='libtensorflow_cc.hdrs')
-    ag = ag.parse_args(argv)
-    print(red('Argument Dump:'))
-    pprint(vars(ag))
-
-    # (0) read bazel dump and apply hard-coded filters
-    srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
-    genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-    tflib_extra_srcs = ['debian/embedded/fft/fftsg.c']
-    _, srclist = eGrep('^third_party', srclist)
-    _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
-    _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
-    _, srclist = eGrep('.*.pbtxt$', srclist) # not for us
-    _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
-    _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
-    _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
-    _, srclist = eGrep('.*test.*', srclist) # don't include any test
-    _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
-    _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
-    _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
-    _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
-    srclist = list(set(srclist))
-
-    if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
-        # they FTBFS on non-amd64 arches
-        _, srclist = eGrep('.*/core/debug/.*', srclist)
-        _, genlist = eGrep('.*/core/debug/.*', genlist)
-        _, srclist = eGrep('.*debug_ops.*', srclist)
-        _, genlist = eGrep('.*debug_ops.*', genlist)
-
-    # (1) Instantiate ninja writer
-    cursor = Writer(open(ag.o, 'w'))
-    ninjaCommonHeader(cursor, ag)
-
-    # (2) deal with generated files
-    # (2.1) .pb.h and .pb.cc are already generated by shogunAllProto
-    gen_pbh, genlist = eGrep('.*.pb.h', genlist)
-    gen_pbcc, genlist = eGrep('.*.pb.cc', genlist)
-
-    # XXX: temporary workaround for //tensorflow/core/debug:debug_service.grpc.pb.cc
-    if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
-        # This is amd64-only
-        cursor.build(['tensorflow/core/debug/debug_service.grpc.pb.cc', 'tensorflow/core/debug/debug_service.grpc.pb.h'],
-            'rule_PROTOC_GRPC', inputs='tensorflow/core/debug/debug_service.proto')
-
-    # (2.2) .pb_text.*
-    pbtlist = [x for x in genlist if any(x.endswith(y) for y in ('.pb_text.h', '.pb_text.cc', '.pb_text-impl.h'))]
-    pbtlist = [x.replace('.pb_text.h', '.proto').replace('.pb_text.cc', '.proto').replace('.pb_text-impl.h', '.proto') for x in pbtlist]
-    gen_pbth, genlist = eGrep('.*.pb_text.h', genlist)
-    gen_pbtih, genlist = eGrep('.*.pb_text-impl.h', genlist)
-    gen_pbtcc, genlist = eGrep('.*.pb_text.cc', genlist)
-    for pbt in list(set(pbtlist)):
-        cursor.build([
-            pbt.replace('.proto', '.pb_text.h'),
-            pbt.replace('.proto', '.pb_text.cc'),
-            pbt.replace('.proto', '.pb_text-impl.h')
-            ], 'rule_PROTO_TEXT', pbt)
-
-    # (2.3) cc_op_gen
-    gen_ccopcc, genlist = eGrep('.*/cc/ops/.*.cc', genlist)
-    gen_ccoph, genlist = eGrep('.*/cc/ops/.*.h', genlist)
-
-    # (2.4) finish dealing with generated files
-    if genlist:
-        print(yellow('Remainders:'), genlist)
-        assert(len(genlist) == 1)
-
-    # (3) deal with source files
-    # (3.1) filter-out headers
-    _, srclist = eGrep('.*.proto$', srclist) # done in (2)
-    src_hdrs, srclist = eGrep('.*.h$', srclist)
-
-    # (3.2) compile .cc source
-    src_cc, srclist = eGrep('.*.cc', srclist)
-    objlist = []
-    exception_eigen_avoid_std_array = [
-        'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d', 'adjust_contrast_op' ]
-    for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
-        variables = {}
-        if any(x in cc for x in exception_eigen_avoid_std_array):
-            variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
-        obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
-        objlist.append(obj)
-
-    # (4) link the final shared object
-    cursor.build('libtensorflow_cc.so', 'rule_CXX_SHLIB', inputs=objlist,
-            variables={'LIBS': '-lpthread -lprotobuf -lnsync -lnsync_cpp'
-                + ' -ldouble-conversion -ljpeg -lpng -lgif -lhighwayhash'
-                + ' -lfarmhash -ljsoncpp -lsqlite3 -lre2 -lcurl'
-                + ' -llmdb -lsnappy -ldl -lz -lm -lLLVM-7 -lgrpc++',
-                'SHOGUN_EXTRA': f'-Wl,--soname=libtensorflow_cc.so.{tf_soversion}'
-                + f' -Wl,--version-script tensorflow/tf_version_script.lds'
-                + f'  -fvisibility=hidden'})
-
-    # (5) write down the related header files
-    allHdrs = gen_pbh + gen_pbth + gen_pbtih + gen_ccoph + src_hdrs
-    with open(ag.H, 'w') as f:
-        f.writelines([x + '\n' for x in sorted(allHdrs)])
-
-    # done
-    print(yellow('Remainders:'))
-    pprint(srclist, indent=4, compact=4)
-    cursor.close()
+    eComplain(Rall)
 
 
 def shogunGenerator(argv):
@@ -633,7 +420,8 @@ def shogunGenerator(argv):
     for proto in Lgrpc_proto:
         Tcc = re.sub('.proto$', '.grpc.pb.cc', proto)
         Th  = re.sub('.proto$', '.grpc.pb.h', proto)
-        cursor.build([Tcc, Th], 'rule_PROTOC_GRPC', proto)
+        if getDpkgArchitecture('DEB_HOST_ARCH') == 'amd64':
+            cursor.build([Tcc, Th], 'rule_PROTOC_GRPC', proto)
 
     # (1.2) Collect protobuf stuff and generate targets
     Rpb_all, Rall = eGrep(['.*.pb.cc', '.*.pb.h'], Rall)
@@ -656,11 +444,36 @@ def shogunGenerator(argv):
         Tih = re.sub('.proto$', '.pb_text-impl.h', proto)
         cursor.build([Tcc, Th, Tih], 'rule_PROTO_TEXT', proto)
 
-    # (2.1) tf_cc_op_gen
-    #Rcc_op_all, Rall = eGrep(['.*/cc/ops/.*.cc', '.*/cc/ops/.*.h'], Rall)
-    #FIXME
+    # (2.1) tf_cc_op_gen (YYY_gen_cc)
+    Rcc_op_all, Rall = eGrep(['.*/cc/ops/.*.cc', '.*/cc/ops/.*.h'], Rall)
+    cursor.build('tensorflow/core/ops/user_ops.cc', 'COPY', 'tensorflow/core/user_ops/fact.cc')
+    # - common object
+    cclist_extra = ['tensorflow/core/framework/op_gen_lib.cc',
+                    'tensorflow/cc/framework/cc_op_gen.cc',
+                    'tensorflow/cc/framework/cc_op_gen_main.cc', ]
+    objlist = []
+    for cc in cclist_extra:
+        obj = re.sub('.cc$', '.o', cc)
+        cursor.build(obj, 'rule_CXX_OBJ', cc)
+        objlist.append(obj)
+    # - all ops
+    ops = eUniq('.cc$', '', Rcc_op_all)
+    ops = eUniq('.h$', '', ops)
+    ops = list(set(os.path.basename(x) for x in ops if 'internal' not in x))
+    # - build elf executables and generate .cc files
+    for op in ops:
+        coreopcc = 'tensorflow/core/ops/' + op + '.cc'
+        ccopcc   = 'tensorflow/cc/ops/'   + op + '.cc'
+        ccoph    = 'tensorflow/cc/ops/'   + op + '.h'
+        ccopincc = 'tensorflow/cc/ops/'   + op + '_internal.cc'
+        ccopinh  = 'tensorflow/cc/ops/'   + op + '_internal.h'
+        cursor.build(f'{op}_gen_cc', 'rule_CXX_EXEC', [coreopcc] + objlist,
+            variables={'SHOGUN_EXTRA': '-I. -L. -ltf_ccop'})
+        cursor.build([ccoph, ccopcc], 'rule_CC_OP_GEN', '{op}_gen_cc',
+                variables={'cc_op_gen_internal': '0' if op != 'sendrecv_ops' else '1'},
+                implicit_outputs=[ccopinh, ccopincc])
 
-    # (9.1) finish
+    # (.) finish
     cursor.close()
     eComplain(Rall)
 
