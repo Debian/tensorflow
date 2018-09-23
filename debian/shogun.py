@@ -183,14 +183,17 @@ def bazelPreprocess(srclist: List[str]) -> List[str]:
     return retlist
 
 
+###############################################################################
+###############################################################################
+
+
 def shogunProtoText(argv):
     '''
     Build a binary ELF executable named proto_text, which generates
     XXX.pb_text{.cc,.h,-impl.h} files from a given XXX.proto file.
     This binary file is for one-time use.
 
-    Depends: shogunAllProto
-    Input: bazelDump, cxx source
+    Input: bazelDump
     Output: proto_text
     '''
     ag = argparse.ArgumentParser()
@@ -204,36 +207,27 @@ def shogunProtoText(argv):
     # (0) read bazel dump and apply hardcoded filters
     srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
     genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+    srclist.extend(genlist)
     _, srclist = eGrep('.*.h$', srclist) # we don't need to deal with header here
     _, srclist = eGrep('^third_party', srclist) # no third_party stuff
     _, srclist = eGrep('.*windows/.*', srclist) # no windoge source
     _, srclist = eGrep('.*.proto$', srclist) # already dealt with in (2)
 
-    # (1) Instantiate ninja writer
+    # (1) Instantiate ninja writer and generate targets
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
-
-    # (2) deal with generated files
-    # (2.1) .pb.cc and .pb.h files are generated in shogunAllProto
-    _, genlist = eGrep('.*.pb.h$', genlist)
-    pbcclist, genlist = eGrep('.*.pb.cc$', genlist)
-    if len(genlist) > 0:
-        print(yellow('Remainders:'), genlist)
-
-    # (3) deal with source files
-    cclist, srclist = eGrep('.*.cc', srclist)
+    cclist, srclist = eGrep('.*.cc$', srclist)
     objlist = []
-    for cc in cclist + pbcclist:
+    for cc in cclist:
         obj = cc.replace('.cc', '.o')
-        objlist.append(cursor.build(obj, 'rule_CXX_OBJ', cc)[0])
-    if len(srclist) > 0:
-        print(yellow('Remainders:'), srclist)
+        cursor.build(obj, 'rule_CXX_OBJ', cc)
+        objlist.append(obj)
 
-    # (4) link objects into the final ELF
-    cursor.build(f'proto_text', 'rule_CXX_EXEC', inputs=objlist,
+    # (2) link objects into ELF: proto_text
+    cursor.build(f'proto_text', 'rule_CXX_EXEC', objlist,
             variables={'LIBS': '-lpthread -lprotobuf -ldouble-conversion'})
 
-    # done
+    # (.) finish
     cursor.close()
 
 
