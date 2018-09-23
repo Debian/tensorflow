@@ -499,7 +499,7 @@ def shogunTFLib(argv):
         'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d', 'adjust_contrast_op' ]
     for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
         variables = {}
-        elif any(x in cc for x in exception_eigen_avoid_std_array):
+        if any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
         obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
@@ -616,7 +616,7 @@ def shogunTFCCLib(argv):
         'sparse_tensor_dense_matmul_op', 'conv_grad_ops_3d', 'adjust_contrast_op' ]
     for cc in src_cc + gen_pbcc + gen_pbtcc + gen_ccopcc + genlist + tflib_extra_srcs:
         variables = {}
-        elif any(x in cc for x in exception_eigen_avoid_std_array):
+        if any(x in cc for x in exception_eigen_avoid_std_array):
             variables = {'SHOGUN_EXTRA': '-DEIGEN_AVOID_STL_ARRAY'}
         obj = cursor.build(re.sub('.c[c]?$', '.o', cc), 'rule_CXX_OBJ', inputs=cc, variables=variables)[0]
         objlist.append(obj)
