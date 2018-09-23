@@ -3272,6 +3272,7 @@
 //tensorflow/core:ops/string_ops.cc
 //tensorflow/core:ops/summary_ops.cc
 //tensorflow/core:ops/training_ops.cc
+//tensorflow/core:ops/user_ops.cc
 //tensorflow/core:ops/word2vec_ops.cc
 //tensorflow/core:platform/abi.cc
 //tensorflow/core:platform/abi.h

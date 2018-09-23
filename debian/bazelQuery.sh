@@ -77,5 +77,6 @@ bazelDump //tensorflow/tools/lib_package:libtensorflow_test
 bazelDump //tensorflow:libtensorflow.so
 bazelDump //tensorflow:libtensorflow_cc.so
 bazelDump //tensorflow/python:pywrap_tensorflow
+bazelDump //tensorflow/tools/pip_package:build_pip_package
 
 #bazelDumpNonPythonTestTargets __tf_alltest_nocontrib_nopy
