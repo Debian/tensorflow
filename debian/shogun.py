@@ -106,6 +106,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CXX_SHLIB', f'$CXX -shared -fPIC $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
     cursor.rule('rule_CC_OP_GEN', f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api')
+    cursor.rule('rule_PY_OP_GEN', f'LD_LIBRARY_PATH=. ./$in tensorflow/core/api_def/base_api,tensorflow/core/api_def/python_api 1 > $out')
     cursor.rule('COPY', f'cp $in $out')
     cursor.rule('rule_ANYi', f'$ANY $in')
     cursor.rule('rule_ANYo', f'$ANY $out')
@@ -503,6 +504,27 @@ def shogunGenerator(argv):
         cursor.build([ccoph, ccopcc], 'rule_CC_OP_GEN', f'{op}_gen_cc',
                 variables={'cc_op_gen_internal': '0' if op != 'sendrecv_ops' else '1'},
                 implicit_outputs=[ccopinh, ccopincc])
+
+    # (2.2) tf_python_op_gen (YYY_gen_python)
+    Rpy_op_all, Rall = eGrep('^tensorflow/python.*gen_.*_ops.py$', Rall)
+    cclist_extra = [
+        'tensorflow/core/framework/op_gen_lib.cc',
+        "tensorflow/python/framework/python_op_gen.cc",
+        "tensorflow/python/framework/python_op_gen_internal.cc",
+        "tensorflow/python/framework/python_op_gen_main.cc" ]
+    objlist = []
+    for cc in cclist_extra:
+        obj = re.sub('.cc$', '.o', cc)
+        cursor.build(obj, 'rule_CXX_OBJ', cc)
+        objlist.append(obj)
+    for pyop in set(Rpy_op_all):
+        dirname = os.path.dirname(pyop)
+        basename = os.path.basename(pyop)
+        op = re.sub('gen_(.*).py', '\\1', basename)
+        coreopcc = 'tensorflow/core/ops/' + op + '.cc'
+        cursor.build(f'{op}_gen_python', 'rule_CXX_EXEC', [coreopcc] + objlist,
+            variables={'SHOGUN_EXTRA': '-I. -L. -ltfccopgen'})
+        #FIXME: generate python files
 
     # (3) SWIG Wrapper
     Rpywrap, Rall = eGrep('.*pywrap_tensorflow_internal.*', Rall)
