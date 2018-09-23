@@ -27,7 +27,10 @@ $SHOGUN Generator \
 $SHOGUN TFLib_framework \
 	-i $DATADIR/SRC__tensorflow_libtensorflow_framework_so \
 	-g $DATADIR/GEN__tensorflow_libtensorflow_framework_so \
-	-o libtensorflow_framework.ninja
+	-o libtensorflow_framework.ninja \
+	-H libtensorflow_framework.hdrs \
+	-O libtensorflow_framework.so \
+	-b libtfccopgen.so
 
 $SHOGUN Generator \
 	-g $DATADIR/GEN__tensorflow_libtensorflow_so \

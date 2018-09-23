@@ -138,7 +138,7 @@ def eComplain(lst: List[str]) -> None:
     if not lst: return
     for x in lst:
         print(yellow('? HowToDealWith'), x)
-    raise Exception(red(f'{len(Rall)} files to be generated left unresolved'))
+    print(red(f'{len(lst)} files to be dealt with left unresolved'))
 
 
 def eGlob(pat: str, *, filt: List[str] = [], vfilt: List[str] = []) -> List[str]:
@@ -248,9 +248,6 @@ def shogunProtoText(argv):
 def shogunTFLib_framework(argv):
     '''
     Build libtensorflow_framework.so, and a byproduct for tf_cc_op_gen.
-
-    Input: bazelDump
-    Output: libtensorflow_framework.so
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', type=str, required=True,
@@ -261,6 +258,10 @@ def shogunTFLib_framework(argv):
             help='where to write the ninja file', )
     ag.add_argument('-H', type=str, default='libtensorflow_framework.hdrs',
             help='a list of header files')
+    ag.add_argument('-O', type=str, required=True,
+            help='file name of shared object')
+    ag.add_argument('-b', type=str, required=True,
+            help='file name of the byproduce')
     ag = ag.parse_args(argv)
     print(red('Argument Dump:'))
     pprint(vars(ag))
@@ -290,17 +291,17 @@ def shogunTFLib_framework(argv):
               z protobuf jpeg nsync nsync_cpp pthread
               '''.split()
     libs = ' '.join(f'-l{x}' for x in libs)
-    extra = f'''-Wl,--soname=libtensorflow_framework.so.{tf_soversion}
-                -Wl,--version-script tensorflow/tf_framework_version_script.lds
+    extra = f'''-Wl,--soname={ag.O}.{tf_soversion}
                 -fvisibility=hidden
+                -Wl,--version-script tensorflow/tf_framework_version_script.lds
              '''.split()
     extra = ' '.join(x for x in extra)
-    cursor.build('libtensorflow_framework.so', 'rule_CXX_SHLIB', inputs=objlist,
+    cursor.build(ag.O, 'rule_CXX_SHLIB', inputs=objlist,
         variables={'LIBS': libs, 'SHOGUN_EXTRA': extra})
 
     # (3) link the byproduct for tf_cc_op_gen
     libtfccopgen, _ = eGrep(['.*core/kernels.*', '.*core/ops.*'], objlist)
-    cursor.build('tfccopgen.so', 'rule_CXX_SHLIB', libtfccopgen,
+    cursor.build(ag.b, 'rule_CXX_SHLIB', libtfccopgen,
             variables={'LIBS': libs})
 
     # done
@@ -389,7 +390,7 @@ def shogunTFLib(argv):
 
     # (.) finish
     cursor.close()
-    eComplain(Rall)
+    eComplain(srclist)
 
 
 def shogunGenerator(argv):
@@ -468,8 +469,8 @@ def shogunGenerator(argv):
         ccopincc = 'tensorflow/cc/ops/'   + op + '_internal.cc'
         ccopinh  = 'tensorflow/cc/ops/'   + op + '_internal.h'
         cursor.build(f'{op}_gen_cc', 'rule_CXX_EXEC', [coreopcc] + objlist,
-            variables={'SHOGUN_EXTRA': '-I. -L. -ltf_ccop'})
-        cursor.build([ccoph, ccopcc], 'rule_CC_OP_GEN', '{op}_gen_cc',
+            variables={'SHOGUN_EXTRA': '-I. -L. -ltfccopgen'})
+        cursor.build([ccoph, ccopcc], 'rule_CC_OP_GEN', f'{op}_gen_cc',
                 variables={'cc_op_gen_internal': '0' if op != 'sendrecv_ops' else '1'},
                 implicit_outputs=[ccopinh, ccopincc])
 
@@ -487,6 +488,6 @@ if __name__ == '__main__':
     try:
         eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
     except (IndexError, NameError) as e:
-        print('you must specify one of the following a subcommand:')
+        print(e, '|', 'you must specify one of the following a subcommand:')
         print([k.replace('shogun', '') for (k, v) in locals().items() if k.startswith('shogun')])
         exit(1)
