@@ -100,6 +100,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.comment('-- compiling rules-- ')
     cursor.rule('rule_PROTOC', f'$PROTOC $in --cpp_out . $SHOGUN_EXTRA')
     cursor.rule('rule_PROTOC_GRPC', f'$PROTOC --grpc_out . --cpp_out . --plugin protoc-gen-grpc=/usr/bin/grpc_cpp_plugin $in')
+    cursor.rule('rule_PROTOC_PYTHON', '$PROTOC --python_out . -I. $in')
     cursor.rule('rule_PROTO_TEXT', f'$PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in')
     cursor.rule('rule_CXX_OBJ', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_EXTRA -c $in -o $out')
     cursor.rule('rule_CXX_EXEC', f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out')
@@ -466,6 +467,13 @@ def shogunGenerator(argv):
         Th  = re.sub('.proto$', '.pb_text.h', proto)
         Tih = re.sub('.proto$', '.pb_text-impl.h', proto)
         cursor.build([Tcc, Th, Tih], 'rule_PROTO_TEXT', proto)
+
+    # (1.4) Collect protobuf-python stuff
+    Rpb_python, Rall = eGrep('.*_pb2.py', Rall)
+    Lpb_python = eUniq('_pb2.py$', '.proto', Rpb_python)
+    for proto in Lpb_python:
+        Tpy = re.sub('.proto$', '_pb2.py', proto)
+        cursor.build(Tpy, 'rule_PROTOC_PYTHON', proto)
 
     # (2.1) tf_cc_op_gen (YYY_gen_cc)
     Rcc_op_all, Rall = eGrep(['.*/cc/ops/.*.cc', '.*/cc/ops/.*.h'], Rall)
