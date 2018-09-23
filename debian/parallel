@@ -2,7 +2,6 @@
 # GNU parallel is problematic so this helper is created for compiling objects.
 from multiprocessing import Pool, cpu_count
 from subprocess import call
-from pprint import pprint
 import shlex
 import sys
 import re
@@ -16,7 +15,7 @@ def compile(cc):
     ldflags = shlex.split('' + os.getenv('LDFLAGS', ''))
     obj = re.sub('\.cc?$', '.o', cc)
     if os.path.exists(obj): return
-    pprint(['g++', *cppflags, *cxxflags, *ldflags, '-c', cc, '-o', obj])
+    print(' '.join(['g++', *cppflags, *cxxflags, *ldflags, '-c', cc, '-o', obj]))
     call(['g++', *cppflags, *cxxflags, *ldflags, '-c', cc, '-o', obj])
 
 with Pool(cpu_count()) as p:
