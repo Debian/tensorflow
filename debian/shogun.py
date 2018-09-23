@@ -114,13 +114,17 @@ def red(s: str) -> str:
     return f'\033[1;31m{s}\033[0;m'
 
 
-def eGrep(pat: str, sourcelist: List[str]) -> (List[str], List[str]):
+def eGrep(pat: Any, lst: List[str]) -> (List[str], List[str]):
     '''
     Just like grep -E
+    pat could be str or List[str]
     '''
     match, unmatch = [], []
-    for item in sourcelist:
-        if re.match(pat, item):
+    if not any((isinstance(pat, str), isinstance(pat, list))):
+        raise TypeError("Undefined argument type")
+    pat = pat if isinstance(pat, list) else [pat]
+    for item in lst:
+        if any(re.match(x, item) for x in pat):
             match.append(item)
         else:
             unmatch.append(item)
@@ -138,6 +142,13 @@ def eGlob(pat: str, *, filt: List[str] = [], vfilt: List[str] = []) -> List[str]
     for vf in vfilt:
         _, globs = eGrep(f, globs)
     return globs
+
+
+def eUniq(pat: str, rep: str, lst: List[str]) -> List[str]:
+    '''
+    lst -> re.sub(pat, rep, ...) -> uniq -> return
+    '''
+    return list(sorted(set([re.sub(pat, rep, x) for x in lst])))
 
 
 def getDpkgArchitecture(query: str) -> str:
@@ -642,12 +653,75 @@ def shogunTFCCLib(argv):
     cursor.close()
 
 
+def shogunGenerator(argv):
+    '''
+    Generic File Generator. It determines how to generate the given list
+    of files by checking every file name extention.
+    '''
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-g', type=str, required=True,
+            help='list of generated files',)
+    ag.add_argument('-o', type=str, required=True,
+            help='where to write the ninja file')
+    ag = ag.parse_args(argv)
+    print(red('Argument Dump:'))
+    pprint(vars(ag))
+
+    # (0.1) Read the list and apply hard-coded filters.
+    Rall = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
+
+    # (0.1) Instantiate ninja writer
+    cursor = Writer(open(ag.o, 'w'))
+    ninjaCommonHeader(cursor, ag)
+
+    # (1.1) Collect protobuf-grpc stuff and generate targets
+    Rgrpc_pb_all, Rall = eGrep(['.*.grpc.pb.cc', '.*.grpc.pb.h'], Rall)
+    Lgrpc_proto = eUniq('.grpc.pb.cc$', '.proto', Rgrpc_pb_all)
+    Lgrpc_proto = eUniq('.grpc.pb.h$', '.proto', Lgrpc_proto)
+    for proto in Lgrpc_proto:
+        Tcc = re.sub('.proto$', '.grpc.pb.cc', proto)
+        Th  = re.sub('.proto$', '.grpc.pb.h', proto)
+        cursor.build([Tcc, Th], 'rule_PROTOC_GRPC', proto)
+
+    # (1.2) Collect protobuf stuff and generate targets
+    Rpb_all, Rall = eGrep(['.*.pb.cc', '.*.pb.h'], Rall)
+    Lproto = eUniq('.pb.cc$', '.proto', Rpb_all)
+    Lproto = eUniq('.pb.h$', '.proto', Lproto)
+    for proto in Lproto:
+        Tcc = re.sub('.proto$', '.pb.cc', proto)
+        Th  = re.sub('.proto$', '.pb.h', proto)
+        cursor.build([Tcc, Th], 'rule_PROTOC', proto)
+
+    # (1.3) Collect proto-text stuff and generate targets
+    Rpb_text_all, Rall = eGrep(['.*.pb_text.h$', '.*.pb_text.cc$',
+                          '.*.pb_text-impl.h$'], Rall)
+    Lpb_text = eUniq('.pb_text.h$', '.proto', Rpb_text_all)
+    Lpb_text = eUniq('.pb_text.cc$', '.proto', Lpb_text)
+    Lpb_text = eUniq('.pb_text-impl.h$', '.proto', Lpb_text)
+    for proto in Lpb_text:
+        Tcc = re.sub('.proto$', '.pb_text.cc', proto)
+        Th  = re.sub('.proto$', '.pb_text.h', proto)
+        Tih = re.sub('.proto$', '.pb_text-impl.h', proto)
+        cursor.build([Tcc, Th, Tih], 'rule_PROTO_TEXT', proto)
+
+    # (2.1) tf_cc_op_gen
+    #Rcc_op_all, Rall = eGrep(['.*/cc/ops/.*.cc', '.*/cc/ops/.*.h'], Rall)
+    #FIXME
+
+    # (9.1) finish
+    cursor.close()
+    if not Rall: return
+    for x in Rall:
+        print(yellow('? HowToGenerate', x))
+    raise Exception(red(f'{len(Rall)} files to be generated left unresolved'))
+
+
 if __name__ == '__main__':
 
     # A graceful argparse implementation with argparse subparser requries
-    # more code than present implementation. However an advantage of the
-    # current implementation is that you only need to define a new shogunXXX
-    # function and it would be automatically added here.
+    # obscure code. An advantage of the current implementation is that you
+    # only need to define a new shogunXXX function and it would be
+    # automatically added here.
     try:
         eval(f'shogun{sys.argv[1]}')(sys.argv[2:])
     except (IndexError, NameError) as e:
