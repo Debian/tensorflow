@@ -373,6 +373,7 @@ def shogunTFLib(argv):
     Rheaders, srclist = eGrep('.*.h$', srclist) # nothing to do
     _, srclist = eGrep('.*.proto$', srclist) # nothing to do
     _, srclist = eGrep('.*.i$', srclist) # SWIG files aren't for us
+    _, srclist = eGrep('.*contrib/gdr.*', srclist) # NO GDR
 
     if getDpkgArchitecture('DEB_HOST_ARCH') != 'amd64':
         # they FTBFS on non-amd64 arches
@@ -385,6 +386,8 @@ def shogunTFLib(argv):
         'conv_grad_ops_3d',
         'adjust_contrast_op'
         ]
+    if 'pywrap' in ag.O:
+        srclist.append('tensorflow/python/framework/fast_tensor_util.cc')
     cursor = Writer(open(ag.o, 'w'))
     ninjaCommonHeader(cursor, ag)
     cclist, srclist = eGrep(['.*.cc$', '.*.c$'], srclist)
@@ -529,11 +532,14 @@ def shogunGenerator(argv):
         cursor.build(obj, 'rule_CXX_OBJ', cc)
         objlist.append(obj)
     for pyop in set(Rpy_op_all):
+        pyop_objlist = objlist
+        if 'control_flow_ops' in pyop:
+            pyop_objlist.append('tensorflow/core/ops/no_op.o')
         dirname = os.path.dirname(pyop)
         basename = os.path.basename(pyop)
         op = re.sub('gen_(.*).py', '\\1', basename)
         coreopcc = 'tensorflow/core/ops/' + op + '.cc'
-        cursor.build(f'{op}_gen_python', 'rule_CXX_EXEC', [coreopcc] + objlist,
+        cursor.build(f'{op}_gen_python', 'rule_CXX_EXEC', [coreopcc] + pyop_objlist,
             variables={'SHOGUN_EXTRA': '-I. -L. -ltfccopgen'})
         cursor.build(pyop, 'rule_PY_OP_GEN', f'{op}_gen_python')
 
@@ -554,10 +560,20 @@ def shogunGenerator(argv):
     if Rverinfo:
         cursor.build(Rverinfo[0], 'rule_ANYio', 'debian/patches/version_info.cc',
                 variables={'ANY': 'cp'})
+
     Rbuildinfo, Rall = eGrep('tensorflow/python/platform/build_info.py', Rall)
     if Rbuildinfo:
         cursor.build(Rbuildinfo[0], 'rule_ANYo', [],
                 variables={'ANY': 'python3 tensorflow/tools/build_info/gen_build_info.py --build_config cpu --raw_generate'})
+
+    Rfasttensorutil, Rall = eGrep('.*fast_tensor_util.*', Rall)
+    if Rfasttensorutil:
+        cursor.build('tensorflow/python/framework/fast_tensor_util.cpp',
+                'rule_ANYi', 'tensorflow/python/framework/fast_tensor_util.pyx',
+                variables={'ANY': 'cython3 -v --cplus'})
+        cursor.build('tensorflow/python/framework/fast_tensor_util.cc',
+                'rule_ANYio', 'tensorflow/python/framework/fast_tensor_util.cpp',
+                variables={'ANY': 'cp'})
 
     # (.) finish
     cursor.close()
