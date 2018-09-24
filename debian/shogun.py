@@ -337,7 +337,7 @@ def shogunTFLib(argv):
     Build any one of the following libraries:
     * libtensorflow.so
     * libtensorflow_cc.so
-    * pywrap_tensorflow_internal.so
+    * _pywrap_tensorflow_internal.so
     '''
     ag = argparse.ArgumentParser()
     ag.add_argument('-i', type=str, required=True,
@@ -413,7 +413,7 @@ def shogunTFLib(argv):
     elif 'libtensorflow_cc.so' in ag.O:
         extra.append('-Wl,--version-script tensorflow/tf_version_script.lds')
     elif 'pywrap' in ag.O:
-        print(f'pywrap_tensorflow_internal will be built with python{py_ver}')
+        print(f'_pywrap_tensorflow_internal will be built with python{py_ver}')
         extra.append(f'-I{py_incdir} -L{py_libdir}')
     extra = ' '.join(x for x in extra)
     cursor.build(ag.O, 'rule_CXX_SHLIB', objlist,
@@ -555,6 +555,10 @@ def shogunGenerator(argv):
     if Rverinfo:
         cursor.build(Rverinfo[0], 'rule_ANYio', 'debian/patches/version_info.cc',
                 variables={'ANY': 'cp'})
+    Rbuildinfo, Rall = eGrep('tensorflow/python/platform/build_info.py', Rall)
+    if Rbuildinfo:
+        cursor.build(Rbuildinfo[0], 'rule_ANYo', [],
+                variables={'ANY': 'python3 tensorflow/tools/build_info/gen_build_info.py --build_config cpu --raw_generate'})
 
     # (.) finish
     cursor.close()
@@ -569,7 +573,7 @@ def shogunPython(argv):
     ag.add_argument('-i', type=str, required=True)
     ag.add_argument('-g', type=str, required=True)
     ag.add_argument('-o', type=str, default='pippackage.sh')
-    ag.add_argument('-O', type=str, default='pywrap_tensorflow_internal.so')
+    ag.add_argument('-O', type=str, default='_pywrap_tensorflow_internal.so')
     ag.add_argument('--api', type=str, default='api_init_files_list.txt')
     ag = ag.parse_args(argv)
     print(red('Argument Dump:'))
@@ -588,15 +592,19 @@ def shogunPython(argv):
         filelist="
         ''')
         for py in Rpy:
-            if not os.path.exists(py):
-                print(py, 'is missing')
-                continue
             f.write(py+'\n')
         f.write('"\n')
         f.write('''
         for f in $filelist ; do
-            install -Dm0644 $f $1/$f
+            if test -r $f; then
+                install -Dm0644 $f $1/$f
+            else
+                echo $f is missing
+            fi
         done
+        ''')
+        f.write(f'''
+        install -Dm0644 {ag.O} $1/tensorflow/python/{ag.O}
         ''')
     print('=>', ag.o)
 
