@@ -44,9 +44,9 @@ References
 6. Gentoo ebuild
    https://packages.gentoo.org/packages/sci-libs/tensorflow
 '''
-# FIXME: libtensorflow.so and libtensorflow_cc.so are still not linked
-# against mkl-dnn, xsmm .
+# FIXME: libs are still not linked against mkl-dnn, xsmm, openblas etc.
 # FIXME: how to use blas/mkl to improve speed?
+# FIXME: they all should depend on libtensorflow_framework?
 
 from typing import *
 import sys
