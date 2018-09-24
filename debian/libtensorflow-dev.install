@@ -4,6 +4,6 @@ usr/lib/*/libtensorflow.so
 usr/lib/*/libtensorflow_cc.so
 
 # Embedded copy of eigen3 and several third party stuff
-debian/embedded/eigen3/unsupported/Eigen  usr/include/tensorflow/eigen3/unsupported/
-debian/embedded/eigen3/Eigen  usr/include/tensorflow/eigen3/
+debian/embedded/eigen3/unsupported/Eigen  usr/include/tensorflow/unsupported/
+debian/embedded/eigen3/Eigen  usr/include/tensorflow/
 third_party/eigen3  usr/include/tensorflow/third_party/
