@@ -47,6 +47,7 @@ References
 # FIXME: libs are still not linked against mkl-dnn, xsmm, openblas etc.
 # FIXME: how to use blas/mkl to improve speed?
 # FIXME: they all should depend on libtensorflow_framework?
+# FIXME: automatically generate installer from shogun
 
 from typing import *
 import sys
