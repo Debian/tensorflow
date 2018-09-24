@@ -65,3 +65,11 @@ $SHOGUN TFLib \
 $SHOGUN Generator \
 	-g $DATADIR/GEN__tensorflow_tools_pip_package_build_pip_package \
 	-o pippackage.gen.ninja
+cat tensorflow/python/tools/api/generator/api_gen.bzl \
+	| awk '/BEGIN GENERATED FILES/,/END GENERATED FILES/{
+		if ($0 !~ /#/) {
+			f = gensub(/.*"(.+)",.*/, "\\1", "g", $0);
+			print f;
+		}
+	}' \
+	> api_init_files_list.txt
