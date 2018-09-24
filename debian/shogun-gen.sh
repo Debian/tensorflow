@@ -80,3 +80,7 @@ python3 tensorflow/python/tools/api/generator/create_python_api.py \
 	--apidir=tensorflow --package=tensorflow.python \
 	--apiname=tensorflow \
 	api_init_files_list.txt
+$SHOGUN Python \
+	-i $DATADIR/SRC__tensorflow_tools_pip_package_build_pip_package \
+	-g $DATADIR/GEN__tensorflow_tools_pip_package_build_pip_package \
+	-o pippackage.sh
