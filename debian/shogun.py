@@ -367,7 +367,6 @@ def shogunTFLib(argv):
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
     _, srclist = eGrep('.*_main.cc$', srclist) # don't include any main function.
     _, srclist = eGrep('.*_test.cc$', srclist) # don't include any test
-    _, srclist = eGrep('.*cc_op_gen.*', srclist) # don't include cc_op_gen.
     _, srclist = eGrep('.*gen_proto_text_functions.cc', srclist) # not for this library
     _, srclist = eGrep('.*tensorflow.contrib.cloud.*', srclist) # it wants GoogleAuthProvider etc.
     _, srclist = eGrep('.*gcs_config_ops.cc', srclist) # it wants GcsFileSystem
