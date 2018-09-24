@@ -184,6 +184,16 @@ def getDpkgArchitecture(query: str) -> str:
     return result
 
 
+def systemShell(command: List[str]) -> str:
+    '''
+    Execute the given command in system shell. Unlike os.system(), the program
+    output to stdout and stderr will be returned.
+    '''
+    result = subprocess.Popen(command, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE).communicate()[0].decode().strip()
+    return result
+
+
 def bazelPreprocess(srclist: List[str]) -> List[str]:
     '''
     1. Filter out external dependencies from bazel dependency dump.
