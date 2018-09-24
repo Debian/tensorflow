@@ -508,11 +508,12 @@ def shogunGenerator(argv):
     # (2.2) tf_python_op_gen (YYY_gen_python)
     Rpy_op_all, Rall = eGrep('^tensorflow/python.*gen_.*_ops.py$', Rall)
     cclist_extra = [
-        'tensorflow/core/framework/op_gen_lib.cc',
         "tensorflow/python/framework/python_op_gen.cc",
         "tensorflow/python/framework/python_op_gen_internal.cc",
         "tensorflow/python/framework/python_op_gen_main.cc" ]
-    objlist = []
+    objlist = [
+        'tensorflow/core/framework/op_gen_lib.o',
+        ]
     for cc in cclist_extra:
         obj = re.sub('.cc$', '.o', cc)
         cursor.build(obj, 'rule_CXX_OBJ', cc)
@@ -524,7 +525,7 @@ def shogunGenerator(argv):
         coreopcc = 'tensorflow/core/ops/' + op + '.cc'
         cursor.build(f'{op}_gen_python', 'rule_CXX_EXEC', [coreopcc] + objlist,
             variables={'SHOGUN_EXTRA': '-I. -L. -ltfccopgen'})
-        #FIXME: generate python files
+        cursor.build(pyop, 'rule_PY_OP_GEN', f'{op}_gen_python')
 
     # (3) SWIG Wrapper
     Rpywrap, Rall = eGrep('.*pywrap_tensorflow_internal.*', Rall)
