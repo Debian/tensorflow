@@ -1,5 +1,5 @@
 #!/bin/sh
-set -xe
+set -x
 
 
 case $1 in
