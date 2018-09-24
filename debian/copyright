@@ -50,6 +50,11 @@ Copyright: 2018 Mo Zhou <lumin@debian.org>
            2018 Mo Zhou <cdluminate@gmail.com>
 License:   Expat
 
+Files:     debian/ninja_syntax.py
+Copyright: 2011-2014 Google
+License:   Apache-2.0
+
+
 # This is an embedded copy of Eigen3 source code.
 # Without this embedded source code TensorFlow will FTBFS.
 # The copyright information is copied from /usr/share/doc/libeigen3-dev
