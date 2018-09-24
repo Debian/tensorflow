@@ -31,10 +31,6 @@ Ambiguous FFT2D license
 Things remain to be done
 ========================
 
-C and C++ interface.
-
-- [ ] upload to experimental.
-
 Postponed
 ---------
 
@@ -43,30 +39,19 @@ Postponed
       cpu capability.
 - [ ] compile documentation instead of providing the raw ones.
 - [ ] build libtensorflow on top of libtensorflow_framework?
-- [ ] (ppc64el) what's this????????
-      tensorflow/core/lib/core/threadpool.o:(.debug_addr+0x4d28): R_PPC64_ADDR64 used with TLS symbol Eigen::NonBlockingThreadPoolTempl<tensorflow::thread::EigenEnvironment>::GetPerThread()::per_thread_
-      tensorflow/core/util/work_sharder.o:(.debug_addr+0xf30): R_PPC64_ADDR64 used with TLS symbol tensorflow::per_thread_max_parallism
 - [ ] make sure libtensorflow/amd64 is linked against libmkldnn
 - [ ] build tf.so and tf_cc.so upon tf_frmwk.so?
 - [ ] upload to unstable.
       Wait for protobuf 3.6.1, mkl-dnn, (and possibly grpc) to enter unstable.
+- [ ] -DUSE_GEMM_FOR_CONV
+- [ ] -DTF_LEAN_BINARY
 
 Python interface.
 
 - [ ] build _pywrap_tensorflow_internal.so on top of libtensorflow*
 - [ ] do we have all the required python dependencies?
-- [ ] figure out how to generate python API
 - [ ] is the resulting python package correct and working?
 - [ ] write autopkgtest with mini python programs.
-
-Definitions.
-
-- [ ] -DUSE_GEMM_FOR_CONV
-- [ ] -DTF_LEAN_BINARY
-- [ ] Jemalloc?
-- [ ] mkl-dnn?
-- [ ] sycl?
-- [ ] ...
 
 Will Never Get Fixed
 --------------------
@@ -91,6 +76,8 @@ Maintainer Notes
 ================
 
 These notes are written for myself and fellow developers.
+
+0. https://www.tensorflow.org/install/errors
 
 1. protobuf database collision::
 
