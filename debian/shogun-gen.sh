@@ -66,10 +66,17 @@ $SHOGUN Generator \
 	-g $DATADIR/GEN__tensorflow_tools_pip_package_build_pip_package \
 	-o pippackage.gen.ninja
 cat tensorflow/python/tools/api/generator/api_gen.bzl \
-	| awk '/BEGIN GENERATED FILES/,/END GENERATED FILES/{
+	| awk '
+	/BEGIN GENERATED FILES/,/END GENERATED FILES/{
 		if ($0 !~ /#/) {
 			f = gensub(/.*"(.+)",.*/, "\\1", "g", $0);
-			print f;
+			print "tensorflow/" f ";";
 		}
-	}' \
+	}
+	END{ print "tensorflow/__init__.py"}' \
 	> api_init_files_list.txt
+python3 tensorflow/python/tools/api/generator/create_python_api.py \
+	--root_init_template=tensorflow/api_template.__init__.py \
+	--apidir=tensorflow --package=tensorflow.python \
+	--apiname=tensorflow \
+	api_init_files_list.txt
