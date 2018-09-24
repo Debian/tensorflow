@@ -111,6 +111,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.rule('rule_ANYi', f'$ANY $in')
     cursor.rule('rule_ANYo', f'$ANY $out')
     cursor.rule('rule_ANY', '$ANY')
+    cursor.rule('rule_ANYio', '$ANY $in $out')
     cursor.newline()
     cursor.comment('-- end common ninja header --')
     cursor.newline()
@@ -538,6 +539,12 @@ def shogunGenerator(argv):
             -outdir tensorflow/python
             -o tensorflow/python/pywrap_tensorflow_internal.cc
             -globals "" '''.split()) })
+
+    # (4.1) Misc source files
+    Rverinfo, Rall = eGrep('tensorflow/core/util/version_info.cc', Rall)
+    if Rverinfo:
+        cursor.build(Rverinfo[0], 'rule_ANYio', 'debian/patches/version_info.cc',
+                variables={'ANY': 'cp'})
 
     # (.) finish
     cursor.close()
