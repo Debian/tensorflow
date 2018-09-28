@@ -48,7 +48,7 @@ override_dh_auto_build:
 	dh_auto_build -- -f libtensorflow.ninja
 	dh_auto_build -- -f libtensorflow_cc.gen.ninja
 	dh_auto_build -- -f libtensorflow_cc.ninja
-	dh_auto_build -- -f pippackage.gen.ninja
+	#dh_auto_build -- -f pippackage.gen.ninja
 
 override_dh_auto_install:
 	$(SHELL) debian/shogun-install.sh
