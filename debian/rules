@@ -1,9 +1,5 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-export DEB_CFLAGS_MAINT_APPEND =
-export DEB_CXXFLAGS_MAINT_APPEND =
-# XXX: Warning: -Wl,--as-needed will trigger FTBFS!!
-export DEB_LDFLAGS_MAINT_APPEND =
 
 # colorized output reduces burden to my eye
 export NINJA_STATUS=[1;36m[%es (%p) %f/%t][0;m 
