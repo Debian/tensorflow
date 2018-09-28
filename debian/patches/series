@@ -1,6 +1,5 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
-stub-version-info-cc.patch
 
 # the jemalloc patch is left for reference
 # jemalloc.patch
