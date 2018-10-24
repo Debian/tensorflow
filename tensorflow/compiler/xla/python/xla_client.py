@@ -99,12 +99,29 @@ _UNARY_OPS = [
     'Cos',
     'Sin',
     'Tanh',
-    'Sqrt',
-    'Square',
     'IsFinite',
+    'Sqrt',
+    'Rsqrt',
+    'Square',
     'Reciprocal',
     'Neg',
-    'Sort',
+    'Erf',
+    'Erfc',
+    'ErfInv',
+    'Lgamma',
+    'Digamma',
+    'Acos',
+    'Asin',
+    'Atan',
+    'Tan',
+    'Acosh',
+    'Asinh',
+    'Atanh',
+    'Cosh',
+    'Sinh',
+    'Real',
+    'Imag',
+    'Conj',
 ]
 
 _BINARY_OPS = [
@@ -125,6 +142,11 @@ _BINARY_OPS = [
     'Or',
     'Xor',
     'Pow',
+    'ShiftLeft',
+    'ShiftRightArithmetic',
+    'ShiftRightLogical',
+    'Atan2',
+    'Complex',
 ]
 
 
@@ -702,6 +724,18 @@ class ComputationBuilder(object):
     """
     return self._client.ConvertElementType(operand, new_element_type)
 
+  def BitcastConvertType(self, operand, new_element_type):
+    """Enqueues a bitcast type conversion operation onto the computation.
+
+    Args:
+      operand: the operand to convert.
+      new_element_type: the target primitive type.
+
+    Returns:
+      A LocalOp representing the added conversion op.
+    """
+    return self._client.BitcastConvertType(operand, new_element_type)
+
   def GetShape(self, operand):
     return _wrap_shape(self._client.GetShape(operand))
 
@@ -1182,6 +1216,14 @@ class ComputationBuilder(object):
     return self._client.ConvGeneralDilated(lhs, rhs, window_strides, padding,
                                            lhs_dilation, rhs_dilation,
                                            dimension_numbers)
+
+  def Sort(self, operand, dimension=-1):
+    """Enqueues a sort operation onto the computation."""
+    return self._client.Sort(operand, dimension)
+
+  def SortKeyVal(self, keys, values, dimension=-1):
+    """Enqueues a key-value sort operation onto the computation."""
+    return self._client.SortKeyVal(keys, values, dimension)
 
 
 def _forward_methods_to_local_builder():

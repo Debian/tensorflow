@@ -18,6 +18,7 @@ limitations under the License.
 #include <numeric>
 #include <vector>
 
+#include "absl/memory/memory.h"
 #include "tensorflow/compiler/tf2xla/dump_graph.h"
 #include "tensorflow/compiler/tf2xla/functionalize_control_flow.h"
 #include "tensorflow/compiler/tf2xla/graph_compiler.h"
@@ -28,12 +29,14 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_compilation_device.h"
 #include "tensorflow/compiler/tf2xla/xla_context.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_computation.h"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/common_runtime/executor.h"
 #include "tensorflow/core/common_runtime/function.h"
 #include "tensorflow/core/common_runtime/graph_optimizer.h"
 #include "tensorflow/core/framework/attr_value_util.h"
+#include "tensorflow/core/framework/node_def_util.h"
 #include "tensorflow/core/graph/algorithm.h"
 #include "tensorflow/core/graph/graph_constructor.h"
 #include "tensorflow/core/graph/node_builder.h"
@@ -308,7 +311,7 @@ Status ExecuteGraph(XlaContext* xla_context, std::unique_ptr<Graph> graph,
   // unique_ptr so we can capture the cleanup status in the end.
   xla_context->Ref();
   Status status;
-  auto step_container = xla::MakeUnique<ScopedStepContainer>(
+  auto step_container = absl::make_unique<ScopedStepContainer>(
       step_id, [&status, device](const string& name) {
         status = device->resource_manager()->Cleanup(name);
       });
@@ -358,6 +361,9 @@ Status BuildComputation(
     if (retval.has_constant_value()) {
       output.is_constant = true;
       output.constant_value = retval.constant_value();
+    } else if (retval.resource() != nullptr) {
+      output.is_constant = false;
+      output.input_index = retval.resource()->arg_num();
     } else {
       output.is_constant = false;
       elems.push_back(retval.handle());
@@ -411,7 +417,7 @@ Status BuildComputation(
 
       // Request that the value be returned on a specific core.
       xla::XlaScopedShardingAssignment assign_sharding(
-          builder, core == -1 ? tensorflow::gtl::optional<xla::OpSharding>()
+          builder, core == -1 ? absl::optional<xla::OpSharding>()
                               : xla::sharding_builder::AssignDevice(core));
 
       xla::XlaOp handle;
@@ -422,16 +428,18 @@ Status BuildComputation(
       // assignment will be placed on this value, which will cause the resource
       // update to be returned from the same device that provided the resource.
       handle = xla::GetTupleElement(xla::Tuple(builder, {handle}), 0);
-
       elems.push_back(handle);
     }
   }
 
   *num_computation_outputs = elems.size();
 
-  // Builds the XLA computation.
-  if (always_return_tuple || elems.size() != 1) {
-    xla::Tuple(builder, elems);
+  // Builds the XLA computation. We *always* form a tuple here to ensure that
+  // the output value is the last thing added into the XLA computation, even
+  // if there is only one output value.
+  auto tuple = xla::Tuple(builder, elems);
+  if (!always_return_tuple && elems.size() == 1) {
+    xla::GetTupleElement(tuple, 0);
   }
   builder->ClearOpMetadata();
 
@@ -460,8 +468,6 @@ Status XlaCompiler::BuildArguments(
   // XLA computation as runtime parameters.
   input_mapping->clear();
   input_mapping->reserve(args.size());
-  std::vector<int> resources;
-  resources.reserve(args.size());
 
   // Fills in constant arguments, and computes non-constant argument order.
   for (std::vector<XlaCompiler::Argument>::size_type i = 0; i < args.size();
@@ -480,8 +486,9 @@ Status XlaCompiler::BuildArguments(
             /*tensor_array_gradients=*/arg.tensor_array_gradients, &resource));
         arg_expression.set_resource(resource);
         if (arg.initialized) {
-          resources.push_back(i);
+          input_mapping->push_back(i);
         }
+
         break;
       case XlaCompiler::Argument::kParameter: {
         input_mapping->push_back(i);
@@ -491,14 +498,11 @@ Status XlaCompiler::BuildArguments(
         arg_expression.set_constant_value(arg.constant_value);
         break;
       case XlaCompiler::Argument::kInvalid:
-        return errors::Internal("Unreachable case in BuildArguments()");
+        return errors::Internal(
+            "Unreachable case in BuildArguments() while filling constant args");
     }
   }
 
-  // Append parameters containing variable values after the other runtime
-  // parameters.
-  input_mapping->insert(input_mapping->end(), resources.begin(),
-                        resources.end());
   if (input_mapping->empty()) {
     return Status::OK();
   }
@@ -566,7 +570,7 @@ Status XlaCompiler::BuildArguments(
     for (std::vector<int>::size_type i = 0; i < input_mapping->size(); ++i) {
       const int core = (*arg_cores)[input_mapping->at(i)];
       xla::XlaScopedShardingAssignment assign_sharding(
-          builder, core == -1 ? tensorflow::gtl::optional<xla::OpSharding>()
+          builder, core == -1 ? absl::optional<xla::OpSharding>()
                               : xla::sharding_builder::AssignDevice(core));
       arg_handles[i] = xla::GetTupleElement(tuple, i);
     }
@@ -574,7 +578,7 @@ Status XlaCompiler::BuildArguments(
     for (std::vector<int>::size_type i = 0; i < input_mapping->size(); ++i) {
       const int core = (*arg_cores)[input_mapping->at(i)];
       xla::XlaScopedShardingAssignment assign_sharding(
-          builder, core == -1 ? tensorflow::gtl::optional<xla::OpSharding>()
+          builder, core == -1 ? absl::optional<xla::OpSharding>()
                               : xla::sharding_builder::AssignDevice(core));
       arg_handles[i] = xla::Parameter(builder, i, (*input_shapes)[i],
                                       strings::StrCat("arg", i));
@@ -615,7 +619,8 @@ Status XlaCompiler::BuildArguments(
         break;
       case XlaCompiler::Argument::kConstant:
       case XlaCompiler::Argument::kInvalid:
-        return errors::Internal("Unreachable case in BuildArguments()");
+        return errors::Internal(
+            "Unreachable case in BuildArguments() while filling handles");
     }
   }
 
@@ -686,12 +691,12 @@ Status ValidateFunctionDef(const FunctionDef* fdef,
 Status ValidateGraph(const Graph* graph,
                      const FunctionLibraryDefinition& flib_def,
                      const DeviceType& device_type, const string& name) {
-  auto maybe_error = [&](const string& op, const Status& s) -> Status {
+  auto maybe_error = [&](const Node* node, const Status& s) -> Status {
     if (!s.ok()) {
       return errors::InvalidArgument(strings::StrCat(
           "Detected unsupported operations when trying to compile graph ", name,
-          " on ", device_type.type_string(), ": ", op, " (", s.error_message(),
-          ")"));
+          " on ", device_type.type_string(), ": ", node->def().op(), " (",
+          s.error_message(), ")", FormatNodeForError(*node)));
     }
     return Status::OK();
   };
@@ -704,15 +709,15 @@ Status ValidateGraph(const Graph* graph,
     Status s;
     if (fdef) {
       s = ValidateFunctionDef(fdef, flib_def);
-      TF_RETURN_IF_ERROR(maybe_error(node->def().op(), s));
+      TF_RETURN_IF_ERROR(maybe_error(node, s));
       continue;
     }
     const OpDef* op_def;
     s = OpRegistry::Global()->LookUpOpDef(node->def().op(), &op_def);
-    TF_RETURN_IF_ERROR(maybe_error(node->def().op(), s));
+    TF_RETURN_IF_ERROR(maybe_error(node, s));
     TF_RETURN_IF_ERROR(ValidateNodeDef(node->def(), *op_def));
     s = FindKernelDef(device_type, node->def(), nullptr, nullptr);
-    TF_RETURN_IF_ERROR(maybe_error(node->def().op(), s));
+    TF_RETURN_IF_ERROR(maybe_error(node, s));
   }
   return Status::OK();
 }
@@ -787,14 +792,6 @@ Status XlaCompiler::CompileGraph(const XlaCompiler::CompileOptions& options,
   VLOG(2) << "XLA output shape: "
           << xla::ShapeUtil::HumanString(result->xla_output_shape);
 
-  // Copy the host transfer metadata to the result.
-  for (const auto& send : host_compute_sends_) {
-    *result->host_compute_metadata.add_device_to_host() = send.second;
-  }
-  for (const auto& recv : host_compute_recvs_) {
-    *result->host_compute_metadata.add_host_to_device() = recv.second;
-  }
-
   // Tensorflow expects a major-to-minor order of results.
   xla::LayoutUtil::SetToDefaultLayout(&result->xla_output_shape);
 
@@ -812,10 +809,34 @@ Status XlaCompiler::GetChannelHandle(const string& key,
   return Status::OK();
 }
 
+Status XlaCompiler::GetHostToDeviceChannelHandle(const string& key,
+                                                 xla::ChannelHandle* channel) {
+  auto result = channels_.emplace(key, xla::ChannelHandle());
+  if (result.second) {
+    TF_ASSIGN_OR_RETURN(result.first->second,
+                        client()->CreateHostToDeviceChannelHandle());
+  }
+  *channel = result.first->second;
+  VLOG(1) << "Host to device channel: " << key << " " << channel->DebugString();
+  return Status::OK();
+}
+
+Status XlaCompiler::GetDeviceToHostChannelHandle(const string& key,
+                                                 xla::ChannelHandle* channel) {
+  auto result = channels_.emplace(key, xla::ChannelHandle());
+  if (result.second) {
+    TF_ASSIGN_OR_RETURN(result.first->second,
+                        client()->CreateDeviceToHostChannelHandle());
+  }
+  *channel = result.first->second;
+  VLOG(1) << "Device to host channel: " << key << " " << channel->DebugString();
+  return Status::OK();
+}
+
 namespace {
 
-void SetTransfer(const string& key, gtl::ArraySlice<DataType> types,
-                 gtl::ArraySlice<TensorShape> shapes,
+void SetTransfer(const string& key, absl::Span<const DataType> types,
+                 absl::Span<const TensorShape> shapes,
                  tf2xla::HostTransferMetadata* transfer) {
   transfer->set_key(key);
   CHECK(types.size() == shapes.size());
@@ -829,8 +850,8 @@ void SetTransfer(const string& key, gtl::ArraySlice<DataType> types,
 }  // namespace
 
 Status XlaCompiler::SetDeviceToHostMetadata(
-    const string& key, gtl::ArraySlice<DataType> types,
-    gtl::ArraySlice<TensorShape> shapes) {
+    const string& key, absl::Span<const DataType> types,
+    absl::Span<const TensorShape> shapes) {
   if (host_compute_sends_.find(key) != host_compute_sends_.end()) {
     return errors::InvalidArgument(
         "Duplicate calls to SetDeviceToHostMetadata with key ", key);
@@ -856,8 +877,8 @@ Status XlaCompiler::GetDeviceToHostShapes(
 }
 
 Status XlaCompiler::SetHostToDeviceMetadata(
-    const string& key, gtl::ArraySlice<DataType> types,
-    gtl::ArraySlice<TensorShape> shapes) {
+    const string& key, absl::Span<const DataType> types,
+    absl::Span<const TensorShape> shapes) {
   if (host_compute_recvs_.find(key) != host_compute_sends_.end()) {
     return errors::InvalidArgument(
         "Duplicate calls to SetHostToDeviceMetadata with key ", key);

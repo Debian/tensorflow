@@ -27,7 +27,7 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_op_registry.h"
 #include "tensorflow/compiler/xla/client/lib/arithmetic.h"
 #include "tensorflow/compiler/xla/client/lib/numeric.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
@@ -155,7 +155,8 @@ class RandomShuffleOp : public XlaOpKernel {
     xla::XlaOp indices = xla::Iota(builder, xla::S32, n);
 
     // Swap the indices at i and swaps[i].
-    auto swap_body_fn = [&](xla::XlaOp i, gtl::ArraySlice<xla::XlaOp> loop_vars,
+    auto swap_body_fn = [&](xla::XlaOp i,
+                            absl::Span<const xla::XlaOp> loop_vars,
                             xla::XlaBuilder* builder)
         -> xla::StatusOr<std::vector<xla::XlaOp>> {
       auto swaps = loop_vars[0];

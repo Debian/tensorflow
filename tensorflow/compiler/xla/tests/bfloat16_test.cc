@@ -21,7 +21,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/array4d.h"
 #include "tensorflow/compiler/xla/client/lib/arithmetic.h"
 #include "tensorflow/compiler/xla/client/local_client.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/literal.h"
 #include "tensorflow/compiler/xla/reference_util.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
@@ -65,7 +65,7 @@ XLA_TEST_F(Bfloat16Test, LogOperation) {
   Log(x);
 
   ComputeAndCompareR0<bfloat16>(&builder, static_cast<bfloat16>(1.387f), {},
-                                error_spec_);
+                                ErrorSpec(0.01, 0.01));
 }
 
 XLA_TEST_F(Bfloat16Test, NegateScalarF16) {
@@ -110,7 +110,7 @@ XLA_TEST_F(Bfloat16Test, BatchNormTraining) {
            {static_cast<bfloat16>(5), static_cast<bfloat16>(5)})
            .get()});
 
-  ComputeAndCompareTuple(&builder, *expected, {}, ErrorSpec(0.01));
+  ComputeAndCompareTuple(&builder, *expected, {}, ErrorSpec(0.01, 0.02));
 }
 
 XLA_TEST_F(Bfloat16Test, BatchNormGrad) {

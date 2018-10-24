@@ -41,6 +41,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/gpu/gpu_util.h"
 #include "tensorflow/core/common_runtime/gpu_device_context.h"
 #include "tensorflow/core/common_runtime/local_device.h"
+#include "tensorflow/core/common_runtime/visitable_allocator.h"
 #include "tensorflow/core/framework/allocator.h"
 #include "tensorflow/core/framework/device_base.h"
 #include "tensorflow/core/framework/op_kernel.h"
@@ -857,7 +858,7 @@ void BaseGPUDevice::ReinitializeDevice(OpKernelContext* context,
       static_cast<ConcretePerOpGpuDevice*>(device);
   DCHECK(concrete_device);
   const cudaStream_t* cuda_stream = reinterpret_cast<const cudaStream_t*>(
-      streams_[stream_id]->compute->implementation()->CudaStreamMemberHack());
+      streams_[stream_id]->compute->implementation()->GpuStreamMemberHack());
   concrete_device->Reinitialize(context, cuda_stream, tf_gpu_id_, allocator,
                                 scratch_[stream_id]);
 }
@@ -916,16 +917,21 @@ Status BaseGPUDeviceFactory::CreateDevices(const SessionOptions& options,
   }
   const auto& gpu_options = options.config.gpu_options();
   std::vector<CudaGpuId> visible_gpu_order;
-  TF_RETURN_IF_ERROR(ParseVisibleDeviceList(gpu_options.visible_device_list(),
-                                            &visible_gpu_order));
-
   std::vector<CudaGpuId> valid_cuda_gpu_ids;
-  TF_RETURN_IF_ERROR(GetValidDeviceIds(visible_gpu_order, &valid_cuda_gpu_ids));
+  // If we aren't going to use any GPUs, don't initialize them.
+  // We don't want to call ParseVisibleDeviceList if num_gpus_to_use is 0,
+  // because it treats an empty gpu_options.visible_device_list as 'all GPUs are
+  // visible'.
+  if (num_gpus_to_use > 0) {
+    TF_RETURN_IF_ERROR(ParseVisibleDeviceList(gpu_options.visible_device_list(),
+                                              &visible_gpu_order));
+    TF_RETURN_IF_ERROR(
+        GetValidDeviceIds(visible_gpu_order, &valid_cuda_gpu_ids));
+  }
   if (num_gpus_to_use > valid_cuda_gpu_ids.size()) {
     num_gpus_to_use = valid_cuda_gpu_ids.size();
   }
-  // If we aren't going to use any GPUs, don't initialize them.
-  if (num_gpus_to_use > 0 && !valid_cuda_gpu_ids.empty()) {
+  if (!valid_cuda_gpu_ids.empty()) {
     // Save the original device.
     int original_device = 0;
     cudaError_t err = cudaGetDevice(&original_device);

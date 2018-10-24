@@ -44,7 +44,6 @@ py_test(
     tags = [
         "no_gpu",
         "no_pip_gpu",
-        "no_windows_gpu",
     ],
     deps = [
         ":sdca_ops_py",

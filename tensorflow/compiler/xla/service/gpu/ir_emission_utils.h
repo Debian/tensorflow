@@ -31,6 +31,12 @@ namespace gpu {
 constexpr int64 kWarpSize = 32;
 
 // Returns true if `hlo` will be implemented as a call to BLAS gemm.
+//
+// Precondition: `hlo` is in an "unnested context", meaning, it lives within the
+// entry computation, within the either of a while loop's subcomputations,
+// within any of a conditional's subcomputations, etc., but *does not* live
+// within a reduce subcomputation, a map subcomputation, a fusion
+// subcomputation, etc.  It's OK if `hlo` *is* a fusion.
 bool ImplementedAsGemm(const HloInstruction& hlo);
 
 // A call to cuDNN for batch normalization is represented as CustomCall HLO with
@@ -120,8 +126,8 @@ bool ImplementedAsLibraryCall(const HloInstruction& hlo);
 bool IsReductionToVector(const HloInstruction& reduce);
 
 // Emits call to "vprintf" with given format and arguments.
-llvm::Value* EmitPrintf(tensorflow::StringPiece fmt,
-                        tensorflow::gtl::ArraySlice<llvm::Value*> arguments,
+llvm::Value* EmitPrintf(absl::string_view fmt,
+                        absl::Span<llvm::Value* const> arguments,
                         llvm::IRBuilder<>* builder);
 
 // Emits code to shuffle data between threads of a warp. This has the same

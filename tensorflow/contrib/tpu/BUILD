@@ -15,8 +15,9 @@ package(
     default_visibility = [
         "//cloud/vmm/testing/tests/tpu:__subpackages__",
         "//learning/brain:__subpackages__",
+        "//learning/deepmind:__subpackages__",
+        "//medical/pathology:__subpackages__",
         "//tensorflow:__subpackages__",
-        "//third_party/cloud_tpu:__subpackages__",
     ],
 )
 
@@ -37,10 +38,10 @@ cc_library(
 py_library(
     name = "tpu_estimator",
     srcs = [
+        "python/tpu/error_handling.py",
         "python/tpu/tpu_config.py",
         "python/tpu/tpu_context.py",
         "python/tpu/tpu_estimator.py",
-        "python/tpu/tpu_system_metadata.py",
         "python/tpu/util.py",
     ],
     srcs_version = "PY2AND3",
@@ -62,10 +63,7 @@ py_library(
         "//tensorflow/python:training",
         "//tensorflow/python:variable_scope",
         "//tensorflow/python:variables",
-        "//tensorflow/python/estimator",
-        "//tensorflow/python/estimator:model_fn",
-        "//tensorflow/python/estimator:run_config",
-        "//tensorflow/python/estimator:util",
+        "//tensorflow/python/estimator:estimator_py",
         "@six_archive//:six",
     ],
 )
@@ -169,10 +167,14 @@ py_library(
     name = "keras_support",
     srcs = [
         "python/tpu/keras_support.py",
+        "python/tpu/keras_tpu_variables.py",
     ],
     srcs_version = "PY2AND3",
     visibility = [
+        "//cloud/vmm/testing/tests/tpu:__subpackages__",
+        "//learning/brain:__subpackages__",
         "//tensorflow:__subpackages__",
+        "//third_party/cloud_tpu/models/keras:__subpackages__",
     ],
     deps = [
         ":tpu_lib",
@@ -192,7 +194,7 @@ py_library(
         "//tensorflow/python:tensor_spec",
         "//tensorflow/python:variable_scope",
         "//tensorflow/python/data/ops:dataset_ops",
-        "//tensorflow/python/estimator:model_fn",
+        "//tensorflow/python/estimator:estimator_py",
         "//tensorflow/python/keras:backend",
         "//tensorflow/python/keras:engine",
         "//tensorflow/python/keras:layers",
@@ -213,6 +215,7 @@ py_library(
         "python/tpu/tpu_function.py",
         "python/tpu/tpu_optimizer.py",
         "python/tpu/tpu_sharding.py",
+        "python/tpu/tpu_system_metadata.py",
         "python/tpu/training_loop.py",
     ],
     srcs_version = "PY2AND3",
@@ -264,7 +267,6 @@ tf_py_test(
         ":datasets",
     ],
     grpc_enabled = True,
-    tags = ["no_windows"],
 )
 
 tf_py_test(

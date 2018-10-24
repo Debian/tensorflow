@@ -29,7 +29,7 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_context.h"
 #include "tensorflow/compiler/tf2xla/xla_op_kernel.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/common_runtime/executor.h"
 #include "tensorflow/core/common_runtime/function.h"
@@ -57,7 +57,8 @@ Status PrepareArguments(XlaOpKernelContext* ctx, Graph* graph,
   std::vector<bool> compile_time_constant_flags(expressions.size());
 
   TF_RETURN_IF_ERROR(
-      BackwardsConstAnalysis(*graph, &compile_time_constant_flags));
+      BackwardsConstAnalysis(*graph, &compile_time_constant_flags,
+                             /*compile_time_const_nodes=*/nullptr));
 
   args->resize(expressions.size());
   for (int i = 0; i < args->size(); ++i) {
@@ -145,6 +146,7 @@ Status GraphCompiler::Compile() {
     }
 
     OpKernelContext op_context(&params, n->num_outputs());
+    VLOG(3) << "Translating " << params.op_kernel->name();
     if (IsFunctional(n)) {
       TF_RETURN_IF_ERROR(CompileFunctionalNode(n, &op_context));
     } else {

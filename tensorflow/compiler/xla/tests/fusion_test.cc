@@ -22,13 +22,14 @@ limitations under the License.
 
 #define EIGEN_USE_THREADS
 
+#include "absl/memory/memory.h"
+#include "absl/types/span.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/compiler/xla/array2d.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/literal.h"
 #include "tensorflow/compiler/xla/primitive_util.h"
-#include "tensorflow/compiler/xla/ptr_util.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_module.h"
@@ -42,13 +43,10 @@ limitations under the License.
 #include "tensorflow/compiler/xla/tests/test_macros.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
 #include "tensorflow/core/common_runtime/eigen_thread_pool.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/protobuf.h"
 #include "tensorflow/core/platform/test_benchmark.h"
 #include "tensorflow/core/platform/types.h"
-
-using tensorflow::gtl::ArraySlice;
 
 namespace xla {
 namespace {
@@ -113,7 +111,7 @@ class FusionTest : public HloTestBase {
     hlos[0] = builder.AddInstruction(std::move(root_hlo));
     hlo_module->AddEntryComputation(builder.Build())
         ->CreateFusionInstruction(
-            ArraySlice<HloInstruction*>(hlos, 0, Arity + 1),
+            absl::Span<HloInstruction* const>(hlos).subspan(0, Arity + 1),
             HloInstruction::FusionKind::kLoop);
 
     auto expected = LiteralUtil::CreateR2FromArray2D(answer_data);
@@ -127,12 +125,12 @@ class FusionTest : public HloTestBase {
 
  private:
   template <typename T>
-  T ComputeElementwiseAnswer(HloOpcode opcode, ArraySlice<float> xs);
+  T ComputeElementwiseAnswer(HloOpcode opcode, absl::Span<const float> xs);
 };
 
 template <>
 float FusionTest::ComputeElementwiseAnswer<float>(HloOpcode opcode,
-                                                  ArraySlice<float> xs) {
+                                                  absl::Span<const float> xs) {
   switch (opcode) {
     case HloOpcode::kAdd:
       return xs[0] + xs[1];
@@ -157,7 +155,7 @@ float FusionTest::ComputeElementwiseAnswer<float>(HloOpcode opcode,
 
 template <>
 bool FusionTest::ComputeElementwiseAnswer<bool>(HloOpcode opcode,
-                                                ArraySlice<float> xs) {
+                                                absl::Span<const float> xs) {
   switch (opcode) {
     case HloOpcode::kEq:
       return xs[0] == xs[1];
@@ -601,7 +599,7 @@ XLA_TEST_F(FusionTest, DISABLED_ON_CPU(Reduce)) {
       hlo_module->AddEmbeddedComputation(MakeReduceTestComputation())));
   hlo_module->AddEntryComputation(builder.Build())
       ->CreateFusionInstruction(/*instructions_to_fuse=*/{reduce2},
-                                HloInstruction::FusionKind::kLoop);
+                                HloInstruction::FusionKind::kInput);
 
   EXPECT_TRUE(
       LiteralTestUtil::Equal(*LiteralUtil::CreateR0<int32>(15),
@@ -797,6 +795,46 @@ ENTRY main {
   EXPECT_TRUE(LiteralTestUtil::Equal(
       *LiteralUtil::CreateR3<float>({{{0.}, {0.76159415595}}, {{0.}, {0.}}}),
       *result));
+}
+
+class FusionClientLibraryTest : public ClientLibraryTestBase {};
+
+XLA_TEST_F(FusionClientLibraryTest, ManyLayoutTransformations) {
+  // On the GPU backend, it's possible to have too many transposes within one
+  // fusion, causing the kernel to run out shared memory and thus not compile.
+  // We want to check that doesn't happen.
+  //
+  // To do this, we create a computation that computes
+  //
+  //   P0 + P0*P1*P1 + P0*P2*P2 ...
+  //
+  // where even parameters have layout 1 and odd parameters have layout 2.
+  //
+  // Our goal is to tempt the backend into creating one giant multi-output
+  // fusion for the whole computation, including the transposes.  Currently
+  // multi-output fusion only fuses fusions, so each of the terms in the sum
+  // needs to be a fusion itself, thus the contortions above.
+  constexpr int kNumParams = 25;
+  XlaBuilder b("ManyLayoutTransformations");
+
+  // This test produces values that overflow int32, which is UB, so use uint32,
+  // where overflow is OK.
+  Array2D<uint32> arr(32, 32);
+  arr.FillUnique();
+  std::unique_ptr<Literal> l1 = LiteralUtil::CreateR2FromArray2D(arr)->Relayout(
+      LayoutUtil::MakeLayout({0, 1}));
+
+  std::unique_ptr<Literal> l2 = LiteralUtil::CreateR2FromArray2D(arr)->Relayout(
+      LayoutUtil::MakeLayout({1, 0}));
+
+  XlaOp p0 = AddParam(*l1, &b);
+  XlaOp sum = p0;
+  for (int i = 1; i < kNumParams; ++i) {
+    auto pN = AddParam((i % 2 == 0 ? *l1 : *l2), &b);
+    sum = sum + p0 * pN * pN;
+  }
+
+  ComputeAndCompare(&b, {});
 }
 
 void BM_ParallelFusion(int num_iters) {

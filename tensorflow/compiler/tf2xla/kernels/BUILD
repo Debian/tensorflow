@@ -6,6 +6,10 @@ package(
 
 load("//tensorflow:tensorflow.bzl", "tf_copts")
 load("//tensorflow:tensorflow.bzl", "tf_kernel_library")
+load(
+    "//third_party/mkl:build_defs.bzl",
+    "if_mkl",
+)
 
 tf_kernel_library(
     name = "xla_ops",
@@ -18,6 +22,7 @@ tf_kernel_library(
         "bcast_ops.cc",
         "bias_ops.cc",
         "binary_ops.cc",
+        "broadcast_to_op.cc",
         "bucketize_op.cc",
         "cast_op.cc",
         "categorical_op.cc",
@@ -96,6 +101,12 @@ tf_kernel_library(
         "unary_ops.cc",
         "unpack_op.cc",
         "variable_ops.cc",
+        "xla_broadcast_helper_op.cc",
+        "xla_conv_op.cc",
+        "xla_dot_op.cc",
+        "xla_pad_op.cc",
+        "xla_reduce_op.cc",
+        "xla_select_and_scatter_op.cc",
     ],
     hdrs = [
         "index_ops.h",
@@ -104,6 +115,9 @@ tf_kernel_library(
     deps = [
         ":if_op",
         ":while_op",
+        "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "//tensorflow/compiler/tf2xla:common",
         "//tensorflow/compiler/tf2xla:xla_compiler",
         "//tensorflow/compiler/tf2xla/lib:batch_dot",
@@ -123,12 +137,15 @@ tf_kernel_library(
         "//tensorflow/compiler/xla:util",
         "//tensorflow/compiler/xla:xla_data_proto",
         "//tensorflow/compiler/xla/client:client_library",
+        "//tensorflow/compiler/xla/client:xla_builder",
+        "//tensorflow/compiler/xla/client:xla_computation",
         "//tensorflow/compiler/xla/client/lib:arithmetic",
         "//tensorflow/compiler/xla/client/lib:constants",
         "//tensorflow/compiler/xla/client/lib:math",
         "//tensorflow/compiler/xla/client/lib:numeric",
+        "//tensorflow/compiler/xla/client/lib:pooling",
         "//tensorflow/compiler/xla/client/lib:prng",
-        "//tensorflow/compiler/xla/client/xla_client:xla_builder",
+        "//tensorflow/compiler/xla/client/lib:sorting",
         "//tensorflow/core:framework",
         "//tensorflow/core:image_ops_op_lib",
         "//tensorflow/core:lib",
@@ -151,8 +168,14 @@ tf_kernel_library(
         "//tensorflow/core/kernels:sparse_to_dense_op",
         "//tensorflow/core/kernels:stack_ops",
         "//tensorflow/core/kernels:training_ops",
-        "//tensorflow/core/kernels:transpose_op",
-    ],
+    ] + if_mkl(
+        [
+            "//tensorflow/core/kernels:mkl_transpose_op",
+        ],
+        [
+            "//tensorflow/core/kernels:transpose_op",
+        ],
+    ),
 )
 
 tf_kernel_library(
@@ -164,7 +187,8 @@ tf_kernel_library(
         "//tensorflow/compiler/tf2xla:xla_compiler",
         "//tensorflow/compiler/tf2xla/ops:xla_ops",
         "//tensorflow/compiler/xla:literal",
-        "//tensorflow/compiler/xla/client/xla_client:xla_builder",
+        "//tensorflow/compiler/xla/client:xla_builder",
+        "//tensorflow/compiler/xla/client:xla_computation",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:protos_all_cc",
@@ -180,7 +204,7 @@ tf_kernel_library(
         "//tensorflow/compiler/tf2xla:xla_compiler",
         "//tensorflow/compiler/tf2xla/ops:xla_ops",
         "//tensorflow/compiler/xla:literal",
-        "//tensorflow/compiler/xla/client/xla_client:xla_builder",
+        "//tensorflow/compiler/xla/client:xla_builder",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:protos_all_cc",
@@ -217,8 +241,8 @@ tf_kernel_library(
         "//tensorflow/compiler/xla:literal",
         "//tensorflow/compiler/xla:literal_util",
         "//tensorflow/compiler/xla/client:client_library",
+        "//tensorflow/compiler/xla/client:xla_builder",
         "//tensorflow/compiler/xla/client/lib:arithmetic",
-        "//tensorflow/compiler/xla/client/xla_client:xla_builder",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core/kernels:argmax_op",

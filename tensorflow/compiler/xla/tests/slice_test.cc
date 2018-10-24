@@ -18,22 +18,23 @@ limitations under the License.
 #include <numeric>
 #include <vector>
 
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
+#include "absl/types/span.h"
 #include "tensorflow/compiler/xla/array2d.h"
 #include "tensorflow/compiler/xla/client/local_client.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/reference_util.h"
 #include "tensorflow/compiler/xla/tests/client_library_test_base.h"
 #include "tensorflow/compiler/xla/tests/literal_test_util.h"
 #include "tensorflow/compiler/xla/tests/test_macros.h"
-#include "tensorflow/core/lib/gtl/array_slice.h"
-#include "tensorflow/core/lib/strings/stringprintf.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/platform/types.h"
 
 namespace xla {
 namespace {
-
-using ::tensorflow::str_util::Join;
 
 class SliceTest : public ClientLibraryTestBase {};
 
@@ -193,9 +194,9 @@ class SliceR1Test : public ClientLibraryTestBase,
  protected:
   template <typename NativeT>
   void Run(const R1Spec& spec) {
-    // This can't be an std::vector, since you can't grab an ArraySlice of a
+    // This can't be an std::vector, since you can't grab a Span of a
     // vector<bool>.
-    tensorflow::gtl::InlinedVector<NativeT, 1> input(spec.input_dim0);
+    absl::InlinedVector<NativeT, 1> input(spec.input_dim0);
     std::iota(input.begin(), input.end(), NativeT());
     auto literal = LiteralUtil::CreateR1<NativeT>(input);
 
@@ -205,7 +206,7 @@ class SliceR1Test : public ClientLibraryTestBase,
           {spec.slice_stride});
 
     // Ditto.
-    tensorflow::gtl::InlinedVector<NativeT, 1> expected;
+    absl::InlinedVector<NativeT, 1> expected;
     for (int i = spec.slice_start; i < spec.slice_limit;
          i += spec.slice_stride) {
       expected.push_back(i);
@@ -222,9 +223,8 @@ class SliceR1LargeTest : public SliceR1Test {};
 
 string SliceR1TestDataToString(const ::testing::TestParamInfo<R1Spec>& data) {
   const R1Spec& spec = data.param;
-  return ::tensorflow::strings::Printf("%lld_%lld_%lld_%lld", spec.input_dim0,
-                                       spec.slice_start, spec.slice_limit,
-                                       spec.slice_stride);
+  return absl::StrFormat("%d_%d_%d_%d", spec.input_dim0, spec.slice_start,
+                         spec.slice_limit, spec.slice_stride);
 }
 
 XLA_TEST_P(SliceR1Test, DoIt_F32) { Run<float>(GetParam()); }
@@ -344,7 +344,11 @@ INSTANTIATE_TEST_CASE_P(
         R1Spec{1024 * 1024 + 71, 3, 1024 * 512 - 9, 2},
         R1Spec{1024 * 1024 + 71, 3, 1024 * 512 - 9, 8},
         R1Spec{1024 * 1024 + 71, 3, 1024 * 512 - 9, 7},
-        R1Spec{1024 * 1024 + 71, 3, 1024 * 512 - 9, 125}
+        R1Spec{1024 * 1024 + 71, 3, 1024 * 512 - 9, 125},
+        R1Spec{16 * 1024 * 1024, 0, 16 * 1024 * 1024, 4097},
+        R1Spec{16 * 1024 * 1024, 0, 16 * 1024 * 1024, 4093},
+        R1Spec{16 * 1024 * 1024, 12 * 1024 + 17, 16 * 1024 * 1024 - 231, 4097},
+        R1Spec{16 * 1024 * 1024, 12 * 1024 + 17, 16 * 1024 * 1024 - 231, 4093}
     ),
     SliceR1TestDataToString
 );
@@ -444,13 +448,11 @@ struct R4Spec {
 
 string R4SpecToString(const ::testing::TestParamInfo<R4Spec>& data) {
   const R4Spec& spec = data.param;
-  return tensorflow::strings::StrCat(              //
-      "input_", Join(spec.input_dims, "x"),        //
-      "__layout_", Join(spec.input_layout, ""),    //
-      "__starts_", Join(spec.slice_starts, "x"),   //
-      "__limits_", Join(spec.slice_limits, "x"),   //
-      "__strides_", Join(spec.slice_strides, "x")  //
-  );
+  return absl::StrCat("input_", absl::StrJoin(spec.input_dims, "x"),
+                      "__layout_", absl::StrJoin(spec.input_layout, ""),
+                      "__starts_", absl::StrJoin(spec.slice_starts, "x"),
+                      "__limits_", absl::StrJoin(spec.slice_limits, "x"),
+                      "__strides_", absl::StrJoin(spec.slice_strides, "x"));
 }
 
 class SliceR4Test : public ClientLibraryTestBase,

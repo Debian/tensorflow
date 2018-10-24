@@ -21,6 +21,7 @@ limitations under the License.
 #include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/function.pb.h"
 #include "tensorflow/core/framework/node_def_util.h"
+#include "tensorflow/core/framework/tensor.pb.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/versions.pb.h"
 #include "tensorflow/core/graph/graph_constructor.h"
@@ -496,18 +497,11 @@ class SymbolicShapeRefiner {
             "supported.");
       }
 
+      // It is guaranteed that output_tensors does not contain any control
+      // inputs, so port_id >= 0.
       string out_tensor = out_arg.output_tensors[0];
-      auto out_tensor_pieces = str_util::Split(out_tensor, ",");
-      string node_name = out_tensor_pieces[0];
       int port_id;
-
-      // Check if port_id was included in out_tensor
-      if (out_tensor_pieces.size() <= 1) {
-        port_id = 0;
-      } else if (!strings::safe_strto32(out_tensor_pieces[1], &port_id)) {
-        return errors::FailedPrecondition(
-            "Failed string to integer conversion for ", out_tensor_pieces[1]);
-      }
+      string node_name = ParseNodeName(out_tensor, &port_id);
 
       const NodeDef* retnode = gv.GetNode(node_name);
       if (retnode == nullptr) {
@@ -516,6 +510,11 @@ class SymbolicShapeRefiner {
       }
 
       auto output_properties = gp.GetOutputProperties(retnode->name());
+      if (port_id >= output_properties.size()) {
+        return errors::InvalidArgument(
+            out_tensor, " has invalid position ", port_id,
+            " (output_properties.size() = ", output_properties.size(), ").");
+      }
       auto const& outprop = output_properties[port_id];
       const TensorShapeProto& shape = outprop.shape();
       ShapeHandle out;
@@ -806,8 +805,9 @@ class SymbolicShapeRefiner {
         CHECK_NOTNULL(function_library_.Find(function_node->op()));
 
     GrapplerFunctionItem grappler_function_item;
-    TF_RETURN_IF_ERROR(MakeGrapplerFunctionItem(
-        *function_def, function_library_, &grappler_function_item));
+    TF_RETURN_IF_ERROR(
+        MakeGrapplerFunctionItem(*function_def, function_library_,
+                                 graph_def_version_, &grappler_function_item));
 
     if (grappler_function_item.inputs().size() > function_node->input_size()) {
       return errors::FailedPrecondition(

@@ -23,6 +23,9 @@ limitations under the License.
 #include <unordered_set>
 #include <vector>
 
+#ifdef TFLITE_EXTENDED
+#include "tensorflow/contrib/lite/delegates/eager/delegate.h"
+#endif  // TFLITE_EXTENDED
 #include "tensorflow/contrib/lite/kernels/register.h"
 #include "tensorflow/contrib/lite/model.h"
 #include "tensorflow/contrib/lite/op_resolver.h"
@@ -198,8 +201,8 @@ std::vector<Flag> BenchmarkTfLiteModel::GetFlags() {
   return flags;
 }
 
-void BenchmarkTfLiteModel::LogFlags() {
-  BenchmarkModel::LogFlags();
+void BenchmarkTfLiteModel::LogParams() {
+  BenchmarkModel::LogParams();
   TFLITE_LOG(INFO) << "Graph: [" << params_.Get<std::string>("graph") << "]";
   TFLITE_LOG(INFO) << "Input layers: ["
                    << params_.Get<std::string>("input_layer") << "]";
@@ -208,7 +211,7 @@ void BenchmarkTfLiteModel::LogFlags() {
   TFLITE_LOG(INFO) << "Use nnapi : [" << params_.Get<bool>("use_nnapi") << "]";
 }
 
-bool BenchmarkTfLiteModel::ValidateFlags() {
+bool BenchmarkTfLiteModel::ValidateParams() {
   if (params_.Get<std::string>("graph").empty()) {
     TFLITE_LOG(ERROR)
         << "Please specify the name of your TF Lite input file with --graph";
@@ -261,6 +264,16 @@ void BenchmarkTfLiteModel::Init() {
   bool use_nnapi = params_.Get<bool>("use_nnapi");
 
   interpreter->UseNNAPI(use_nnapi);
+
+#ifdef TFLITE_EXTENDED
+  TFLITE_LOG(INFO) << "Instantiating Eager Delegate";
+  delegate_ = EagerDelegate::Create();
+  if (delegate_) {
+    interpreter->ModifyGraphWithDelegate(delegate_.get(),
+                                         /*allow_dynamic_tensors=*/true);
+  }
+#endif  // TFLITE_EXTENDED
+
   auto interpreter_inputs = interpreter->inputs();
 
   if (!inputs.empty()) {

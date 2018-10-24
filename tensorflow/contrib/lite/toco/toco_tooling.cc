@@ -55,7 +55,7 @@ void MakeGeneralGraphTransformationsSet(
   transformations->Add(new ConvertExpandDimsToReshape);
   transformations->Add(new ConvertSqueezeToReshape);
   transformations->Add(new ConvertTrivialAddNToAdd);
-  transformations->Add(new ConvertTrivialStackToReshape);
+  transformations->Add(new ConvertTrivialPackToReshape);
   transformations->Add(new ConvertTrivialTileToConcat);
   transformations->Add(new ConvertTrivialTransposeToReshape);
   transformations->Add(new ConvertReorderAxes);
@@ -86,12 +86,14 @@ void MakeGeneralGraphTransformationsSet(
   transformations->Add(new ResolveConstantBinaryOperator);
   transformations->Add(new ResolveConstantFill);
   transformations->Add(new ResolveConstantGather);
+  transformations->Add(new ResolveConstantPack);
   transformations->Add(new ResolveConstantRandomUniform);
   transformations->Add(new ResolveConstantRange);
   transformations->Add(new ResolveConstantReshape);
+  transformations->Add(new ResolveConstantSelect);
   transformations->Add(new ResolveConstantSlice);
-  transformations->Add(new ResolveConstantStack);
   transformations->Add(new ResolveConstantStridedSlice);
+  transformations->Add(new ResolveConstantTile);
   transformations->Add(new ResolveConstantTranspose);
   transformations->Add(new ResolveConstantUnaryOperator);
   transformations->Add(new ResolveTensorFlowMerge);
@@ -113,10 +115,11 @@ void MakeGeneralGraphTransformationsSet(
   transformations->Add(new ResolvePadV2Attributes);
   transformations->Add(new ResolveStridedSliceAttributes);
   transformations->Add(new ResolveSliceAttributes);
-  transformations->Add(new ResolveMeanAttributes);
+  transformations->Add(new ResolveReduceAttributes);
   transformations->Add(new ResolveConstantShapeOrRank);
   transformations->Add(new MakeInitialDequantizeOperator);
   transformations->Add(new UnpartitionEmbeddingLookup);
+  transformations->Add(new ResolveGatherAttributes);
 }
 
 bool SupportsQuantization(FileFormat format) {
@@ -278,12 +281,6 @@ void Transform(const TocoFlags& toco_flags, Model* model) {
   RunGraphTransformations(model, "general graph transformations",
                           transformations);
 
-  if (toco_flags.quantize_weights()) {
-    // Run the quantize weights transformation after batchnorms have been
-    // folded into the weights.
-    RunGraphTransformations(model, "quantize weights transformation",
-                            {new QuantizeWeights});
-  }
   if (quantize_output) {
     if (toco_flags.propagate_fake_quant_num_bits()) {
       RunGraphTransformations(model,
@@ -308,8 +305,9 @@ void Transform(const TocoFlags& toco_flags, Model* model) {
     // HardcodeMinMax to move changes through the graph as we make changes.
     auto propagate_default_min_max =
         absl::make_unique<PropagateDefaultMinMax>();
-    if (toco_flags.has_default_ranges_min() &&
-        toco_flags.has_default_ranges_max()) {
+    bool has_default_ranges_flag = (toco_flags.has_default_ranges_min() &&
+                                    toco_flags.has_default_ranges_max());
+    if (has_default_ranges_flag) {
       propagate_default_min_max->DefineTypeRange(
           ArrayDataType::kUint8, toco_flags.default_ranges_min(),
           toco_flags.default_ranges_max());
@@ -334,6 +332,8 @@ void Transform(const TocoFlags& toco_flags, Model* model) {
         new EnsureUint8WeightsSafeForFastInt8Kernels;
     ensure_safe_for_int8_kernels->set_allow_nudging_weights(
         toco_flags.allow_nudging_weights_to_use_fast_gemm_kernel());
+    ensure_safe_for_int8_kernels->set_has_default_ranges_flag(
+        has_default_ranges_flag);
     RunGraphTransformations(model, "quantization graph transformations",
                             {
                                 new RemoveTrivialQuantizedActivationFunc,
@@ -398,7 +398,9 @@ void Export(const TocoFlags& toco_flags, const Model& model,
       ExportTensorFlowGraphDef(model, output_file_contents);
       break;
     case TFLITE:
-      toco::tflite::Export(model, allow_custom_ops, output_file_contents);
+      toco::tflite::Export(model, allow_custom_ops,
+                           toco_flags.post_training_quantize(),
+                           output_file_contents);
       break;
     case GRAPHVIZ_DOT:
       DumpGraphviz(model, output_file_contents);

@@ -279,6 +279,11 @@ class ArithmeticOptimizerTest : public GrapplerTest {
     optimizer->options_.optimize_max_or_min_of_monotonic = true;
   }
 
+  void EnableOnlyExpm1(ArithmeticOptimizer* optimizer) {
+    DisableAllStages(optimizer);
+    optimizer->options_.convert_expm1 = true;
+  }
+
   void EnableOnlyUnaryOpsComposition(ArithmeticOptimizer* optimizer) {
     DisableAllStages(optimizer);
     optimizer->options_.unary_ops_composition = true;
@@ -2484,6 +2489,11 @@ TEST_F(ArithmeticOptimizerTest, ConvertPow) {
   auto tensors = EvaluateNodes(got, item.fetch);
   EXPECT_EQ(7, tensors.size());
 
+  for (int i = 0; i < 7; ++i) {
+    EXPECT_EQ(tensors[i].NumElements(), tensors_expected[i].NumElements());
+    test::ExpectTensorNear<float>(tensors[i], tensors_expected[i], 1e-6);
+  }
+
   GraphDef want;
   AddNode("x", "Const", {}, {}, &want);
   AddNode("y2", "Const", {}, {}, &want);
@@ -2529,6 +2539,11 @@ TEST_F(ArithmeticOptimizerTest, Log1p) {
   auto tensors = EvaluateNodes(got, item.fetch);
   EXPECT_EQ(2, tensors.size());
 
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(tensors[i].NumElements(), tensors_expected[i].NumElements());
+    test::ExpectTensorNear<float>(tensors[i], tensors_expected[i], 1e-6);
+  }
+
   GraphDef want;
   AddNode("x1", "Const", {}, {}, &want);
   AddNode("x2", "Const", {}, {}, &want);
@@ -2538,6 +2553,47 @@ TEST_F(ArithmeticOptimizerTest, Log1p) {
           {"x2", AsControlDependency("x1"), AsControlDependency("x3")}, {},
           &want);
   AddNode("out2", "Log", {"a23"}, {}, &want);
+
+  CompareGraphs(want, got);
+}
+
+TEST_F(ArithmeticOptimizerTest, Expm1) {
+  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+
+  auto x1 = ops::Const(s.WithOpName("x1"), {2.0f, 2.0f}, {1, 2});
+  auto x2 = ops::Const(s.WithOpName("x2"), {1.0f, 1.0f}, {1, 2});
+  auto x3 = ops::Const(s.WithOpName("x3"), {3.0f, 3.0f}, {1, 2});
+  auto exp1 = ops::Exp(s.WithOpName("exp1").WithControlDependencies(x3), x1);
+  Output out1 = ops::Sub(s.WithOpName("out1"), exp1, x2);
+  Output out2 = ops::Sub(s.WithOpName("out2"), exp1, x3);
+
+  GrapplerItem item;
+  item.fetch = {"out1", "out2"};
+  TF_CHECK_OK(s.ToGraphDef(&item.graph));
+  auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
+  EXPECT_EQ(2, tensors_expected.size());
+
+  GraphDef got;
+  ArithmeticOptimizer optimizer;
+  EnableOnlyExpm1(&optimizer);
+  OptimizeAndPrune(&optimizer, &item, &got);
+  auto tensors = EvaluateNodes(got, item.fetch);
+  EXPECT_EQ(2, tensors.size());
+
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(tensors[i].NumElements(), tensors_expected[i].NumElements());
+    test::ExpectTensorNear<float>(tensors[i], tensors_expected[i], 1e-6);
+  }
+
+  GraphDef want;
+  AddNode("x1", "Const", {}, {}, &want);
+  AddNode("x2", "Const", {}, {}, &want);
+  AddNode("x3", "Const", {}, {}, &want);
+  AddNode("exp1", "Exp", {"x1", AsControlDependency("x3")}, {}, &want);
+  AddNode("out1", "Expm1",
+          {"x1", AsControlDependency("x2"), AsControlDependency("x3")}, {},
+          &want);
+  AddNode("out2", "Sub", {"exp1", "x3"}, {}, &want);
 
   CompareGraphs(want, got);
 }
@@ -3166,6 +3222,30 @@ TEST_F(ArithmeticOptimizerTest, OptimizeMaxOrMinOfMonotonicElementWise) {
     }
   }
   EXPECT_EQ(2, required_node_count);
+}
+
+TEST_F(ArithmeticOptimizerTest,
+       OptimizeMaxOrMinOfMonotonicElementWise_DoNotChangeFetchNode) {
+  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  auto x = ops::Const(s.WithOpName("x"), {1.0f, 2.0f}, {1, 2});
+  Output sqrt = ops::Sqrt(s.WithOpName("sqrt"), x);
+  Output reduce_max = ops::Max(s.WithOpName("reduce_max"), sqrt, {0});
+  Output final_out = ops::Identity(s.WithOpName("final_out"), reduce_max);
+
+  GrapplerItem item;
+  item.fetch = {"sqrt", "final_out"};
+  TF_CHECK_OK(s.ToGraphDef(&item.graph));
+  auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
+  EXPECT_EQ(2, tensors_expected.size());
+
+  GraphDef output;
+  ArithmeticOptimizer optimizer;
+  EnableOnlyOptimizeMaxOrMinOfMonotonic(&optimizer);
+  OptimizeTwice(&optimizer, &item, &output);
+
+  // Should be a NoOp since we are not allowed to change the output of fetch
+  // nodes.
+  VerifyGraphsMatch(item.graph, output, __LINE__);
 }
 
 TEST_F(ArithmeticOptimizerTest, UnaryOpsComposition) {

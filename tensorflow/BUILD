@@ -23,6 +23,22 @@ load(
     "//tensorflow/python/tools/api/generator:api_gen.bzl",
     "gen_api_init_files",  # @unused
 )
+load(
+    "//tensorflow/python/tools/api/generator:api_init_files_v1.bzl",
+    "TENSORFLOW_API_INIT_FILES_V1",  # @unused
+)
+load(
+    "//third_party/ngraph:build_defs.bzl",
+    "if_ngraph",
+)
+
+# Config setting used when building for products
+# which requires restricted licenses to be avoided.
+config_setting(
+    name = "no_lgpl_deps",
+    values = {"define": "__TENSORFLOW_NO_LGPL_DEPS__=1"},
+    visibility = ["//visibility:public"],
+)
 
 # Config setting for determining if we are building for Android.
 config_setting(
@@ -112,12 +128,6 @@ config_setting(
 config_setting(
     name = "windows",
     values = {"cpu": "x64_windows"},
-    visibility = ["//visibility:public"],
-)
-
-config_setting(
-    name = "windows_msvc",
-    values = {"cpu": "x64_windows_msvc"},
     visibility = ["//visibility:public"],
 )
 
@@ -373,6 +383,15 @@ config_setting(
     },
 )
 
+# Setting to use when loading kernels dynamically
+config_setting(
+    name = "dynamic_loaded_kernels",
+    define_values = {
+        "dynamic_loaded_kernels": "true",
+    },
+    visibility = ["//visibility:public"],
+)
+
 config_setting(
     name = "using_cuda_nvcc",
     define_values = {
@@ -400,11 +419,11 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
-# TODO(laigd): consider removing this option and make TensorRT enabled
-# automatically when CUDA is enabled.
+# This flag is set from the configure step when the user selects with nGraph option.
+# By default it should be false
 config_setting(
-    name = "with_tensorrt_support",
-    values = {"define": "with_tensorrt_support=true"},
+    name = "with_ngraph_support",
+    values = {"define": "with_ngraph_support=true"},
     visibility = ["//visibility:public"],
 )
 
@@ -421,21 +440,16 @@ package_group(
 
 load(
     "//third_party/mkl:build_defs.bzl",
-    "if_mkl",
+    "if_mkl_ml",
 )
 
 filegroup(
     name = "intel_binary_blob",
-    data = if_mkl(
+    data = if_mkl_ml(
         [
             "//third_party/mkl:intel_binary_blob",
         ],
     ),
-)
-
-filegroup(
-    name = "docs_src",
-    data = glob(["docs_src/**/*.md"]),
 )
 
 cc_library(
@@ -484,7 +498,6 @@ tf_cc_shared_object(
     linkopts = select({
         "//tensorflow:darwin": [],
         "//tensorflow:windows": [],
-        "//tensorflow:windows_msvc": [],
         "//conditions:default": [
             "-Wl,--version-script",  #  This line must be directly followed by the version_script.lds file
             "$(location //tensorflow:tf_framework_version_script.lds)",
@@ -526,7 +539,6 @@ tf_cc_shared_object(
             "-Wl,-install_name,@rpath/libtensorflow.so",
         ],
         "//tensorflow:windows": [],
-        "//tensorflow:windows_msvc": [],
         "//conditions:default": [
             "-z defs",
             "-Wl,--version-script",  #  This line must be directly followed by the version_script.lds file
@@ -551,7 +563,6 @@ tf_cc_shared_object(
             "$(location //tensorflow:tf_exported_symbols.lds)",
         ],
         "//tensorflow:windows": [],
-        "//tensorflow:windows_msvc": [],
         "//conditions:default": [
             "-z defs",
             "-Wl,--version-script",  #  This line must be directly followed by the version_script.lds file
@@ -568,7 +579,7 @@ tf_cc_shared_object(
         "//tensorflow/cc:scope",
         "//tensorflow/cc/profiler",
         "//tensorflow/core:tensorflow",
-    ],
+    ] + if_ngraph(["@ngraph_tf//:ngraph_tf"]),
 )
 
 exports_files(
@@ -581,6 +592,8 @@ exports_files(
 gen_api_init_files(
     name = "tensorflow_python_api_gen",
     srcs = ["api_template.__init__.py"],
+    api_version = 1,
+    output_files = TENSORFLOW_API_INIT_FILES_V1,
     root_init_template = "api_template.__init__.py",
 )
 

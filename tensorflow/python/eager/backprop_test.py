@@ -23,7 +23,6 @@ import numpy as np
 from tensorflow.python import pywrap_tensorflow
 from tensorflow.python.eager import backprop
 from tensorflow.python.eager import context
-from tensorflow.python.eager import tape
 from tensorflow.python.eager import test
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
@@ -87,7 +86,6 @@ class BackpropTest(test.TestCase):
         initial_value=constant_op.constant(1.0), name='x')
 
     def fn():
-      tape.watch_variable(x)
       b = constant_op.constant(2.0)
       c = math_ops.add(x.value(), b)
       return math_ops.add(c, constant_op.constant(3.0))
@@ -95,6 +93,19 @@ class BackpropTest(test.TestCase):
     grads_and_vars = backprop.implicit_grad(fn)()
     self.assertAllEqual(grads_and_vars[0][0], 1.0)
     self.assertAllEqual(id(grads_and_vars[0][1]), id(x))
+
+  def testGradientInsideLoop(self):
+    with ops.Graph().as_default():
+      v = resource_variable_ops.ResourceVariable(1.0)
+
+      def body(_):
+        _ = v + 1.0  # This reads the variable inside the loop context
+        with backprop.GradientTape() as t:
+          result = v * 2
+        self.assertTrue(t.gradient(result, v) is not None)
+        return 1.0
+
+      control_flow_ops.while_loop(lambda i: False, body, [1.0])
 
   def testWhereGradient(self):
     # Note: where is special because only some of its arguments are of
@@ -181,7 +192,6 @@ class BackpropTest(test.TestCase):
         initial_value=random_init, dtype=dtypes.float32, name='embedding')
 
     def f():
-      tape.watch_variable(embedding)
       embedded_x = embedding_ops.embedding_lookup(embedding, x)
       return constant_op.constant(1.0, dtypes.float32) - embedded_x
 
@@ -391,7 +401,6 @@ class BackpropTest(test.TestCase):
 
     def f():
       with context.device('gpu:0'):
-        tape.watch_variable(v)
         return v.read_value()
 
     self.assertEqual(
@@ -771,7 +780,6 @@ class BackpropTest(test.TestCase):
         initial_value=array_ops.constant([1.0]), name='x')
 
     def fn():
-      tape.watch_variable(x)
       a = math_ops.add(x.value(), 1.0)
       # Make sure convert_to_tensor works correctly with list of TensorNodes.
       b = array_ops.stack([a, a], axis=0)
@@ -912,32 +920,23 @@ class BackpropTest(test.TestCase):
         'did you forget to return a value from fn?'):
       val_and_grads_fn(x, y)
 
-  def testZerosCacheDoesntLeakAcrossModes(self):
-    with ops.Graph().as_default():
-      t = random_ops.random_normal(shape=[100, 2])
-      x = random_ops.random_normal(shape=[100, 4])
-      dy = random_ops.random_normal(shape=[100, 4])
-      with backprop.GradientTape() as gradient_tape:
-        gradient_tape.watch(x)
-        x1, _ = array_ops.split(x, num_or_size_splits=2, axis=1)
-        y1 = x1 ** 2.
-        y = array_ops.concat([y1, t], axis=1)
+  def testZerosCacheDoesntLeakAcrossGraphs(self):
+    with context.graph_mode():
+      def get_grad():
+        with ops.Graph().as_default(), self.test_session():
+          t = constant_op.constant(1, dtype=dtypes.float32, shape=(10, 4))
+          x = constant_op.constant(2, dtype=dtypes.float32, shape=(10, 4))
+          with backprop.GradientTape() as tape:
+            tape.watch(x)
+            x1, _ = array_ops.split(x, num_or_size_splits=2, axis=1)
+            y1 = x1**2
+            y = array_ops.concat([y1, t], axis=1)
+          return self.evaluate(tape.gradient(y, x))
 
-      dx = gradient_tape.gradient(y, x, output_gradients=dy)
-      with self.test_session() as sess:
-        sess.run(variables.global_variables_initializer())
-        sess.run(dx)
+      grad1 = get_grad()
+      grad2 = get_grad()
 
-    t = random_ops.random_normal(shape=[100, 2])
-    x = random_ops.random_normal(shape=[100, 4])
-    dy = random_ops.random_normal(shape=[100, 4])
-    with backprop.GradientTape() as gradient_tape:
-      gradient_tape.watch(x)
-      x1, _ = array_ops.split(x, num_or_size_splits=2, axis=1)
-      y1 = x1 ** 2.
-      y = array_ops.concat([y1, t], axis=1)
-
-    dx = gradient_tape.gradient(y, x, output_gradients=dy)
+      self.assertAllEqual(grad1, grad2)
 
 
 if __name__ == '__main__':

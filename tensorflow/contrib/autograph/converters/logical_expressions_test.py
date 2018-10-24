@@ -31,11 +31,9 @@ class GradientsFunctionTest(converter_testing.TestCase):
     def test_fn(a, b):
       return a == b
 
-    node = self.parse_and_analyze(test_fn, {})
-    node = logical_expressions.transform(node, self.ctx)
-
-    with self.compiled(node, math_ops.equal) as result:
-      with self.test_session() as sess:
+    with self.converted(test_fn, logical_expressions, {},
+                        math_ops.equal) as result:
+      with self.cached_session() as sess:
         self.assertTrue(sess.run(result.test_fn(1, 1)))
         self.assertFalse(sess.run(result.test_fn(1, 2)))
 
@@ -44,12 +42,9 @@ class GradientsFunctionTest(converter_testing.TestCase):
     def test_fn(a, b, c):
       return (a or b) and (a or b or c)
 
-    node = self.parse_and_analyze(test_fn, {})
-    node = logical_expressions.transform(node, self.ctx)
-
-    with self.compiled(node, math_ops.logical_or,
-                       math_ops.logical_and) as result:
-      with self.test_session() as sess:
+    with self.converted(test_fn, logical_expressions, {}, math_ops.logical_or,
+                        math_ops.logical_and) as result:
+      with self.cached_session() as sess:
         self.assertTrue(sess.run(result.test_fn(True, False, True)))
 
 

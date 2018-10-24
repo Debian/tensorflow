@@ -95,6 +95,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":evaluation_utils",
         ":graph_optimizer",
         ":symbolic_shapes",
         "//tensorflow/core:framework",
@@ -115,6 +116,7 @@ tf_cc_test(
     shard_count = 5,
     deps = [
         ":constant_folding",
+        ":dependency_optimizer",
         "//tensorflow/cc:cc_ops",
         "//tensorflow/cc:cc_ops_internal",
         "//tensorflow/core:all_kernels",
@@ -603,7 +605,9 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":constant_folding",
+        ":evaluation_utils",
         ":graph_optimizer",
+        "//tensorflow/core:core_cpu_lib",
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
@@ -624,6 +628,7 @@ tf_cuda_cc_test(
         ":loop_optimizer",
         "//tensorflow/cc:cc_ops",
         "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:tensor_testutil",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
         "//tensorflow/core/grappler:grappler_item",
@@ -808,5 +813,36 @@ tf_cc_test(
         "//tensorflow/core/grappler:grappler_item",
         "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/inputs:trivial_test_graph_input_yielder",
+    ],
+)
+
+cc_library(
+    name = "evaluation_utils",
+    srcs = ["evaluation_utils.cc"],
+    hdrs = [
+        "evaluation_utils.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
+        "//tensorflow/core:protos_all_cc",
+    ],
+)
+
+tf_cc_test(
+    name = "evaluation_utils_test",
+    srcs = ["evaluation_utils_test.cc"],
+    deps = [
+        ":evaluation_utils",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+        "//third_party/eigen3",
     ],
 )

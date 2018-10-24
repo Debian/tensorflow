@@ -15,16 +15,17 @@
 """Experimental API for building input pipelines.
 
 This module contains experimental `Dataset` sources and transformations that can
-be used in conjunction with the @{tf.data.Dataset} API. Note that the
+be used in conjunction with the `tf.data.Dataset` API. Note that the
 `tf.contrib.data` API is not subject to the same backwards compatibility
 guarantees as `tf.data`, but we will provide deprecation advice in advance of
 removing existing functionality.
 
-See @{$guide/datasets$Importing Data} for an overview.
+See [Importing Data](https://tensorflow.org/guide/datasets) for an overview.
 
 @@Counter
 @@CheckpointInputPipelineHook
 @@CsvDataset
+@@LMDBDataset
 @@RandomDataset
 @@Reducer
 @@SqlDataset
@@ -49,9 +50,11 @@ See @{$guide/datasets$Importing Data} for an overview.
 @@map_and_batch
 @@padded_batch_and_drop_remainder
 @@parallel_interleave
+@@parse_example_dataset
 @@prefetch_to_device
 @@read_batch_features
 @@rejection_resample
+@@reduce_dataset
 @@sample_from_datasets
 @@scan
 @@shuffle_and_repeat
@@ -77,6 +80,7 @@ from tensorflow.contrib.data.python.ops.counter import Counter
 from tensorflow.contrib.data.python.ops.enumerate_ops import enumerate_dataset
 from tensorflow.contrib.data.python.ops.error_ops import ignore_errors
 from tensorflow.contrib.data.python.ops.get_single_element import get_single_element
+from tensorflow.contrib.data.python.ops.get_single_element import reduce_dataset
 from tensorflow.contrib.data.python.ops.grouping import bucket_by_sequence_length
 from tensorflow.contrib.data.python.ops.grouping import group_by_reducer
 from tensorflow.contrib.data.python.ops.grouping import group_by_window
@@ -87,10 +91,12 @@ from tensorflow.contrib.data.python.ops.interleave_ops import sample_from_datase
 from tensorflow.contrib.data.python.ops.interleave_ops import sloppy_interleave
 from tensorflow.contrib.data.python.ops.iterator_ops import CheckpointInputPipelineHook
 from tensorflow.contrib.data.python.ops.iterator_ops import make_saveable_from_iterator
+from tensorflow.contrib.data.python.ops.parsing_ops import parse_example_dataset
 from tensorflow.contrib.data.python.ops.prefetching_ops import copy_to_device
 from tensorflow.contrib.data.python.ops.prefetching_ops import prefetch_to_device
 from tensorflow.contrib.data.python.ops.random_ops import RandomDataset
 from tensorflow.contrib.data.python.ops.readers import CsvDataset
+from tensorflow.contrib.data.python.ops.readers import LMDBDataset
 from tensorflow.contrib.data.python.ops.readers import make_batched_features_dataset
 from tensorflow.contrib.data.python.ops.readers import make_csv_dataset
 from tensorflow.contrib.data.python.ops.readers import read_batch_features

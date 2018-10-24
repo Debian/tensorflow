@@ -18,8 +18,10 @@ limitations under the License.
 #include "tensorflow/cc/ops/standard_ops.h"
 #include "tensorflow/core/framework/graph_def_util.h"
 #include "tensorflow/core/framework/node_def_builder.h"
+#include "tensorflow/core/framework/tensor.pb.h"  // NOLINT
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/tensor_testutil.h"
+#include "tensorflow/core/framework/versions.pb.h"
 #include "tensorflow/core/grappler/clusters/single_machine.h"
 #include "tensorflow/core/grappler/grappler_item.h"
 #include "tensorflow/core/grappler/inputs/trivial_test_graph_input_yielder.h"
@@ -783,6 +785,46 @@ TEST_F(GraphPropertiesTest, InferRestoreOpShape_WithTwoNodesShareSameOutput) {
   EXPECT_EQ("float: [128,256]", PropToString(prop));
 }
 
+TEST_F(GraphPropertiesTest, FunctionWithScalarInputTest) {
+  // Create graph with a function that takes a scalar value so that we use
+  // Placeholder with scalar as for input to the function shape inference.
+  // Placeholder -> Identity -> MyFunc, where MyFunc simply takes Identity of
+  // the input; all tensors are scalars.
+  FunctionDefLibrary library;
+  *library.add_function() = FunctionDefHelper::Create(
+      "MyFunc",                                                   // Name
+      {"x: float"},                                               // Inputs
+      {"out: float"},                                             // Outputs
+      {},                                                         // Attrs
+      {{{"a"}, "Identity", {"x"}, {{"T", DataType::DT_FLOAT}}}},  // Nodes
+      {{"out", "a:output:0"}});                                   // Returns
+  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  TF_CHECK_OK(s.graph()->AddFunctionLibrary(library));
+  Output placeholder =
+      ops::Placeholder(s.WithOpName("Placeholder"), DataType::DT_FLOAT,
+                       ops::Placeholder::Shape(TensorShape({})));
+  Output identity = ops::Identity(s.WithOpName("Identity"), placeholder);
+  auto _identity = tensorflow::ops::AsNodeOut(s, identity);
+  auto builder =
+      tensorflow::NodeBuilder("MyFunc", "MyFunc", s.graph()->op_registry());
+  tensorflow::Node* func_op;
+  TF_CHECK_OK(builder.Input(_identity).Finalize(s.graph(), &func_op));
+  GrapplerItem item;
+  TF_CHECK_OK(s.ToGraphDef(&item.graph));
+
+  // Tensorflow version < 21 infers output shape of Placeholder with empty shape
+  // as unknown, instead of scalar.
+  EXPECT_GT(item.graph.versions().producer(), 21);
+
+  // MyFunc output shouldn't be unknown rank.
+  GraphProperties properties(item);
+  TF_CHECK_OK(properties.InferStatically(false));
+  const auto out_props = properties.GetOutputProperties("MyFunc");
+  const OpInfo::TensorProperties out_prop0 = out_props[0];
+  EXPECT_EQ(DT_FLOAT, out_prop0.dtype());
+  EXPECT_FALSE(out_prop0.shape().unknown_rank());
+}
+
 TEST_F(GraphPropertiesTest, SimpleFunctionStaticShapeInference) {
   // Test graph produced in python using:
   /*
@@ -885,6 +927,44 @@ TEST_F(GraphPropertiesTest, LargeFunctionStaticShapeInference) {
   EXPECT_EQ(7, in_prop3.shape().dim(1).size());
   EXPECT_EQ(3, in_prop3.shape().dim(2).size());
   EXPECT_EQ(8, in_prop3.shape().dim(3).size());
+}
+
+TEST_F(GraphPropertiesTest, LargeFunctionWithMultipleOutputs) {
+  // Test graph produced in python using:
+  /*
+    @function.Defun(noinline=True)
+    def MyFunc():
+      @function.Defun(*[tf.float32] * 2)
+      def Cond(n, unused_x):
+        return n > 0
+
+      @function.Defun(*[tf.float32] * 2)
+      def Body(n, x):
+        return n - 1, x + n
+
+      i = tf.constant(10)
+      return functional_ops.While([i, 0.], Cond, Body)
+
+    with tf.Graph().as_default():
+      z = MyFunc()
+  */
+  GrapplerItem item;
+  string filename = io::JoinPath(testing::TensorFlowSrcRoot(), kTestDataPath,
+                                 "function_functional_while.pbtxt");
+  TF_CHECK_OK(ReadGraphDefFromFile(filename, &item.graph));
+  GraphProperties properties(item);
+  TF_CHECK_OK(properties.InferStatically(false));
+
+  const auto out_props = properties.GetOutputProperties("MyFunc_AenMyWWx1Us");
+  EXPECT_EQ(2, out_props.size());
+
+  const OpInfo::TensorProperties& out_prop0 = out_props[0];
+  EXPECT_EQ(DT_INT32, out_prop0.dtype());
+  EXPECT_FALSE(out_prop0.shape().unknown_rank());
+
+  const OpInfo::TensorProperties& out_prop1 = out_props[1];
+  EXPECT_EQ(DT_FLOAT, out_prop1.dtype());
+  EXPECT_FALSE(out_prop1.shape().unknown_rank());
 }
 
 TEST_F(GraphPropertiesTest, FunctionWithErrorStaticShapeInference) {

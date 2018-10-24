@@ -19,7 +19,7 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_helpers.h"
 #include "tensorflow/compiler/tf2xla/xla_op_registry.h"
 #include "tensorflow/compiler/xla/client/client_library.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/core/framework/kernel_def_builder.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/types.h"
@@ -30,21 +30,21 @@ namespace {
 // A subclass of a XlaBinaryOp must build the computation that
 // describes the (tensor,tensor)->tensor function to apply to each element of
 // the input.
-#define XLA_MAKE_BINARY(NAME, HLO)                                      \
-  class NAME##Op : public XlaBinaryOp {                                 \
-   public:                                                              \
-    explicit NAME##Op(OpKernelConstruction* ctx) : XlaBinaryOp(ctx) {}  \
-    xla::XlaOp Computation(                                             \
-        XlaOpKernelContext* ctx, const xla::XlaOp& lhs,                 \
-        const gtl::ArraySlice<int64>& lhs_shape, const xla::XlaOp& rhs, \
-        const gtl::ArraySlice<int64>& rhs_shape,                        \
-        const BCast& broadcast_helper,                                  \
-        const std::vector<int64>& extend_dimensions) override {         \
-      xla::XlaBuilder* b = ctx->builder();                              \
-      (void)b;                                                          \
-      return HLO;                                                       \
-    }                                                                   \
-  };                                                                    \
+#define XLA_MAKE_BINARY(NAME, HLO)                                       \
+  class NAME##Op : public XlaBinaryOp {                                  \
+   public:                                                               \
+    explicit NAME##Op(OpKernelConstruction* ctx) : XlaBinaryOp(ctx) {}   \
+    xla::XlaOp Computation(                                              \
+        XlaOpKernelContext* ctx, const xla::XlaOp& lhs,                  \
+        const absl::Span<const int64>& lhs_shape, const xla::XlaOp& rhs, \
+        const absl::Span<const int64>& rhs_shape,                        \
+        const BCast& broadcast_helper,                                   \
+        const std::vector<int64>& extend_dimensions) override {          \
+      xla::XlaBuilder* b = ctx->builder();                               \
+      (void)b;                                                           \
+      return HLO;                                                        \
+    }                                                                    \
+  };                                                                     \
   REGISTER_XLA_OP(Name(#NAME), NAME##Op)
 
 XLA_MAKE_BINARY(Add, xla::Add(lhs, rhs, extend_dimensions));

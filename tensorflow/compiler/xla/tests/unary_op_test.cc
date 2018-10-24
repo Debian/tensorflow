@@ -18,7 +18,7 @@ limitations under the License.
 
 #include "tensorflow/compiler/xla/client/global_data.h"
 #include "tensorflow/compiler/xla/client/local_client.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/tests/client_library_test_base.h"
 #include "tensorflow/compiler/xla/tests/literal_test_util.h"
 #include "tensorflow/compiler/xla/tests/test_macros.h"
@@ -188,25 +188,6 @@ XLA_TEST_F(UnaryOpTest, SignAbsTestR1) {
   SignAbsTestHelper<int>();
   SignAbsTestHelper<float>();
   SignAbsTestHelper<complex64>();
-}
-
-XLA_TEST_F(UnaryOpTest, UnsignedAbsTestR1) {
-  XlaBuilder builder(TestName());
-  auto arg = ConstantR1<unsigned int>(
-      &builder, {2, 25, 0, 123, std::numeric_limits<unsigned int>::max()});
-  Abs(arg);
-
-  ComputeAndCompareR1<unsigned int>(
-      &builder, {2, 25, 0, 123, std::numeric_limits<unsigned int>::max()}, {});
-}
-
-XLA_TEST_F(UnaryOpTest, UnsignedSignTestR1) {
-  XlaBuilder builder(TestName());
-  auto arg = ConstantR1<unsigned int>(
-      &builder, {2, 25, 0, 123, std::numeric_limits<unsigned int>::max()});
-  Sign(arg);
-
-  ComputeAndCompareR1<unsigned int>(&builder, {1, 1, 0, 1, 1}, {});
 }
 
 XLA_TEST_F(UnaryOpTest, SignAbsTestR2) {

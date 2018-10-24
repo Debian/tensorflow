@@ -25,7 +25,7 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_op_kernel.h"
 #include "tensorflow/compiler/tf2xla/xla_op_registry.h"
 #include "tensorflow/compiler/tf2xla/xla_resource.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/compiler/xla/literal.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/partial_tensor_shape.h"
@@ -122,7 +122,7 @@ Status GetTensorArrayShape(const XlaResource* resource,
 // relevant slice of 'operand'.
 xla::XlaOp DynamicAddSlice(xla::XlaBuilder* builder, const xla::XlaOp& operand,
                            const xla::XlaOp& update,
-                           const gtl::ArraySlice<int64>& update_dims,
+                           absl::Span<const int64> update_dims,
                            const xla::XlaOp& start_indices) {
   xla::XlaOp current = xla::DynamicSlice(operand, start_indices, update_dims);
   xla::XlaOp sum = xla::Add(current, update);

@@ -18,9 +18,9 @@ limitations under the License.
 #include <memory>
 #include <utility>
 
+#include "absl/memory/memory.h"
 #include "tensorflow/compiler/xla/layout_util.h"
 #include "tensorflow/compiler/xla/literal.h"
-#include "tensorflow/compiler/xla/ptr_util.h"
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_matchers.h"
@@ -32,7 +32,6 @@ limitations under the License.
 #include "tensorflow/compiler/xla/tests/hlo_test_base.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
-#include "tensorflow/core/lib/strings/str_util.h"
 
 namespace xla {
 namespace {
@@ -137,9 +136,9 @@ ENTRY entry {
     if (instruction->opcode() == HloOpcode::kParameter) {
       continue;
     }
-    ASSERT_TRUE(instruction->has_sharding());
-    TF_ASSERT_OK_AND_ASSIGN(int device, instruction->sharding().UniqueDevice());
-    EXPECT_EQ(device, 1);
+    auto device = instruction->sharding_unique_device();
+    ASSERT_TRUE(device);
+    EXPECT_EQ(*device, 1);
   }
 }
 

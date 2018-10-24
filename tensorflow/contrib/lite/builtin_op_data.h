@@ -277,6 +277,20 @@ typedef struct {
   bool narrow_range;
 } TfLiteFakeQuantParams;
 
+typedef struct {
+  int values_count;
+  int axis;
+} TfLitePackParams;
+
+typedef struct {
+  int axis;
+} TfLiteOneHotParams;
+
+typedef struct {
+  int num;
+  int axis;
+} TfLiteUnpackParams;
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

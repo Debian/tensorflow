@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import os
 import time
 
 import numpy as np
@@ -332,6 +333,13 @@ class GradientsTest(test.TestCase):
     for i in range(n):
       self.assertAllClose(outputs[i], outputs[i + n], rtol=rtol, atol=atol)
 
+  def test_no_path(self):
+    for grad_func in [gradients.jacobian, gradients.batch_jacobian]:
+      for use_pfor in [True, False]:
+        x = constant_op.constant([[1.0]])
+        y = constant_op.constant([[2.0]])
+        self.assertIsNone(grad_func(y, x, use_pfor=use_pfor))
+
   def test_jacobian_fixed_shape(self):
     x = random_ops.random_uniform([2, 2])
     y = math_ops.matmul(x, x, transpose_a=True)
@@ -444,6 +452,10 @@ class GradientsTest(test.TestCase):
     self.run_and_assert_equal(pfor_outputs, while_outputs)
 
   def test_mnist_per_eg_grad(self):
+    # It looks like CUDNN_CONVOLUTION_BWD_DATA_ALGO_WINOGRAD_NONFUSED
+    # configuration of Winograd can cause low precision output resulting in
+    # tests failing. So we disable that here.
+    os.environ["TF_ENABLE_WINOGRAD_NONFUSED"] = "0"
     data_format = ("channels_first"
                    if test.is_gpu_available() else "channels_last")
     # Note that we we are setting training=False here so that dropout produces
@@ -451,8 +463,13 @@ class GradientsTest(test.TestCase):
     pfor_outputs, while_outputs = create_mnist_per_eg_grad(
         4, data_format, training=False)
     self.run_and_assert_equal(pfor_outputs, while_outputs, rtol=1e-3)
+    os.environ.pop("TF_ENABLE_WINOGRAD_NONFUSED", None)
 
   def test_mnist_per_eg_jacobian(self):
+    # It looks like CUDNN_CONVOLUTION_BWD_DATA_ALGO_WINOGRAD_NONFUSED
+    # configuration of Winograd can cause low precision output resulting in
+    # tests failing. So we disable that here.
+    os.environ["TF_ENABLE_WINOGRAD_NONFUSED"] = "0"
     data_format = ("channels_first"
                    if test.is_gpu_available() else "channels_last")
     # Note that we we are setting training=False here so that dropout produces
@@ -460,6 +477,7 @@ class GradientsTest(test.TestCase):
     pfor_outputs, while_outputs = create_mnist_per_eg_jacobian(
         2, data_format, training=False)
     self.run_and_assert_equal(pfor_outputs, while_outputs, rtol=1e-3)
+    os.environ.pop("TF_ENABLE_WINOGRAD_NONFUSED", None)
 
   def test_fc_jacobian(self):
     jacobians, per_eg_jacobians_pfor, per_eg_jacobians_while = (
