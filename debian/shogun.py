@@ -499,6 +499,7 @@ def shogunGenerator(argv):
                     'tensorflow/cc/framework/cc_op_gen_main.cc', ]
     objlist = []
     for cc in cclist_extra:
+        if 'tensorflow_tools_proto_text' in ag.g: break  # ungraceful...
         obj = re.sub('.cc$', '.o', cc)
         cursor.build(obj, 'rule_CXX_OBJ', cc)
         objlist.append(obj)
@@ -529,6 +530,7 @@ def shogunGenerator(argv):
         'tensorflow/core/framework/op_gen_lib.o',
         ]
     for cc in cclist_extra:
+        if 'tensorflow_tools_proto_text' in ag.g: break  # ungraceful...
         obj = re.sub('.cc$', '.o', cc)
         cursor.build(obj, 'rule_CXX_OBJ', cc)
         objlist.append(obj)
