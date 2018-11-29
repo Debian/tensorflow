@@ -1,8 +1,5 @@
 bazel.patch
 fix-include-path-jsoncpp.patch
 
-# the jemalloc patch is left for reference
-# jemalloc.patch
-
 # This patch is for embedded source and is manually applied
 # fft-cxx-no-mangle.patch

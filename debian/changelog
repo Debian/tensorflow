@@ -1,6 +1,6 @@
 tensorflow (1.10.1+dfsg-A2) UNRELEASED; urgency=medium
 
-  [ BuildSystem shogun.py ]
+  [ BuildSystem ]
   * Significantly simplified code of shogun.py .
   * Add -DNDEBUG and -pipe to default CXXFLAGS.
   * Work-In-Progress support for the python interface. (Disabled by default)
@@ -8,10 +8,10 @@ tensorflow (1.10.1+dfsg-A2) UNRELEASED; urgency=medium
   * Fix installation path for the embedded Eigen3 library.
   * See git history for detailed changes.
 
-  [ Debian Packaging ]
-  * Update rules accordingly.
+  [ Debian ]
+  * Require B-D highwayhash-dev on all architectures.
 
- -- Mo Zhou <cdluminate@gmail.com>  Fri, 28 Sep 2018 12:36:17 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Thu, 29 Nov 2018 08:27:16 +0000
 
 tensorflow (1.10.1+dfsg-A1) experimental; urgency=medium
 
