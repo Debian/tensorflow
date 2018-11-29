@@ -1,15 +1,14 @@
 tensorflow (1.10.1+dfsg-A2) UNRELEASED; urgency=medium
 
+  * Require B-D highwayhash-dev on all architectures. (Closes: #914985)
+
   [ BuildSystem ]
   * Significantly simplified code of shogun.py .
   * Add -DNDEBUG and -pipe to default CXXFLAGS.
   * Work-In-Progress support for the python interface. (Disabled by default)
   * Create version_info.cc by ninja target instead of patch.
   * Fix installation path for the embedded Eigen3 library.
-  * See git history for detailed changes.
-
-  [ Debian ]
-  * Require B-D highwayhash-dev on all architectures.
+  + See git history for detailed changes.
 
  -- Mo Zhou <cdluminate@gmail.com>  Thu, 29 Nov 2018 08:27:16 +0000
 
