@@ -76,6 +76,7 @@ class IrEmitterUnnested : public IrEmitter {
   Status HandleInfeed(HloInstruction* xla_infeed) override;
   Status HandleOutfeed(HloInstruction* outfeed) override;
   Status HandleRng(HloInstruction* random) override;
+  Status HandleScatter(HloInstruction* scatter) override;
   Status HandleSelect(HloInstruction* select) override;
   Status HandleSort(HloInstruction* sort) override;
   Status HandleTupleSelect(HloInstruction* tuple_select) override;
@@ -184,6 +185,14 @@ class IrEmitterUnnested : public IrEmitter {
       absl::Span<const std::pair<llvm_ir::ElementGenerator, ShapeIndex>>
           extra_output_gens);
 
+  // Emits code for an in-place scatter, modifying `thunk`s launch dimensions in
+  // the process. `scatter` may be fused, scatter indices are taken from
+  // `scatter_indices_gen`, updates from`updates_gen`. The output buffer is
+  // expected to have the operand values in it already.
+  Status EmitScatter(Thunk* thunk, HloInstruction* scatter,
+                     const llvm_ir::ElementGenerator& scatter_indices_gen,
+                     const llvm_ir::ElementGenerator& updates_gen);
+
   // Returns true if a 0-2-1 tiling algorithm is already used to emit the kernel
   // for the hlo instruction.
   bool CheckAndEmitHloWithTile021(HloInstruction* hlo);
@@ -193,14 +202,12 @@ class IrEmitterUnnested : public IrEmitter {
   LaunchDimensions EmitHlo021Tile(HloInstruction* hlo,
                                   absl::Span<const int64> reduced_output_dims,
                                   absl::Span<const int64> tiled_param_ids);
-  // Generates the IrArray for each output of hlo and returns the number of
-  // outputs.
-  int ConstructIrArrayForOutputs(const HloInstruction& hlo,
-                                 std::vector<llvm_ir::IrArray>* output_arrays);
-  // Generates the IrArray for each input of hlo and returns the number of
-  // inputs.
-  int ConstructIrArrayForInputs(const HloInstruction& hlo,
-                                std::vector<llvm_ir::IrArray>* param_arrays);
+
+  // Generates the IrArray for each input of an hlo and returns a vector that
+  // constains such IrArrays.
+  std::vector<llvm_ir::IrArray> ConstructIrArrayForInputs(
+      const HloInstruction& hlo);
+
   // For each output of the `hlo` instruction, constructs the reduced shape for
   // the output with the given `reduced_output_dims` and cast the original
   // output IrArray element in `output_arrays` to the reduced shape. Returns
@@ -244,7 +251,7 @@ class IrEmitterUnnested : public IrEmitter {
   // Returns a thunk that, given a reduce or select-and-scatter op, initializes
   // its memory to the appropriate initial value.
   StatusOr<std::unique_ptr<Thunk>> BuildInitializerThunk(
-      const HloInstruction* hlo, const ShapeIndex& index = {});
+      HloInstruction* hlo, const ShapeIndex& index = {});
 
   // Returns a thunk that calls host-to-device cuMemcpy to implement `inst`.
   std::unique_ptr<Thunk> BuildHostToDeviceCopyThunk(const HloInstruction* inst);

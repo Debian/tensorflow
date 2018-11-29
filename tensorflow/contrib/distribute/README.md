@@ -76,7 +76,7 @@ We then compile the Keras model and pass the `MirroredStrategy` object in the
 ```python
 model.compile(loss='mean_squared_error',
               optimizer=tf.train.GradientDescentOptimizer(learning_rate=0.2),
-              distribute=strategy)
+              distribute=distribution)
 ```
 
 To train the model we call Keras `fit` API using the input dataset that we
@@ -231,7 +231,8 @@ The same `input_fn` will be used for all workers if you use
 important to shuffle your dataset in your `input_fn`.
 
 `MirroredStrategy` will insert a `tf.dataset.Dataset.shard` call in you
-`input_fn`. As a result, each worker gets a fraction of your input data.
+`input_fn` if `auto_shard_dataset` is set to `True`. As a result, each worker
+gets a fraction of your input data.
 
 ### Performance Tips
 
@@ -341,7 +342,7 @@ code and run a new model against the same cluster.
 
 We've been optimizing the performance of standalone client mode. If you notice
 high latency between your laptop and your cluster, you can reduce that latency
-by running your run your model binary in the cluster.
+by running your model binary in the cluster.
 
 ## Caveats
 

@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/grappler/optimizers/data/map_vectorization.h"
+#include "tensorflow/core/grappler/optimizers/data/vectorization_utils.h"
 
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/node_def.pb.h"
@@ -24,6 +25,7 @@ limitations under the License.
 #include "tensorflow/core/grappler/mutable_graph_view.h"
 #include "tensorflow/core/grappler/op_types.h"
 #include "tensorflow/core/grappler/optimizers/custom_graph_optimizer_registry.h"
+#include "tensorflow/core/grappler/optimizers/data/function_utils.h"
 #include "tensorflow/core/grappler/optimizers/data/graph_utils.h"
 #include "tensorflow/core/grappler/utils.h"
 #include "tensorflow/core/lib/gtl/map_util.h"
@@ -33,15 +35,11 @@ namespace tensorflow {
 namespace grappler {
 namespace {
 
-void CopyAttribute(const string& attr_name, const NodeDef& from, NodeDef* to) {
-  (*to->mutable_attr())[attr_name] = from.attr().at(attr_name);
-}
-
-FunctionDef* AddVectorizedFunction(const NodeDef& map_node,
+// Returns a FunctionDef containing a MapDefun op that wraps the original
+// function.
+FunctionDef* CreateMapDefunWrapper(const NodeDef& map_node,
                                    const FunctionDef& orig_func,
                                    FunctionDefLibrary* library) {
-  // If we decide to use a different method of vectorization, we can just
-  // swap out this part.
   FunctionDef* vectorized_func = library->add_function();
   // Function inputs and outputs are the same as original, just
   // with different shapes.
@@ -52,14 +50,14 @@ FunctionDef* AddVectorizedFunction(const NodeDef& map_node,
   // Add MapDefun node
   NodeDef* map_defun_node = vectorized_func->mutable_node_def()->Add();
   map_defun_node->set_op("MapDefun");
-  graph_utils::SetUniqueFunctionNodeName(map_defun_node->op(), vectorized_func,
-                                         map_defun_node);
+  function_utils::SetUniqueFunctionNodeName(map_defun_node->op(),
+                                            vectorized_func, map_defun_node);
 
   // Set attrs and inputs
   for (const string& k : {"f", "output_types", "output_shapes"}) {
     // Function, output types and (unbatched) shapes are the same as the
     // original map node.
-    CopyAttribute(k, map_node, map_defun_node);
+    graph_utils::CopyAttribute(k, map_node, map_defun_node);
   }
 
   // Get types of input arguments from original map function
@@ -79,6 +77,28 @@ FunctionDef* AddVectorizedFunction(const NodeDef& map_node,
   }
 
   return vectorized_func;
+}
+
+FunctionDef* AddVectorizedFunction(const NodeDef& map_node,
+                                   const FunctionDef& orig_func,
+                                   FunctionDefLibrary* library) {
+  // Vectorizes orig_func naively by wrapping in a MapDefun op, then performing
+  // efficient vectorization with VectorizeMapDefun.
+  FunctionDef* vectorized_func =
+      CreateMapDefunWrapper(map_node, orig_func, library);
+  const NodeDef& map_defun_node = vectorized_func->node_def(0);
+  DCHECK_EQ(map_defun_node.op(), "MapDefun");
+
+  // TODO(b/116285210): Unreferenced functions should get cleaned up later
+  FunctionDef* result;
+  Status s = vectorization_utils::VectorizeMapDefun(
+      *vectorized_func, map_defun_node, library, &result);
+
+  if (!s.ok()) {
+    LOG(ERROR) << "VectorizeMapDefun failed: " << s;
+    return vectorized_func;
+  }
+  return result;
 }
 
 bool IsOutputShapesFullyDefined(const NodeDef& node) {
@@ -169,13 +189,16 @@ NodeDef MakeNewMapNode(const NodeDef& old_map_node,
   }
 
   // Set attrs
-  CopyAttribute("Targuments", old_map_node, &map_node);
+  graph_utils::CopyAttribute("Targuments", old_map_node, &map_node);
   auto& func_attr = (*map_node.mutable_attr())["f"];
   func_attr.mutable_func()->set_name(vectorized_func.signature().name());
 
   for (auto key : {"output_shapes", "output_types"}) {
-    CopyAttribute(key, old_batch_node, &map_node);
+    graph_utils::CopyAttribute(key, old_batch_node, &map_node);
   }
+
+  (*map_node.mutable_attr())["use_inter_op_parallelism"].set_b(true);
+
   return map_node;
 }
 

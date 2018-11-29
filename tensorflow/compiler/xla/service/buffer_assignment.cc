@@ -22,6 +22,8 @@ limitations under the License.
 #include <ostream>
 #include <utility>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -30,7 +32,6 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/heap_simulator.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
-#include "tensorflow/compiler/xla/service/hlo_scheduling.h"
 #include "tensorflow/compiler/xla/shape_util.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/types.h"
@@ -42,10 +43,10 @@ limitations under the License.
 namespace xla {
 namespace {
 
+using absl::flat_hash_map;
+using absl::flat_hash_set;
 using absl::StrAppend;
 using absl::StrAppendFormat;
-using ::tensorflow::gtl::FlatMap;
-using ::tensorflow::gtl::FlatSet;
 using ::tensorflow::strings::HumanReadableNumBytes;
 
 template <typename T>
@@ -129,8 +130,8 @@ Status GatherComputationsByAllocationType(
 
   // Sets for quickly checking membership. Computations are returned in vectors
   // for stable iteration.
-  FlatSet<const HloComputation*> thread_local_set;
-  FlatSet<const HloComputation*> global_set;
+  flat_hash_set<const HloComputation*> thread_local_set;
+  flat_hash_set<const HloComputation*> global_set;
 
   while (!worklist.empty()) {
     auto worklist_front = worklist.front();
@@ -445,7 +446,7 @@ bool BufferAssignment::SharesSliceAtIndex(
 bool BufferAssignment::HaveDisjointSlices(const HloInstruction* hlo_a,
                                           const HloInstruction* hlo_b) const {
   using SliceSet =
-      FlatSet<BufferAllocation::Slice, BufferAllocation::Slice::Hasher>;
+      flat_hash_set<BufferAllocation::Slice, BufferAllocation::Slice::Hasher>;
   // Gets the slices all of instr's subshapes.  If any subshape doesn't have an
   // assigned slice, returns the empty set.
   auto collect_slices = [&](const HloInstruction* instr) -> SliceSet {
@@ -520,7 +521,8 @@ void BufferAssignment::AddAssignment(BufferAllocation* allocation,
 // BufferAllocation.
 void BufferAssignment::CombineTempAllocations() {
   VLOG(1) << "CombineTempAllocations()";
-  FlatMap<LogicalBuffer::Color, BufferAllocation, LogicalBuffer::Color::Hasher>
+  flat_hash_map<LogicalBuffer::Color, BufferAllocation,
+                LogicalBuffer::Color::Hasher>
       combined_allocation_map;
 
   // Move all temp allocations into a single run at the end of the allocations
@@ -583,7 +585,8 @@ void BufferAssignment::CombineTempAllocations() {
   }
 
   // Update allocation indices to their new positions.
-  allocation_index_for_buffer_.clear_no_resize();
+  allocation_index_for_buffer_.erase(allocation_index_for_buffer_.begin(),
+                                     allocation_index_for_buffer_.end());
   for (size_t index = 0; index < allocations_.size(); ++index) {
     BufferAllocation* allocation = &allocations_[index];
     allocation->set_index(index);
@@ -617,18 +620,24 @@ Status BufferAssignment::ComputeSummaryStats() {
   }
 
   // Only compute total fragmentation if all computations have schedules.
-  SequentialHloOrdering::HloModuleSequence module_sequence;
+  HloSchedule schedule(module_);
+  bool schedule_complete = true;
   for (const auto& computation : module_->computations()) {
-    const std::vector<const HloInstruction*>* sequence =
-        liveness_->hlo_ordering().SequentialOrder(*computation);
-    if (sequence != nullptr) {
-      module_sequence.emplace(computation, *sequence);
+    if (!computation->IsFusionComputation()) {
+      const std::vector<const HloInstruction*>* sequence =
+          liveness_->hlo_ordering().SequentialOrder(*computation);
+      if (sequence == nullptr) {
+        schedule_complete = false;
+      } else {
+        schedule.set_sequence(computation, *sequence);
+      }
     }
   }
-  if (module_sequence.size() == module_->computation_count()) {
+  if (schedule_complete) {
+    TF_RETURN_IF_ERROR(schedule.Verify());
     TF_ASSIGN_OR_RETURN(
         const int64 min_size,
-        HeapSimulator::MinimumMemoryForModule(module_sequence, buffer_size_));
+        HeapSimulator::MinimumMemoryForModule(schedule, buffer_size_));
     stats_.total_fragmentation_bytes = stats_.total_allocation_bytes - min_size;
   }
 
@@ -807,9 +816,9 @@ bool BufferAssigner::MaybeAssignBuffer(BufferAllocation* allocation,
 
 Status BufferAssigner::AssignBuffersForComputation(
     const HloComputation* computation, bool is_thread_local,
-    const FlatSet<const LogicalBuffer*>& colocated_buffers,
-    const FlatSet<BufferAllocation::Index>& colocated_allocations,
-    FlatMap<const HloComputation*, FlatSet<const LogicalBuffer*>>*
+    const flat_hash_set<const LogicalBuffer*>& colocated_buffers,
+    const flat_hash_set<BufferAllocation::Index>& colocated_allocations,
+    flat_hash_map<const HloComputation*, flat_hash_set<const LogicalBuffer*>>*
         buffers_to_assign_sequentially,
     BufferAssignment* assignment) {
   // Buffers are sorted and assigned to BufferAllocations in decreasing order of
@@ -828,7 +837,7 @@ Status BufferAssigner::AssignBuffersForComputation(
 
   // Generate a post order sort of instructions for sorting of the
   // LogicalBuffers.
-  FlatMap<const HloInstruction*, int> post_order_position;
+  flat_hash_map<const HloInstruction*, int> post_order_position;
   int position = 0;
   for (auto* instruction : computation->MakeInstructionPostOrder()) {
     post_order_position.emplace(instruction, position);
@@ -845,8 +854,8 @@ Status BufferAssigner::AssignBuffersForComputation(
     // buffers_to_assign_sequentially map, even if we end up with an empty set
     // of buffers. This ensures we can correctly determine whether to run
     // whole-module heap simulation.
-    buffers_to_assign_sequentially->emplace(computation,
-                                            FlatSet<const LogicalBuffer*>());
+    buffers_to_assign_sequentially->emplace(
+        computation, flat_hash_set<const LogicalBuffer*>());
   }
 
   // Sort the LogicalBuffers first by size. We assign the larger LogicalBuffers
@@ -1038,12 +1047,12 @@ Status BufferAssigner::AssignBuffersForComputation(
   return Status::OK();
 }
 
-FlatMap<LogicalBuffer::Color, FlatSet<const LogicalBuffer*>,
-        LogicalBuffer::Color::Hasher>
+flat_hash_map<LogicalBuffer::Color, flat_hash_set<const LogicalBuffer*>,
+              LogicalBuffer::Color::Hasher>
 BufferAssigner::SplitBuffersByColor(
-    const FlatSet<const LogicalBuffer*>& buffers) {
-  FlatMap<LogicalBuffer::Color, FlatSet<const LogicalBuffer*>,
-          LogicalBuffer::Color::Hasher>
+    const flat_hash_set<const LogicalBuffer*>& buffers) {
+  flat_hash_map<LogicalBuffer::Color, flat_hash_set<const LogicalBuffer*>,
+                LogicalBuffer::Color::Hasher>
       color_map;
   for (auto buffer : buffers) {
     color_map[buffer->color()].insert(buffer);
@@ -1052,27 +1061,42 @@ BufferAssigner::SplitBuffersByColor(
 }
 
 Status BufferAssigner::AssignBuffersWithSequentialOrdering(
-    const FlatMap<const HloComputation*, FlatSet<const LogicalBuffer*>>&
+    const flat_hash_map<const HloComputation*,
+                        flat_hash_set<const LogicalBuffer*>>&
         buffers_to_assign_sequentially,
     bool run_whole_module_heap_simulation, BufferAssignment* assignment) {
   // Run the sequence of instructions through the heap simulator.  The heuristic
   // that seems to give the best results is lazy-best-fit, with all runs of
   // alloc / free calls sorted in decreasing size order.
   const HloOrdering& hlo_ordering = assignment->liveness().hlo_ordering();
+
+  // Returns a heap algorithm that chooses the best result from several
+  // algorithms.
+  auto get_heap_algorithm = [&](int64 alignment) {
+    auto algorithms =
+        absl::make_unique<std::vector<std::unique_ptr<HeapAlgorithm>>>();
+    algorithms->push_back(absl::make_unique<DecreasingSizeRunsHeap>(
+        absl::make_unique<LazyBestFitHeap>(alignment)));
+    algorithms->push_back(
+        absl::make_unique<GlobalDecreasingSizeBestFitHeap>(alignment));
+    return absl::make_unique<ChooseBestHeapAlgorithm>(std::move(algorithms));
+  };
+
   if (run_whole_module_heap_simulation) {
     // Run the heap simulation over the whole module. This reduces memory usage,
     // since buffers for kCall, kWhile, and kConditional sub-computations are
     // only live for the duration of their calling instructions.
     VLOG(1) << "Running whole-module heap simulation";
-    SequentialHloOrdering::HloModuleSequence module_sequence;
-    FlatSet<const LogicalBuffer*> all_buffers_to_assign;
+    HloSchedule schedule(&assignment->module());
+    flat_hash_set<const LogicalBuffer*> all_buffers_to_assign;
     for (const auto& pair : buffers_to_assign_sequentially) {
       const HloComputation* computation = pair.first;
-      const FlatSet<const LogicalBuffer*>& buffers_to_assign = pair.second;
+      const flat_hash_set<const LogicalBuffer*>& buffers_to_assign =
+          pair.second;
       const std::vector<const HloInstruction*>* instruction_sequence =
           hlo_ordering.SequentialOrder(*computation);
       CHECK(instruction_sequence != nullptr) << computation->name();
-      module_sequence[computation] = *instruction_sequence;
+      schedule.set_sequence(computation, *instruction_sequence);
       all_buffers_to_assign.insert(buffers_to_assign.begin(),
                                    buffers_to_assign.end());
     }
@@ -1088,9 +1112,8 @@ Status BufferAssigner::AssignBuffersWithSequentialOrdering(
       options.buffers_to_assign = &buffer_value_set;
       TF_ASSIGN_OR_RETURN(
           const HeapSimulator::Result result,
-          HeapSimulator::Run(absl::make_unique<DecreasingSizeRunsHeap>(
-                                 absl::make_unique<LazyBestFitHeap>(alignment)),
-                             assignment->module(), module_sequence,
+          HeapSimulator::Run(get_heap_algorithm(alignment),
+                             assignment->module(), schedule,
                              assignment->points_to_analysis(),
                              assignment->buffer_size_, options));
       AssignBuffersFromHeapSimulator(result, assignment,
@@ -1103,7 +1126,8 @@ Status BufferAssigner::AssignBuffersWithSequentialOrdering(
     VLOG(1) << "Running per-computation heap simulation";
     for (const auto& pair : buffers_to_assign_sequentially) {
       const HloComputation* computation = pair.first;
-      const FlatSet<const LogicalBuffer*>& buffers_to_assign = pair.second;
+      const flat_hash_set<const LogicalBuffer*>& buffers_to_assign =
+          pair.second;
       const std::vector<const HloInstruction*>* instruction_sequence =
           hlo_ordering.SequentialOrder(*computation);
       CHECK(instruction_sequence != nullptr) << computation->name();
@@ -1118,12 +1142,10 @@ Status BufferAssigner::AssignBuffersWithSequentialOrdering(
         options.buffers_to_assign = &buffer_value_set;
         TF_ASSIGN_OR_RETURN(
             const HeapSimulator::Result result,
-            HeapSimulator::Run(
-                absl::make_unique<DecreasingSizeRunsHeap>(
-                    absl::make_unique<LazyBestFitHeap>(alignment)),
-                *computation, *instruction_sequence,
-                assignment->points_to_analysis(), assignment->buffer_size_,
-                options));
+            HeapSimulator::Run(get_heap_algorithm(alignment), *computation,
+                               HloInstructionSequence(*instruction_sequence),
+                               assignment->points_to_analysis(),
+                               assignment->buffer_size_, options));
         AssignBuffersFromHeapSimulator(result, assignment,
                                        single_colored_set.first);
       }
@@ -1140,9 +1162,8 @@ std::vector<const LogicalBuffer*> ComputePeakMemoryLogicalBuffers(
     const BufferAllocation& allocation, const HeapSimulatorTrace& heap_trace) {
   // Create a map from LogicalBuffer::Id to LogicalBuffer* for the logical
   // buffers in this allocation.
-  tensorflow::gtl::FlatMap<LogicalBuffer::Id, const LogicalBuffer*>
-      id_to_buffer;
-  tensorflow::gtl::FlatMap<const LogicalBuffer*, int64> buffer_sizes;
+  absl::flat_hash_map<LogicalBuffer::Id, const LogicalBuffer*> id_to_buffer;
+  absl::flat_hash_map<const LogicalBuffer*, int64> buffer_sizes;
   for (const auto& pair : allocation.assigned_buffers()) {
     const LogicalBuffer* buffer = pair.first;
     const BufferAllocation::OffsetSize& offset_size = pair.second;
@@ -1181,7 +1202,7 @@ std::vector<const LogicalBuffer*> ComputePeakMemoryLogicalBuffers(
 
   // Next gather the set of logical buffers live at the earliest point of
   // maximal live set size.
-  tensorflow::gtl::FlatSet<const LogicalBuffer*> live_buffers;
+  absl::flat_hash_set<const LogicalBuffer*> live_buffers;
   live_size = 0;
   for (const auto& event : heap_trace.events()) {
     const LogicalBuffer* buffer = id_to_buffer.at(event.buffer_id());
@@ -1571,8 +1592,8 @@ void BufferAssigner::BuildColocatedBufferSets(
 void BufferAssigner::AssignColocatedBufferSets(
     const std::vector<ColocatedBufferSet>& colocated_buffer_sets,
     BufferAssignment* assignment,
-    FlatSet<const LogicalBuffer*>* colocated_buffers,
-    FlatSet<BufferAllocation::Index>* colocated_allocations) {
+    flat_hash_set<const LogicalBuffer*>* colocated_buffers,
+    flat_hash_set<BufferAllocation::Index>* colocated_allocations) {
   for (const ColocatedBufferSet& colocated_buffer_set : colocated_buffer_sets) {
     BufferAllocation* allocation = nullptr;
     // Set 'entry_parameter_number' and 'entry_parameter_shape_idx' if entry
@@ -1645,8 +1666,8 @@ StatusOr<std::unique_ptr<BufferAssignment>> BufferAssigner::CreateAssignment(
   // Once b/32491382 enables module-level liveness analysis, we may be able
   // to assign colocated buffers (or at least reuse their allocation for
   // buffers outside of the set) in AssignBuffersForComputation.
-  FlatSet<const LogicalBuffer*> colocated_buffers;
-  FlatSet<BufferAllocation::Index> colocated_allocations;
+  flat_hash_set<const LogicalBuffer*> colocated_buffers;
+  flat_hash_set<BufferAllocation::Index> colocated_allocations;
   std::vector<ColocatedBufferSet> colocated_buffer_sets;
   BuildColocatedBufferSets(module, assignment->liveness(),
                            assignment->buffer_size_, &colocated_buffer_sets);
@@ -1664,7 +1685,7 @@ StatusOr<std::unique_ptr<BufferAssignment>> BufferAssigner::CreateAssignment(
 
   // First assign buffers for global computatations. Temporary buffers for
   // sequential computations are collected in 'buffers_to_assign_sequentially'.
-  FlatMap<const HloComputation*, FlatSet<const LogicalBuffer*>>
+  flat_hash_map<const HloComputation*, flat_hash_set<const LogicalBuffer*>>
       buffers_to_assign_sequentially;
   for (auto* computation : global_computations) {
     TF_RETURN_IF_ERROR(AssignBuffersForComputation(

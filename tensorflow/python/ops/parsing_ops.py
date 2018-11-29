@@ -36,6 +36,7 @@ from tensorflow.python.ops import sparse_ops
 from tensorflow.python.ops.gen_parsing_ops import *
 # pylint: enable=wildcard-import,undefined-variable
 from tensorflow.python.platform import tf_logging
+from tensorflow.python.util import deprecation
 from tensorflow.python.util.tf_export import tf_export
 
 
@@ -45,7 +46,7 @@ ops.NotDifferentiable("SerializeTensor")
 ops.NotDifferentiable("StringToNumber")
 
 
-@tf_export("VarLenFeature")
+@tf_export("io.VarLenFeature", "VarLenFeature")
 class VarLenFeature(collections.namedtuple("VarLenFeature", ["dtype"])):
   """Configuration for parsing a variable-length input feature.
 
@@ -55,7 +56,7 @@ class VarLenFeature(collections.namedtuple("VarLenFeature", ["dtype"])):
   pass
 
 
-@tf_export("SparseFeature")
+@tf_export("io.SparseFeature", "SparseFeature")
 class SparseFeature(
     collections.namedtuple(
         "SparseFeature",
@@ -130,7 +131,7 @@ class SparseFeature(
         cls, index_key, value_key, dtype, size, already_sorted)
 
 
-@tf_export("FixedLenFeature")
+@tf_export("io.FixedLenFeature", "FixedLenFeature")
 class FixedLenFeature(collections.namedtuple(
     "FixedLenFeature", ["shape", "dtype", "default_value"])):
   """Configuration for parsing a fixed-length input feature.
@@ -150,7 +151,7 @@ class FixedLenFeature(collections.namedtuple(
         cls, shape, dtype, default_value)
 
 
-@tf_export("FixedLenSequenceFeature")
+@tf_export("io.FixedLenSequenceFeature", "FixedLenSequenceFeature")
 class FixedLenSequenceFeature(collections.namedtuple(
     "FixedLenSequenceFeature",
     ["shape", "dtype", "allow_missing", "default_value"])):
@@ -360,7 +361,7 @@ def _prepend_none_dimension(features):
     return features
 
 
-@tf_export("parse_example")
+@tf_export("io.parse_example", "parse_example")
 def parse_example(serialized, features, name=None, example_names=None):
   # pylint: disable=line-too-long
   """Parses `Example` protos into a `dict` of tensors.
@@ -761,7 +762,7 @@ def _process_raw_parameters(names, dense_defaults, sparse_keys, sparse_types,
           dense_shapes_as_proto, dense_shapes)
 
 
-@tf_export("parse_single_example")
+@tf_export("io.parse_single_example", "parse_single_example")
 def parse_single_example(serialized, features, name=None, example_names=None):
   """Parses a single `Example` proto.
 
@@ -981,9 +982,10 @@ def parse_sequence_example(serialized,
     name: A name for this operation (optional).
 
   Returns:
-    A tuple of two `dict`s, each mapping keys to `Tensor`s and `SparseTensor`s.
-    The first dict contains the context key/values.
-    The second dict contains the feature_list key/values.
+    A tuple of three `dict`s, each mapping keys to `Tensor`s and
+    `SparseTensor`s. The first dict contains the context key/values,
+    the second dict contains the feature_list key/values, and the final dict
+    contains the lengths of any dense feature_list features.
 
   Raises:
     ValueError: if any feature is invalid.
@@ -1243,7 +1245,7 @@ def _parse_sequence_example_raw(serialized,
 
 # TODO(sundberg): rewrite this method to call the batch version, which is more
 # efficient especially for large inputs.
-@tf_export("parse_single_sequence_example")
+@tf_export("io.parse_single_sequence_example", "parse_single_sequence_example")
 def parse_single_sequence_example(
     serialized, context_features=None, sequence_features=None,
     example_name=None, name=None):
@@ -1563,7 +1565,8 @@ def _parse_single_sequence_example_raw(serialized,
 
 
 # Swap `name` and `na_value` for backward compatibility.
-@tf_export("decode_csv")
+@tf_export("io.decode_csv", "decode_csv")
+@deprecation.deprecated_endpoints("decode_csv")
 def decode_csv(records,
                record_defaults,
                field_delim=",",
@@ -1584,7 +1587,8 @@ def decode_csv(records,
     record_defaults: A list of `Tensor` objects with specific types.
       Acceptable types are `float32`, `float64`, `int32`, `int64`, `string`.
       One tensor per column of the input record, with either a
-      scalar default value for that column or empty if the column is required.
+      scalar default value for that column or an empty vector if the column is
+      required.
     field_delim: An optional `string`. Defaults to `","`.
       char delimiter to separate fields in a record.
     use_quote_delim: An optional `bool`. Defaults to `True`.

@@ -826,7 +826,7 @@ class MirroredStrategyVariableCreationTest(test.TestCase):
 
       with dist.scope():
         ret_v_sum = dist.call_for_each_tower(model_fn, run_concurrently=False)
-        update_ops = dist.unwrap(dist.update(ret_v_sum, update, 5.0))
+        update_ops = dist.update(ret_v_sum, update, 5.0, grouped=False)
 
         # Initialize variables.
         self.evaluate(variables.global_variables_initializer())
@@ -1271,7 +1271,17 @@ class MirroredStrategyDefunTest(test.TestCase):
                             self.evaluate(device_result))
 
       for defun in defuns:
-        self.assertEqual(set(mock_model.variables), set(defun.variables))
+        # PolymorphicFunctions are specialized to the current device stack, so
+        # call_for_each has one trace per device. To check that the expected set
+        # of variables was accessed on each trace, we first retrieve each
+        # device-specific graph function.
+        per_device_graph_functions = dist.call_for_each_tower(
+            defun.get_concrete_function,
+            mock_model, *inputs, run_concurrently=False)
+        for device in devices:
+          graph_function = per_device_graph_functions.get(device=device)
+          self.assertEqual(set(mock_model.variables),
+                           set(graph_function.graph.variables))
 
   @test_util.run_in_graph_and_eager_modes()
   def testVariableInDefun(self):

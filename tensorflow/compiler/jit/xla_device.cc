@@ -148,10 +148,9 @@ Status DefaultPaddedShapeFn(const Tensor& tensor, xla::Shape* shape) {
   }
 
   const DeviceAttributes attrs = Device::BuildDeviceAttributes(
-      strings::StrCat(name_prefix, "/device:", device_name, ":",
-                      device_ordinal),
+      absl::StrCat(name_prefix, "/device:", device_name, ":", device_ordinal),
       DeviceType(device_name), Bytes(16ULL << 30), DeviceLocality(),
-      strings::StrCat("device: ", device_name, " device"));
+      absl::StrCat("device: ", device_name, " device"));
 
   device->reset(
       new XlaDevice(options, attrs, device_ordinal, DeviceType(jit_device_name),
@@ -374,7 +373,7 @@ Status XlaDevice::FillContextMap(const Graph* graph,
 void XlaDevice::Compute(OpKernel* op_kernel, OpKernelContext* context) {
   VLOG(2) << "XlaDevice::Compute " << op_kernel->name() << ":"
           << op_kernel->type_string();
-  TracingDevice::Compute(op_kernel, context);
+  op_kernel->Compute(context);
 }
 
 void XlaDevice::ComputeAsync(AsyncOpKernel* op_kernel, OpKernelContext* context,
@@ -433,6 +432,16 @@ Status XlaDevice::MakeTensorFromProto(const TensorProto& tensor_proto,
   }
   VLOG(2) << "Allocated tensor at " << DMAHelper::base(tensor);
   return status;
+}
+
+void XlaDevice::SetRequiresSyncOnCompletion(bool sync_on_completion) {
+  mutex_lock lock(mu_);
+  sync_on_completion_ = sync_on_completion;
+}
+
+bool XlaDevice::RequiresSyncOnCompletion() const {
+  mutex_lock lock(mu_);
+  return sync_on_completion_;
 }
 
 XlaDeviceOpRegistrations* RegisterXlaDeviceKernels(const char* device,

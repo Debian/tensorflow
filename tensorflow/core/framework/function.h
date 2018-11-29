@@ -331,6 +331,11 @@ class FunctionLibraryDefinition : public OpRegistryInterface {
   // a non-OK status if "func" was not found in the library, OK otherwise.
   Status ReplaceFunction(const string& func, const FunctionDef& fdef);
 
+  // Replaces the gradient corresponding to `grad.function_name()`. Returns
+  // a non-OK status if "grad.function_name()" was not found in the library, OK
+  // otherwise.
+  Status ReplaceGradient(const GradientDef& grad);
+
   // Adds the functions and gradients in 'other' to this function library.
   // Duplicate functions and gradients are ignored.
   // This operation is atomic.
@@ -357,6 +362,10 @@ class FunctionLibraryDefinition : public OpRegistryInterface {
   Status LookUp(const string& op_type_name,
                 const OpRegistrationData** op_reg_data) const override
       LOCKS_EXCLUDED(mu_);
+
+  // Generates new function name with the specified prefix that is unique
+  // across this library.
+  string UniqueFunctionName(StringPiece prefix) const LOCKS_EXCLUDED(mu_);
 
   // Ops created for function arguments bear the name given by `kArgOp`; those
   // created for return values bear the name given by `kRetOp`.

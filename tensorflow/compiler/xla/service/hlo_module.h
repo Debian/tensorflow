@@ -25,6 +25,7 @@ limitations under the License.
 #include <vector>
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "tensorflow/compiler/xla/iterator_util.h"
 #include "tensorflow/compiler/xla/service/hlo.pb.h"
@@ -32,6 +33,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/hlo_computation.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_module_config.h"
+#include "tensorflow/compiler/xla/service/hlo_schedule.h"
 #include "tensorflow/compiler/xla/service/name_uniquer.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/core/lib/gtl/iterator_range.h"
@@ -61,6 +63,7 @@ class HloModule {
   // tests). The versioned handle is used by the service in the compilation
   // cache. A default configuration is created for this module.
   explicit HloModule(const string& name, const HloModuleConfig& config);
+  virtual ~HloModule() {}
 
   // Adds an entry computation to the module. A module can only have one entry
   // computation. Returns a pointer to the newly added computation.
@@ -85,6 +88,7 @@ class HloModule {
       const std::unordered_map<HloComputation*, HloComputation*>& replacements);
 
   const string& name() const { return name_; }
+  void set_name(string name) { name_ = std::move(name); }
 
   // Returns a deep copy of this module including all computations.
   std::unique_ptr<HloModule> Clone(const string& suffix = "clone") const;
@@ -235,12 +239,25 @@ class HloModule {
   StatusOr<HloInstruction*> LaunderConstInstructionFromModule(
       const HloInstruction* hlo);
 
+  // Sets the schedule of the module to the given schedule.
+  Status set_schedule(HloSchedule schedule);
+
+  // Clears the schedule of the module.
+  void clear_schedule() { schedule_.reset(); }
+
+  // Returns true if the module has a schedule set.
+  bool has_schedule() const { return schedule_.has_value(); }
+
+  // Returns the schedue of the module. CHECK fails if no schedule is set.
+  const HloSchedule& schedule() const { return *schedule_; }
+  HloSchedule& schedule() { return *schedule_; }
+
  private:
   HloComputation* AddComputationInternal(
       std::unique_ptr<HloComputation> computation, bool is_entry,
-      bool uniquify_names);
+      bool uniquify_identifiers);
 
-  const string name_;
+  string name_;
   HloModuleConfig config_;
   HloComputation* entry_computation_ = nullptr;
   std::vector<std::unique_ptr<HloComputation>> computations_;
@@ -262,6 +279,11 @@ class HloModule {
   static std::atomic<int> next_unique_module_id_;
   // A unique id to label modules with.
   int unique_id_;
+
+  // The HloSchedule of the module. The schedule if it exists contains a
+  // sequential order of instructions for each non-fusion computation in the
+  // module.
+  absl::optional<HloSchedule> schedule_;
 };
 
 }  // namespace xla

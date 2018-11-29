@@ -231,7 +231,7 @@ class TPUEstimatorSpec(model_fn_lib._TPUEstimatorSpec):  # pylint: disable=prote
   `metric_fn` runs on CPU to generate metrics and `tensors` represents the
   `Tensor`s transferred from TPU system to CPU host and passed to `metric_fn`.
   To be precise, TPU evaluation expects a slightly different signature from the
-  @{tf.estimator.Estimator}. While `EstimatorSpec.eval_metric_ops` expects a
+  `tf.estimator.Estimator`. While `EstimatorSpec.eval_metric_ops` expects a
   dict, `TPUEstimatorSpec.eval_metrics` is a tuple of `metric_fn` and `tensors`.
   The `tensors` could be a list of `Tensor`s or dict of names to `Tensor`s. The
   `tensors` usually specify the model logits, which are transferred back from
@@ -254,7 +254,7 @@ class TPUEstimatorSpec(model_fn_lib._TPUEstimatorSpec):  # pylint: disable=prote
   sending tensors from TPU to CPU. To reduce the overhead, try reducing the
   size of the tensors. The `tensors` are concatenated along their major (batch)
   dimension, and so must be >= rank 1. The `host_call` is useful for writing
-  summaries with @{tf.contrib.summary.create_file_writer}.
+  summaries with `tf.contrib.summary.create_file_writer`.
   """
 
   def __new__(cls,
@@ -404,12 +404,17 @@ class TPUInfeedOutfeedSessionHook(session_run_hook.SessionRunHook):
 
     self._feed_error = None
     self._finished = False
+    self._should_initialize_tpu = True
 
   def begin(self):
     logging.info('TPU job name %s', self._master_job)
     self._iterations_per_loop_var = _create_or_get_iterations_per_loop()
-    self._init_ops = [tpu.initialize_system(job=self._master_job)]
-    self._finalize_ops = [tpu.shutdown_system(job=self._master_job)]
+    if self._should_initialize_tpu:
+      self._init_ops = [tpu.initialize_system(job=self._master_job)]
+      self._finalize_ops = [tpu.shutdown_system(job=self._master_job)]
+    else:
+      self._init_ops = []
+      self._finalize_ops = []
 
     summary_writer_init_ops = contrib_summary.summary_writer_initializer_op()
     self._init_ops.extend(summary_writer_init_ops)
@@ -421,10 +426,10 @@ class TPUInfeedOutfeedSessionHook(session_run_hook.SessionRunHook):
   def _run_infeed(self, queue_ctx, session):
     logging.info('Starting infeed thread controller.')
     if self._initial_infeed_sleep_secs:
-      logging.info('%s thread sleeping for %d seconds.', self._name,
+      logging.info('Infeed thread sleeping for %d seconds.',
                    self._initial_infeed_sleep_secs)
       time.sleep(self._initial_infeed_sleep_secs)
-      logging.info('%s thread starting after sleep', self._name)
+      logging.info('Infeed thread starting after sleep')
 
     with self._rendezvous.catch_errors(source='infeed', session=session):
       if self._run_infeed_loop_on_coordinator:
@@ -451,8 +456,10 @@ class TPUInfeedOutfeedSessionHook(session_run_hook.SessionRunHook):
 
   def after_create_session(self, session, coord):
     logging.info('Init TPU system')
+    start = time.time()
     session.run(self._init_ops,
                 options=config_pb2.RunOptions(timeout_in_ms=5 * 60 * 1000))
+    logging.info('Initialized TPU in %d seconds', time.time() - start)
 
     self._infeed_controller = self._create_infeed_controller(
         name='InfeedController', target=self._run_infeed, args=(session,))
@@ -674,7 +681,7 @@ def generate_per_host_enqueue_ops_fn_for_host(
   """Generates infeed enqueue ops for per-host input_fn on a single host."""
   captured_infeed_queue = _CapturedObject()
 
-  hooks = []
+  dataset_initializer = None
 
   with ops.device(device):
     user_context = tpu_context.TPUContext(
@@ -696,7 +703,7 @@ def generate_per_host_enqueue_ops_fn_for_host(
           add_padding=True)
 
     if is_dataset:
-      hooks.append(inputs.dataset_initializer_hook())
+      dataset_initializer = inputs.dataset_initializer()
 
     tpu_ordinal_function_impl = ctx.tpu_ordinal_function(host_id)
 
@@ -742,14 +749,14 @@ def generate_per_host_enqueue_ops_fn_for_host(
             'signals': signals,
         }
 
-  return enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset
+  return enqueue_ops_fn, captured_infeed_queue, dataset_initializer
 
 
 def generate_per_host_v2_enqueue_ops_fn_for_host(
     ctx, input_fn, inputs_structure_recorder, device, host_id):
   """Generates infeed enqueue ops for per-host input_fn on a single host."""
   captured_infeed_queue = _CapturedObject()
-  hooks = []
+  dataset_initializer = None
 
   with ops.device(device):
     user_context = tpu_context.TPUContext(
@@ -770,7 +777,7 @@ def generate_per_host_v2_enqueue_ops_fn_for_host(
           add_padding=True,
           num_invocations_per_step=ctx.num_of_replicas_per_host)
 
-    hooks.append(inputs.dataset_initializer_hook())
+    dataset_initializer = inputs.dataset_initializer()
     tpu_ordinal_function_impl = ctx.tpu_ordinal_function(host_id)
 
   def enqueue_ops_fn():
@@ -831,14 +838,14 @@ def generate_per_host_v2_enqueue_ops_fn_for_host(
           'signals': signals,
       }
 
-  return enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset
+  return enqueue_ops_fn, captured_infeed_queue, dataset_initializer
 
 
 def generate_broadcast_enqueue_ops_fn(ctx, input_fn, inputs_structure_recorder,
                                       num_hosts):
   """Generates infeed enqueue ops for one input_fn on all the hosts."""
   captured_infeed_queue = _CapturedObject()
-  hooks = []
+  dataset_initializer = None
   device_0 = ctx.tpu_host_placement_function(host_id=0)
   with ops.device(device_0):
     user_context = tpu_context.TPUContext(
@@ -858,7 +865,7 @@ def generate_broadcast_enqueue_ops_fn(ctx, input_fn, inputs_structure_recorder,
           add_padding=True)
 
     if is_dataset:
-      hooks.append(inputs.dataset_initializer_hook())
+      dataset_initializer = inputs.dataset_initializer()
     num_replicas_per_host = ctx.num_of_replicas_per_host
 
   def tpu_ordinal_function_impl(replica_id):
@@ -909,7 +916,7 @@ def generate_broadcast_enqueue_ops_fn(ctx, input_fn, inputs_structure_recorder,
           'signals': signals,
       }
 
-  return enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset
+  return enqueue_ops_fn, captured_infeed_queue, dataset_initializer
 
 
 class _InputPipeline(object):
@@ -1113,7 +1120,7 @@ class _InputPipeline(object):
     """Deploys the input pipeline and record input structure."""
     enqueue_ops = []
     infeed_queues = []
-    all_hooks = []
+    all_dataset_initializers = []
     num_hosts = self._ctx.num_hosts
     tpu_host_placement_fn = self._ctx.tpu_host_placement_function
 
@@ -1145,12 +1152,12 @@ class _InputPipeline(object):
     elif self._ctx.is_input_broadcast_with_iterators():
       # Only calls input_fn in host 0.
       host_device = tpu_host_placement_fn(host_id=0)
-      enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset = (
+      enqueue_ops_fn, captured_infeed_queue, dataset_initializer = (
           generate_broadcast_enqueue_ops_fn(self._ctx, self._input_fn,
                                             self._inputs_structure_recorder,
                                             num_hosts))
-      all_hooks.extend(hooks)
-      if is_dataset:
+      if dataset_initializer:
+        all_dataset_initializers.append(dataset_initializer)
         run_infeed_loop_on_coordinator = False
         wrap_fn = (
             _wrap_computation_in_while_loop
@@ -1166,17 +1173,16 @@ class _InputPipeline(object):
         with ops.device(host_device):
           with ops.name_scope('input_pipeline_task%d' % (host_id)):
             if self._ctx.is_input_per_host_with_iterators():
-              enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset = (
+              enqueue_ops_fn, captured_infeed_queue, dataset_initializer = (
                   generate_per_host_v2_enqueue_ops_fn_for_host(
                       self._ctx, self._input_fn,
                       self._inputs_structure_recorder, host_device, host_id))
             else:
-              enqueue_ops_fn, captured_infeed_queue, hooks, is_dataset = (
+              enqueue_ops_fn, captured_infeed_queue, dataset_initializer = (
                   generate_per_host_enqueue_ops_fn_for_host(
                       self._ctx, self._input_fn,
                       self._inputs_structure_recorder, self._batch_axis,
                       host_device, host_id))
-            all_hooks.extend(hooks)
 
             # NOTE(xiejw): We dispatch here based on the return type of the
             # users `input_fn`.
@@ -1190,7 +1196,8 @@ class _InputPipeline(object):
             # handled in TF control flow properly. In this case, we will use
             # python loop to enqueue the data into TPU system.  This may be
             # slow compared to the previous case.
-            if is_dataset:
+            if dataset_initializer:
+              all_dataset_initializers.append(dataset_initializer)
               run_infeed_loop_on_coordinator = False
               wrap_fn = (
                   _wrap_computation_in_while_loop
@@ -1205,7 +1212,9 @@ class _InputPipeline(object):
     # dequeue is dtypes and types. So, any one can be used. Here, grab the
     # first one.
     self._infeed_queue = infeed_queues[0]
-    return enqueue_ops, all_hooks, run_infeed_loop_on_coordinator
+    return enqueue_ops, [
+        estimator_util.MultiHostDatasetInitializerHook(all_dataset_initializers)
+    ], run_infeed_loop_on_coordinator
 
   def _validate_input_pipeline(self):
     """Validates the input pipeline.
@@ -3026,23 +3035,19 @@ class _Inputs(object):
     """Returns True if the return value from input_fn is Dataset."""
     return self._dataset is not None
 
-  def dataset_initializer_hook(self):
-    """Returns a `SessionRunHook` to initialize this dataset.
+  def dataset_initializer(self):
+    """Returns the dataset's initializer.
 
-    This must be called before `features_and_labels`.
+    The initializer must be run before calling `features_and_labels`.
     """
-    iterator = self._dataset.make_initializable_iterator()
-    # pylint: disable=protected-access
-    hook = estimator_util._DatasetInitializerHook(iterator)
-    # pylint: enable=protected-access
-    self._iterator = iterator
-    return hook
+    self._iterator = self._dataset.make_initializable_iterator()
+    return self._iterator.initializer
 
   def features_and_labels(self):
     """Gets `features` and `labels`."""
     if self.is_dataset:
       if self._iterator is None:
-        raise RuntimeError('Internal error: Must call dataset_initializer_hook '
+        raise RuntimeError('Internal error: Must run dataset_initializer '
                            'before calling features_and_labels(). Please file '
                            'a bug!')
       return _Inputs._parse_inputs(self._iterator.get_next())

@@ -16,6 +16,8 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/indexed_array_analysis.h"
 
 #include "absl/algorithm/container.h"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -23,7 +25,6 @@ limitations under the License.
 #include "tensorflow/compiler/xla/map_util.h"
 #include "tensorflow/compiler/xla/service/hlo_evaluator.h"
 #include "tensorflow/compiler/xla/util.h"
-#include "tensorflow/core/lib/gtl/flatset.h"
 
 namespace xla {
 namespace gtl = ::tensorflow::gtl;
@@ -95,7 +96,7 @@ Status IndexedArrayAnalysis::TraverseAndPopulateCache(
   absl::InlinedVector<const HloInstruction*, 4> stack;
 
   enum DfsState { kDiscovered, kVisited };
-  gtl::FlatMap<const HloInstruction*, DfsState> dfs_state_map;
+  absl::flat_hash_map<const HloInstruction*, DfsState> dfs_state_map;
 
   stack.push_back(root);
   InsertOrDie(&dfs_state_map, root, kDiscovered);
@@ -165,6 +166,7 @@ StatusOr<Analysis::Array*> IndexedArrayAnalysis::ComputeArrayFor(
     TF_ASSIGN_OR_RETURN(
         computed_array,
         ComputeArrayForDot(instr->shape(), instr->dot_dimension_numbers(),
+                           instr->precision_config(),
                            FindOrDie(cache_, instr->operand(0)),
                            FindOrDie(cache_, instr->operand(1))));
   } else {
@@ -917,7 +919,7 @@ IndexedArrayAnalysis::ComputeArrayForElementwiseBinaryOp(HloOpcode opcode,
   // inner_broadcast_result is the Broadcast'(Const0) bit in
   // BinaryOp(Broadcast'(Const0), Const1)
   TF_ASSIGN_OR_RETURN(
-      std::unique_ptr<Literal> inner_broadcast_result,
+      Literal inner_broadcast_result,
       broadcast_const_operand->literal().Broadcast(
           scalar_indexed_const->source()->shape(), new_inner_broadcast_dims));
 
@@ -927,12 +929,12 @@ IndexedArrayAnalysis::ComputeArrayForElementwiseBinaryOp(HloOpcode opcode,
     TF_ASSIGN_OR_RETURN(
         literal_for_new_source,
         TakeOwnership(HloEvaluator{}.EvaluateElementwiseBinaryOp(
-            opcode, scalar_indexed_const->literal(), *inner_broadcast_result)));
+            opcode, scalar_indexed_const->literal(), inner_broadcast_result)));
   } else {
     TF_ASSIGN_OR_RETURN(
         literal_for_new_source,
         TakeOwnership(HloEvaluator{}.EvaluateElementwiseBinaryOp(
-            opcode, *inner_broadcast_result, scalar_indexed_const->literal())));
+            opcode, inner_broadcast_result, scalar_indexed_const->literal())));
   }
 
   ConstantArray* new_source = Construct<ConstantArray>(literal_for_new_source);
@@ -1030,7 +1032,8 @@ bool CanFoldDotIntoIndexedArray(
 StatusOr<Analysis::Array*>
 IndexedArrayAnalysis::ComputeArrayForDotWithIndexedLhs(
     const Shape& shape, const DotDimensionNumbers& dim_numbers,
-    ScalarIndexedConstantArray* lhs, ConstantArray* rhs) {
+    const PrecisionConfig& precision_config, ScalarIndexedConstantArray* lhs,
+    ConstantArray* rhs) {
   VLOG(3) << "ComputeArrayForDotWithIndexedLhs(" << ToString(lhs) << " "
           << ToString(rhs);
   if (!CanFoldDotIntoIndexedArray(
@@ -1045,9 +1048,10 @@ IndexedArrayAnalysis::ComputeArrayForDotWithIndexedLhs(
   new_dim_numbers.set_lhs_contracting_dimensions(
       0, lhs->source_dim() == (lhs_rank - 1) ? (lhs_rank - 2) : (lhs_rank - 1));
 
-  TF_ASSIGN_OR_RETURN(Literal * literal_for_new_source,
-                      TakeOwnership(HloEvaluator{}.EvaluateDotOp(
-                          new_dim_numbers, lhs->literal(), *rhs->literal())));
+  TF_ASSIGN_OR_RETURN(
+      Literal * literal_for_new_source,
+      TakeOwnership(HloEvaluator{}.EvaluateDotOp(
+          new_dim_numbers, precision_config, lhs->literal(), *rhs->literal())));
 
   // The new source dimension is wherever the non-batch non-contracting LHS
   // dimension "went".
@@ -1063,7 +1067,8 @@ IndexedArrayAnalysis::ComputeArrayForDotWithIndexedLhs(
 StatusOr<Analysis::Array*>
 IndexedArrayAnalysis::ComputeArrayForDotWithIndexedRhs(
     const Shape& shape, const DotDimensionNumbers& dim_numbers,
-    ConstantArray* lhs, ScalarIndexedConstantArray* rhs) {
+    const PrecisionConfig& precision_config, ConstantArray* lhs,
+    ScalarIndexedConstantArray* rhs) {
   VLOG(3) << "ComputeArrayForDotWithIndexedRhs(" << ToString(lhs) << " "
           << ToString(rhs);
   if (!CanFoldDotIntoIndexedArray(
@@ -1079,9 +1084,10 @@ IndexedArrayAnalysis::ComputeArrayForDotWithIndexedRhs(
   new_dim_numbers.set_rhs_contracting_dimensions(
       0, rhs->source_dim() == (rhs_rank - 1) ? (rhs_rank - 2) : (rhs_rank - 1));
 
-  TF_ASSIGN_OR_RETURN(Literal * literal_for_new_source,
-                      TakeOwnership(HloEvaluator{}.EvaluateDotOp(
-                          new_dim_numbers, *lhs->literal(), rhs->literal())));
+  TF_ASSIGN_OR_RETURN(
+      Literal * literal_for_new_source,
+      TakeOwnership(HloEvaluator{}.EvaluateDotOp(
+          new_dim_numbers, precision_config, *lhs->literal(), rhs->literal())));
 
   // The new source dimension is wherever the non-batch non-contracting RHS
   // dimension "went".
@@ -1095,8 +1101,8 @@ IndexedArrayAnalysis::ComputeArrayForDotWithIndexedRhs(
 }
 
 StatusOr<Analysis::Array*> IndexedArrayAnalysis::ComputeArrayForDot(
-    const Shape& shape, const DotDimensionNumbers& dim_numbers, Array* lhs,
-    Array* rhs) {
+    const Shape& shape, const DotDimensionNumbers& dim_numbers,
+    const PrecisionConfig& precision_config, Array* lhs, Array* rhs) {
   // Intuitively, if
   //
   //  - The LHS of a dot product is a gathered sequence of rows from a constant
@@ -1119,6 +1125,7 @@ StatusOr<Analysis::Array*> IndexedArrayAnalysis::ComputeArrayForDot(
           dynamic_cast<ScalarIndexedConstantArray*>(lhs)) {
     if (auto* rhs_constant = dynamic_cast<ConstantArray*>(rhs)) {
       return ComputeArrayForDotWithIndexedLhs(shape, dim_numbers,
+                                              precision_config,
                                               lhs_indexed_array, rhs_constant);
     }
   }
@@ -1126,7 +1133,8 @@ StatusOr<Analysis::Array*> IndexedArrayAnalysis::ComputeArrayForDot(
   if (auto* rhs_indexed_array =
           dynamic_cast<ScalarIndexedConstantArray*>(rhs)) {
     if (auto* lhs_constant = dynamic_cast<ConstantArray*>(lhs)) {
-      return ComputeArrayForDotWithIndexedRhs(shape, dim_numbers, lhs_constant,
+      return ComputeArrayForDotWithIndexedRhs(shape, dim_numbers,
+                                              precision_config, lhs_constant,
                                               rhs_indexed_array);
     }
   }

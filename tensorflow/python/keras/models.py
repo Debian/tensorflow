@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow.python.keras import backend as K
+from tensorflow.python.keras import metrics as metrics_module
 from tensorflow.python.keras import optimizers
 from tensorflow.python.keras.engine import saving
 from tensorflow.python.keras.engine import sequential
@@ -290,7 +291,9 @@ def _in_place_subclassed_model_reset(model):
     if isinstance(value, Layer):
       attributes_cache[name] = value
       assert value in model._layers
-    elif isinstance(value, (list, tuple)) and name not in ('layers', '_layers'):
+    elif isinstance(
+        value, (list, tuple)) and name not in ('layers', '_layers',
+                                               'stateful_metric_functions'):
       # Handle case: list/tuple of layers (also tracked by the Network API).
       if value and all(isinstance(val, Layer) for val in value):
         raise ValueError('We do not support the use of list-of-layers '
@@ -414,10 +417,10 @@ def clone_and_build_model(
       this argument must be set to `True` (default `False`). To restore the
       original model, use the function
       `in_place_subclassed_model_state_restoration(model)`.
-    optimizer_iterations: An iterations variable to pass to the optimizer if
-      the model uses a TFOptimizer, and if the clone is compiled. This is used
-      when a Keras model is cloned into an Estimator model function, because
-      Estimators create their own global step variable.
+    optimizer_iterations: An iterations variable that will be incremented by the
+      optimizer if the clone is compiled. This argument is used when a Keras
+      model is cloned into an Estimator model function, because Estimators
+      create their own global step variable.
 
   Returns:
     Clone of the model.
@@ -444,6 +447,8 @@ def clone_and_build_model(
     clone = model
     _in_place_subclassed_model_reset(clone)
     if input_tensors is not None:
+      if isinstance(input_tensors, (list, tuple)) and len(input_tensors) == 1:
+        input_tensors = input_tensors[0]
       clone._set_inputs(input_tensors)
 
   # Compile/Build model
@@ -458,14 +463,16 @@ def clone_and_build_model(
     else:
       optimizer_config = model.optimizer.get_config()
       optimizer = model.optimizer.__class__.from_config(optimizer_config)
+      if optimizer_iterations is not None:
+        optimizer.iterations = optimizer_iterations
 
     clone.compile(
         optimizer,
         model.loss,
-        metrics=model.metrics,
+        metrics=metrics_module.clone_metrics(model.metrics),
         loss_weights=model.loss_weights,
         sample_weight_mode=model.sample_weight_mode,
-        weighted_metrics=model.weighted_metrics,
+        weighted_metrics=metrics_module.clone_metrics(model.weighted_metrics),
         target_tensors=target_tensors)
 
   return clone

@@ -71,9 +71,6 @@ class TestUtilTest(test_util.TensorFlowTestCase):
           with self.cached_session(graph=ops.Graph()) as sess2:
             pass
         with self.assertRaises(ValueError):
-          with self.cached_session(use_gpu=True) as sess2:
-            pass
-        with self.assertRaises(ValueError):
           with self.cached_session(force_gpu=True) as sess2:
             pass
     # We make sure that test_session will cache the session even after the
@@ -271,6 +268,11 @@ class TestUtilTest(test_util.TensorFlowTestCase):
       self.assertAllClose(7, 7 + 1e-5)
 
   @test_util.run_in_graph_and_eager_modes
+  def testAllCloseList(self):
+    with self.assertRaisesRegexp(AssertionError, r"not close dif"):
+      self.assertAllClose([0], [1])
+
+  @test_util.run_in_graph_and_eager_modes
   def testAllCloseDictToNonDict(self):
     with self.assertRaisesRegexp(ValueError, r"Can't compare dict to non-dict"):
       self.assertAllClose(1, {"a": 1})
@@ -454,6 +456,9 @@ class TestUtilTest(test_util.TensorFlowTestCase):
     self.evaluate(variables.global_variables_initializer())
     self.assertAllEqual([120] * 3, k)
     self.assertAllEqual([20] * 3, j)
+
+    with self.assertRaisesRegexp(AssertionError, r"not equal lhs"):
+      self.assertAllEqual([0] * 3, k)
 
   @test_util.run_in_graph_and_eager_modes
   def testAssertNotAllClose(self):

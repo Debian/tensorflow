@@ -855,8 +855,7 @@ void LayoutAssignment::SetupCopiedInstruction(const HloInstruction& instruction,
             ? instruction.sharding().GetSubSharding(instruction.shape(), index)
             : instruction.sharding();
     // We propagate the sharding to the copied instruction only if it is a
-    // special sharding, like tiled ones, or special devices like the
-    // HostCompute module.
+    // special sharding, like tiled ones.
     // Otherwise it is preferable to leave the new instruction without device,
     // and let the automatic device placer to choose the best location.
     auto device = sharding.UniqueDevice();
@@ -959,10 +958,15 @@ Status LayoutAssignment::CheckLayouts(HloModule* module) {
 
 LayoutAssignment::LayoutAssignment(
     ComputationLayout* entry_computation_layout,
+    std::function<bool(const HloInstruction*)>
+        instruction_can_change_layout_func,
     ChannelLayoutConstraints* channel_constraints)
     : entry_computation_layout_(entry_computation_layout),
+
       saved_entry_computation_layout_(*entry_computation_layout),
-      channel_layout_constraints_(channel_constraints) {
+      channel_layout_constraints_(channel_constraints),
+      instruction_can_change_layout_func_(
+          std::move(instruction_can_change_layout_func)) {
   if (channel_layout_constraints_ != nullptr) {
     // Save a copy of the input ChannelLayoutConstraints so that we can reset it
     // if we have to undo previous operations (ClearPreviousPassSideEffects()).
@@ -983,7 +987,7 @@ std::unique_ptr<Layout> LayoutAssignment::ChooseOperandLayoutFromOutputLayout(
   if (!ShapeUtil::IsScalar(operand->shape()) &&
       ShapeUtil::Rank(operand->shape()) ==
           ShapeUtil::Rank(instruction->shape()) &&
-      InstructionRequiresInputLayoutEqualToOutputLayout(instruction)) {
+      !instruction_can_change_layout_func_(instruction)) {
     // Propagate the result layout to the operand layout if the instruction
     // requires the same layout out for the result and the operand.
     //
@@ -1061,7 +1065,7 @@ std::unique_ptr<Layout> LayoutAssignment::ChooseOutputLayoutFromOperandLayout(
 
   if (!ShapeUtil::IsScalar(operand->shape()) &&
       ShapeUtil::Rank(operand->shape()) == ShapeUtil::Rank(user->shape()) &&
-      InstructionRequiresInputLayoutEqualToOutputLayout(user)) {
+      !instruction_can_change_layout_func_(user)) {
     // Assign users the same layout as the operand.
     return absl::make_unique<Layout>(operand_layout);
   }
@@ -1804,7 +1808,8 @@ StatusOr<bool> LayoutAssignment::Run(HloModule* module) {
   return true;
 }
 
-bool LayoutAssignment::InstructionRequiresInputLayoutEqualToOutputLayout(
+/* static */
+bool LayoutAssignment::InstructionCanChangeLayout(
     const HloInstruction* instruction) {
   switch (instruction->opcode()) {
     case HloOpcode::kAbs:
@@ -1857,6 +1862,7 @@ bool LayoutAssignment::InstructionRequiresInputLayoutEqualToOutputLayout(
     case HloOpcode::kRemainder:
     case HloOpcode::kReverse:
     case HloOpcode::kRoundNearestAfz:
+    case HloOpcode::kScatter:
     case HloOpcode::kSelect:
     case HloOpcode::kSelectAndScatter:
     case HloOpcode::kShiftLeft:
@@ -1870,7 +1876,7 @@ bool LayoutAssignment::InstructionRequiresInputLayoutEqualToOutputLayout(
     case HloOpcode::kTanh:
     case HloOpcode::kTupleSelect:
     case HloOpcode::kWhile:
-      return true;
+      return false;
     case HloOpcode::kBatchNormGrad:
     case HloOpcode::kBatchNormInference:
     case HloOpcode::kBatchNormTraining:
@@ -1894,14 +1900,13 @@ bool LayoutAssignment::InstructionRequiresInputLayoutEqualToOutputLayout(
     case HloOpcode::kReduce:
     case HloOpcode::kReshape:
     case HloOpcode::kRng:
-    case HloOpcode::kScatter:
     case HloOpcode::kSend:
     case HloOpcode::kSendDone:
     case HloOpcode::kAfterAll:
     case HloOpcode::kTrace:
     case HloOpcode::kTranspose:
     case HloOpcode::kTuple:
-      return false;
+      return true;
   }
 }
 

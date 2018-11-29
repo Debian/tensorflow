@@ -15,7 +15,7 @@ limitations under the License.
 #include <stdlib.h>
 #include <string.h>
 
-#include "tensorflow/contrib/lite/builtin_op_data.h"
+#include "tensorflow/contrib/lite/c/builtin_op_data.h"
 #include "tensorflow/contrib/lite/kernels/activation_functor.h"
 #include "tensorflow/contrib/lite/kernels/internal/common.h"
 #include "tensorflow/contrib/lite/kernels/internal/compatibility.h"
@@ -457,7 +457,7 @@ void NeonSymmetricQuantizeFloats(const float* values, const int size,
     return;
   }
   *scaling_factor = range / kScale;
-  const float scaling_factor_inv = 1.0f / *scaling_factor;
+  const float scaling_factor_inv = kScale / range;
 
   const int postamble_start =
       size - (size & (2 * kFloatWeightsPerNeonLane - 1));

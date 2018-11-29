@@ -30,7 +30,6 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import gradients
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import resource_variable_ops
-from tensorflow.python.ops import state_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import variables
 from tensorflow.python.training import distribute as distribute_lib
@@ -214,7 +213,8 @@ class _OptimizerV2State(object):
     # with that Tensor cast to that dtype.
     with ops.init_scope():
       self._hyper = {name: {None: ops.convert_to_tensor(value, name=name)}
-                     for name, (dynamic, value) in hyper.items() if not dynamic}
+                     for name, (dynamic, value) in sorted(hyper.items())
+                     if not dynamic}
     self._slots = {}
     self._non_slot_dict = {}
     # Extra state to help Optimizers implement Checkpointable. Holds information
@@ -231,7 +231,8 @@ class _OptimizerV2State(object):
     ret._deferred_dependencies = self._deferred_dependencies
     ret._deferred_slot_restorations = self._deferred_slot_restorations
     ret._hyper = {name: {None: _resolve(value, name)}
-                  for name, (dynamic, value) in hyper.items() if dynamic}
+                  for name, (dynamic, value) in sorted(hyper.items())
+                  if dynamic}
     ret._hyper.update(self._hyper)
     ret._non_slot_devices = non_slot_devices
     ret._distribution = distribution
@@ -963,8 +964,7 @@ class OptimizerV2(optimizer_v1.Optimizer):
       # Use the processors to update the variables.
       update_ops = []
       for grad, var in grads_and_vars:
-        update_ops.extend(distribution.unwrap(distribution.update(
-            var, update, grad)))
+        update_ops.extend(distribution.update(var, update, grad, grouped=False))
 
       # Give the child class a chance to do something after applying
       # gradients
@@ -976,26 +976,24 @@ class OptimizerV2(optimizer_v1.Optimizer):
 
       update_ops = control_flow_ops.group(update_ops)
       with ops.control_dependencies([update_ops]):
-        finish_updates = distribution.update_non_slot(non_slot_devices, finish)
-      if finish_updates is None:
-        finish_updates = update_ops
+        finish_updates = distribution.update_non_slot(
+            non_slot_devices, finish, grouped=False)
+      # We said grouped=False, which means finish_updates is always a list.
+      # It will be [None] when finish() returns None.
+      if finish_updates == [None]:
+        finish_updates = [update_ops]
 
       # Update `global_step` (if any).
       if global_step is None:
         apply_updates = distribution.group(finish_updates, name=name)
       else:
-        with ops.control_dependencies(distribution.unwrap(finish_updates)):
+        with ops.control_dependencies(finish_updates):
 
-          def update_global_step(global_step):
-            if isinstance(global_step, resource_variable_ops.ResourceVariable):
-              return global_step.assign_add(
-                  ops.convert_to_tensor(1, dtype=global_step.dtype),
-                  read_value=False)
-            else:
-              return state_ops.assign_add(global_step, 1)
+          def update_global_step(global_step, name):
+            return global_step.assign_add(1, read_value=False, name=name)
 
-          apply_updates = distribution.group(
-              distribution.update(global_step, update_global_step), name=name)
+          apply_updates = distribution.update(
+              global_step, update_global_step, name)
 
       # Add the training op to the TRAIN_OP graph collection in graph mode.
       if not eager_execution:

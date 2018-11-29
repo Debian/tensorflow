@@ -52,44 +52,44 @@ string DeviceFromFlag() {
 xla::LiteralProto TwoElementTuple() {
   auto array = xla::LiteralUtil::CreateR1<float>({1.0f, 3.0f});
   auto matrix = xla::LiteralUtil::CreateR2({{4, 5}, {6, 7}});
-  auto tuple = xla::LiteralUtil::MakeTuple({array.get(), matrix.get()});
-  return tuple->ToProto();
+  auto tuple = xla::LiteralUtil::MakeTuple({&array, &matrix});
+  return tuple.ToProto();
 }
 
 xla::LiteralProto ScalarLiteral() {
   auto scalar = xla::LiteralUtil::CreateR0<float>(12.0f);
-  return scalar->ToProto();
+  return scalar.ToProto();
 }
 
 xla::LiteralProto NestedTuple() {
   auto array = xla::LiteralUtil::CreateR1<float>({1.0f, 3.0f});
   auto matrix = xla::LiteralUtil::CreateR2({{4, 5}, {6, 7}});
-  auto tuple = xla::LiteralUtil::MakeTuple({array.get(), matrix.get()});
+  auto tuple = xla::LiteralUtil::MakeTuple({&array, &matrix});
   auto scalar = xla::LiteralUtil::CreateR0<float>(12.0f);
-  auto nested = xla::LiteralUtil::MakeTuple({tuple.get(), scalar.get()});
-  return nested->ToProto();
+  auto nested = xla::LiteralUtil::MakeTuple({&tuple, &scalar});
+  return nested.ToProto();
 }
 
 xla::LiteralProto MakeTuple0() {
   auto scalar = xla::LiteralUtil::CreateR0<float>(12.0f);
   auto array = xla::LiteralUtil::CreateR1<float>({1.0f, 3.0f});
   auto matrix = xla::LiteralUtil::CreateR2({{4, 5}, {6, 7}});
-  auto tuple = xla::LiteralUtil::MakeTuple({array.get(), matrix.get()});
-  auto nested0 = xla::LiteralUtil::MakeTuple({scalar.get(), tuple.get()});
-  auto nested1 = xla::LiteralUtil::MakeTuple({scalar.get(), nested0.get()});
-  return nested1->ToProto();
+  auto tuple = xla::LiteralUtil::MakeTuple({&array, &matrix});
+  auto nested0 = xla::LiteralUtil::MakeTuple({&scalar, &tuple});
+  auto nested1 = xla::LiteralUtil::MakeTuple({&scalar, &nested0});
+  return nested1.ToProto();
 }
 
-xla::LiteralProto FloatVector(gtl::ArraySlice<float> v) {
+xla::LiteralProto FloatVector(absl::Span<const float> v) {
   auto array = xla::LiteralUtil::CreateR1<float>(v);
-  return array->ToProto();
+  return array.ToProto();
 }
 
 bool CompareLiteralProtos(const xla::LiteralProto& a,
                           const xla::LiteralProto& b) {
   auto l_a = xla::Literal::CreateFromProto(a).ValueOrDie();
   auto l_b = xla::Literal::CreateFromProto(b).ValueOrDie();
-  bool equal = *l_a == *l_b;
+  bool equal = l_a == l_b;
   if (!equal) {
     LOG(INFO) << "LiteralProtos don't match " << a.DebugString()
               << " != " << b.DebugString();
@@ -100,12 +100,20 @@ bool CompareLiteralProtos(const xla::LiteralProto& a,
 bool CompareLiteralToLiteralProto(const xla::Literal& a,
                                   const xla::LiteralProto& b) {
   auto l_b = xla::Literal::CreateFromProto(b).ValueOrDie();
-  bool equal = a == *l_b;
+  bool equal = a == l_b;
   if (!equal) {
     LOG(INFO) << "Literal and LiteralProto don't match "
               << a.ToProto().DebugString() << " != " << b.DebugString();
   }
   return equal;
+}
+
+xla::XlaComputation OnePlusTwo() {
+  xla::XlaBuilder builder("OnePlusTwo");
+  auto c0 = xla::ConstantR0(&builder, 1.0f);
+  auto c1 = xla::ConstantR0(&builder, 2.0f);
+  xla::Add(c0, c1);
+  return builder.Build().ValueOrDie();
 }
 
 xla::XlaComputation AddAndScale() {
@@ -211,7 +219,7 @@ TEST(RawApiTest, SubBuffer) {
   TF_EXPECT_OK(session.Run({value_0, value_1, value_00}, &outputs));
 
   auto base_literal = xla::Literal::CreateFromProto(alloc.value()).ValueOrDie();
-  auto base_elements = base_literal->DecomposeTuple();
+  auto base_elements = base_literal.DecomposeTuple();
   auto nested_0_elements = base_elements[0].Clone().DecomposeTuple();
   xla::LiteralProto response_0;
   EXPECT_TRUE(response_0.ParseFromString(outputs[0].scalar<string>()()));
@@ -343,7 +351,40 @@ TEST(RawApiTest, CompileAndExecute) {
   EXPECT_TRUE(response.ParseFromString(outputs[0].scalar<string>()()));
 
   auto expected = xla::LiteralUtil::CreateR1<float>({27.0f, 21.0f});
-  EXPECT_TRUE(CompareLiteralToLiteralProto(*expected, response));
+  EXPECT_TRUE(CompareLiteralToLiteralProto(expected, response));
+}
+
+TEST(RawApiTest, CompileAndExecuteZeroArg) {
+  xrt::XLAComputation c;
+  auto config = c.mutable_config();
+  auto shapes = config->mutable_program_shape();
+  *shapes->mutable_result() = xla::ShapeUtil::MakeShape(xla::F32, {});
+
+  xrt::XRTExecutionConfig e;
+  e.set_release_input_handles(true);
+  e.set_release_compilation_handle(true);
+  StoreComputationSnapshot(OnePlusTwo(), c.mutable_hlo_snapshot());
+
+  Scope root = Scope::NewRootScope().WithDevice(DeviceFromFlag());
+  auto e_config =
+      ops::Const(root.WithDevice("/device:CPU:0"), e.SerializeAsString());
+  auto computation =
+      ops::Const(root.WithDevice("/device:CPU:0"), c.SerializeAsString());
+  auto c_handle = ops::XRTCompile(root, computation);
+  auto result = ops::XRTExecute(root, c_handle, e_config,
+                                std::initializer_list<Input>({}));
+  auto read_back = ops::XRTReadLiteralAndRelease(root, result);
+  TF_ASSERT_OK(root.status());
+
+  ClientSession session(root);
+  std::vector<Tensor> outputs;
+  TF_EXPECT_OK(session.Run({read_back}, &outputs));
+
+  xla::LiteralProto response;
+  EXPECT_TRUE(response.ParseFromString(outputs[0].scalar<string>()()));
+
+  auto expected = xla::LiteralUtil::CreateR0<float>(3.0f);
+  EXPECT_TRUE(CompareLiteralToLiteralProto(expected, response));
 }
 
 TEST(RawApiTest, CompileAndExecuteReturnTuple) {
@@ -392,8 +433,8 @@ TEST(RawApiTest, CompileAndExecuteReturnTuple) {
   EXPECT_TRUE(response.ParseFromString(outputs[0].scalar<string>()()));
 
   auto sum = xla::LiteralUtil::CreateR1<float>({9.0f, 7.0f});
-  auto expected = xla::LiteralUtil::MakeTuple({sum.get()});
-  EXPECT_TRUE(CompareLiteralToLiteralProto(*expected, response));
+  auto expected = xla::LiteralUtil::MakeTuple({&sum});
+  EXPECT_TRUE(CompareLiteralToLiteralProto(expected, response));
 }
 
 }  // namespace

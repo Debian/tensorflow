@@ -327,12 +327,36 @@ int EagerTensor_init(EagerTensor* self, PyObject* args, PyObject* kwds) {
   PyObject* context = nullptr;
   PyObject* device = nullptr;
   PyObject* dtype = Py_None;
-  const char* kwlist[] = {"value", "context", "device", "dtype", nullptr};
-  if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOO|O",
+  PyObject* other_value = nullptr;
+  const char* kwlist[] = {"value", "context",     "device",
+                          "dtype", "other_value", nullptr};
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOO|OO",
                                    const_cast<char**>(kwlist), &value, &context,
-                                   &device, &dtype)) {
+                                   &device, &dtype, &other_value)) {
     return -1;
   }
+
+  if (other_value != nullptr) {
+    if (!EagerTensor_CheckExact(other_value)) {
+      PyErr_SetString(PyExc_TypeError,
+                      tensorflow::strings::StrCat(
+                          "Expecting an EagerTensor for other_value, got ",
+                          Py_TYPE(other_value)->tp_name)
+                          .c_str());
+
+      return -1;
+    }
+    EagerTensor* other = reinterpret_cast<EagerTensor*>(other_value);
+    self->handle =
+        TFE_TensorHandleCopySharingTensor(other->handle, self->status);
+
+    if (MaybeRaiseExceptionFromTFStatus(self->status, PyExc_ValueError)) {
+      return -1;
+    }
+
+    return 0;
+  }
+
   // Extract dtype
   int desired_dtype = -1;
   if (dtype != Py_None) {
@@ -492,25 +516,13 @@ static PyObject* EagerTensor_rank(EagerTensor* self) {
 // Getter for `_num_elements`.
 static PyObject* EagerTensor_num_elements(EagerTensor* self) {
   auto handle = self->handle;
-  int n = TFE_TensorHandleNumDims(handle, self->status);
+  int n = TFE_TensorHandleNumElements(handle, self->status);
   if (MaybeRaiseExceptionFromTFStatus(self->status, PyExc_ValueError)) {
     // Cleanup self->status before returning.
     TF_SetStatus(self->status, TF_OK, "");
     return nullptr;
   }
-  tensorflow::int64 value = 1;
-  if (PyErr_Occurred()) return nullptr;
-  for (int i = 0; i < n; ++i) {
-    int64_t dim = TFE_TensorHandleDim(handle, i, self->status);
-    if (MaybeRaiseExceptionFromTFStatus(self->status, PyExc_ValueError)) {
-      // Cleanup self->status before returning.
-      TF_SetStatus(self->status, TF_OK, "");
-      PyErr_SetString(PyExc_RuntimeError, "Error while iterating dimensions");
-      return nullptr;
-    }
-    value *= dim;
-  }
-  return PyLong_FromLongLong(value);
+  return PyLong_FromLongLong(n);
 }
 
 static PyObject* EagerTensor_tensor_handle(EagerTensor* self, void* unused) {
@@ -753,15 +765,32 @@ PyObject* EagerTensorFromHandle(TFE_TensorHandle* handle) {
   return reinterpret_cast<PyObject*>(t);
 }
 
-tensorflow::int64 EagerTensor_id(const PyObject* tensor) {
-  CHECK(EagerTensor_CheckExact(tensor));
+tensorflow::int64 PyEagerTensor_ID(const PyObject* tensor) {
+  DCHECK(EagerTensor_CheckExact(tensor));
   return reinterpret_cast<const EagerTensor*>(tensor)->id;
 }
 
-tensorflow::DataType EagerTensor_dtype(const PyObject* tensor) {
-  CHECK(EagerTensor_CheckExact(tensor));
+tensorflow::DataType PyEagerTensor_Dtype(const PyObject* tensor) {
+  DCHECK(EagerTensor_CheckExact(tensor));
   return static_cast<tensorflow::DataType>(TFE_TensorHandleDataType(
       reinterpret_cast<const EagerTensor*>(tensor)->handle));
+}
+
+tensorflow::int64 PyEagerTensor_NumElements(const PyObject* tensor) {
+  DCHECK(EagerTensor_CheckExact(tensor));
+  const EagerTensor* as_c_eager_tensor =
+      reinterpret_cast<const EagerTensor*>(tensor);
+  tensorflow::int64 result = TFE_TensorHandleNumElements(
+      as_c_eager_tensor->handle, as_c_eager_tensor->status);
+
+  if (MaybeRaiseExceptionFromTFStatus(as_c_eager_tensor->status,
+                                      PyExc_ValueError)) {
+    // Cleanup status before returning.
+    TF_SetStatus(as_c_eager_tensor->status, TF_OK, "");
+    return -1;
+  }
+
+  return result;
 }
 
 PyObject* TFE_Py_InitEagerTensor(PyObject* base_class) {

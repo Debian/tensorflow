@@ -107,7 +107,8 @@ class DepthwiseConvolution
         ActivationFunction::Serialize(op.fused_activation_function);
     return ::tflite::CreateDepthwiseConv2DOptions(
         *builder, padding, op.stride_width, op.stride_height,
-        op.depth_multiplier, activation_function);
+        op.depth_multiplier, activation_function, op.dilation_width_factor,
+        op.dilation_height_factor);
   }
 
   void ReadOptions(const TfLiteOptions& options,
@@ -118,9 +119,18 @@ class DepthwiseConvolution
     op->depth_multiplier = options.depth_multiplier();
     op->fused_activation_function =
         ActivationFunction::Deserialize(options.fused_activation_function());
+    op->dilation_width_factor = options.dilation_w_factor();
+    op->dilation_height_factor = options.dilation_h_factor();
   }
 
-  int GetVersion(const Operator& op) const override { return 1; }
+  int GetVersion(const Operator& op) const override {
+    const auto& conv_op = static_cast<const DepthwiseConvOperator&>(op);
+    if (conv_op.dilation_width_factor != 1 ||
+        conv_op.dilation_height_factor != 1) {
+      return 2;
+    }
+    return 1;
+  }
 };
 
 class Add : public BuiltinOperator<AddOperator, ::tflite::AddOptions,
@@ -1149,7 +1159,9 @@ class Unpack : public BuiltinOperator<UnpackOperator, ::tflite::UnpackOptions,
 
 class TensorFlowUnsupported : public BaseOperator {
  public:
-  using BaseOperator::BaseOperator;
+  TensorFlowUnsupported(const string& name, OperatorType type,
+                        bool allow_flex_ops)
+      : BaseOperator(name, type), allow_flex_ops_(allow_flex_ops) {}
 
   Options Serialize(const Operator& op,
                     flatbuffers::FlatBufferBuilder* builder) const override {
@@ -1165,6 +1177,9 @@ class TensorFlowUnsupported : public BaseOperator {
   std::unique_ptr<Operator> Deserialize(
       const BuiltinOptions* builtin_options,
       const CustomOptions* custom_options) const override {
+    // Deserializing Flex ops doesn't work now.
+    // TODO(ycling): Revisit and decide if we should fix the flow for importing
+    // TFLite models with Flex ops.
     auto op = absl::make_unique<TensorFlowUnsupportedOperator>();
     if (custom_options) {
       auto flexbuffer_map =
@@ -1183,6 +1198,16 @@ class TensorFlowUnsupported : public BaseOperator {
     if (!node_def.ParseFromString(op.tensorflow_node_def)) {
       LOG(ERROR) << "Failed to parse TensorFlow NodeDef";
       return std::unique_ptr<flexbuffers::Builder>();
+    }
+
+    if (allow_flex_ops_) {
+      fbb->Vector([&]() {
+        fbb->String(node_def.op());
+        fbb->String(op.tensorflow_node_def);
+      });
+      fbb->Finish();
+      LOG(INFO) << "Writing flex op: " << node_def.op();
+      return std::unique_ptr<flexbuffers::Builder>(fbb.release());
     }
 
     bool has_valid_attr = false;
@@ -1235,6 +1260,10 @@ class TensorFlowUnsupported : public BaseOperator {
     return std::unique_ptr<flexbuffers::Builder>(fbb.release());
   }
 
+// TODO(wvo): hack to make this code compile with 2 different API versions.
+// Please remove once OS/internal versions are in sync.
+// See hardcoded values in the switch below.
+
   void ReadOptions(const flexbuffers::Map& m,
                    TensorFlowUnsupportedOperator* op) const {
     ::tensorflow::NodeDef node_def;
@@ -1245,16 +1274,16 @@ class TensorFlowUnsupported : public BaseOperator {
       const auto key = keys[i].AsKey();
       const auto& value = m[key];
       switch (value.GetType()) {
-        case flexbuffers::TYPE_STRING:
+        case 5:  // flexbuffers::FBT_STRING:
           (*attr)[key].set_s(value.AsString().c_str());
           break;
-        case flexbuffers::TYPE_INT:
+        case 1:  // flexbuffers::FBT_INT:
           (*attr)[key].set_i(value.AsInt64());
           break;
-        case flexbuffers::TYPE_FLOAT:
+        case 3:  // flexbuffers::FBT_FLOAT:
           (*attr)[key].set_f(value.AsFloat());
           break;
-        case flexbuffers::TYPE_BOOL:
+        case 26:  // flexbuffers::FBT_BOOL:
           (*attr)[key].set_b(value.AsBool());
           if (string(key) == "_output_quantized") {
             op->quantized = value.AsBool();
@@ -1263,7 +1292,7 @@ class TensorFlowUnsupported : public BaseOperator {
             op->support_output_type_float_in_quantized_op = value.AsBool();
           }
           break;
-        case flexbuffers::TYPE_VECTOR_INT: {
+        case 11: {  // flexbuffers::FBT_VECTOR_INT: {
           auto* list = (*attr)[key].mutable_list();
           const auto& vector = value.AsTypedVector();
           for (size_t i = 0; i < vector.size(); i++) {
@@ -1285,11 +1314,15 @@ class TensorFlowUnsupported : public BaseOperator {
     // custom ops.
     return 1;
   }
+
+ private:
+  const bool allow_flex_ops_;
 };
 
 namespace {
 // Build a vector containing all the known operators.
-std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList() {
+std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList(
+    bool allow_flex_ops = false) {
   std::vector<std::unique_ptr<BaseOperator>> ops;
   using tensorflow::MakeUnique;
   // Builtin Operators.
@@ -1400,8 +1433,8 @@ std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList() {
       MakeUnique<DepthToSpace>("DEPTH_TO_SPACE", OperatorType::kDepthToSpace));
   ops.push_back(MakeUnique<CTCBeamSearchDecoder>(
       "CTC_BEAM_SEARCH_DECODER", OperatorType::kCTCBeamSearchDecoder));
-  ops.push_back(MakeUnique<TensorFlowUnsupported>("TENSORFLOW_UNSUPPORTED",
-                                                  OperatorType::kUnsupported));
+  ops.push_back(MakeUnique<TensorFlowUnsupported>(
+      "TENSORFLOW_UNSUPPORTED", OperatorType::kUnsupported, allow_flex_ops));
 
   // There operators are supported by Toco, but not by TF Lite, and has no
   // attributes.
@@ -1469,15 +1502,21 @@ std::vector<std::unique_ptr<BaseOperator>> BuildOperatorList() {
       "SQRT", OperatorType::kSqrt));
   ops.push_back(MakeUnique<SimpleOperator<TensorFlowRsqrtOperator>>(
       "RSQRT", OperatorType::kRsqrt));
+  ops.push_back(MakeUnique<SimpleOperator<TensorFlowSquareOperator>>(
+      "SQUARE", OperatorType::kSquare));
+  ops.push_back(MakeUnique<SimpleOperator<TensorFlowZerosLikeOperator>>(
+      "ZEROS_LIKE", OperatorType::kZerosLike));
 
   return ops;
 }
 }  // namespace
 
-std::map<OperatorType, std::unique_ptr<BaseOperator>> BuildOperatorByTypeMap() {
+std::map<OperatorType, std::unique_ptr<BaseOperator>> BuildOperatorByTypeMap(
+    bool allow_flex_ops) {
   std::map<OperatorType, std::unique_ptr<BaseOperator>> result;
 
-  std::vector<std::unique_ptr<BaseOperator>> ops = BuildOperatorList();
+  std::vector<std::unique_ptr<BaseOperator>> ops =
+      BuildOperatorList(allow_flex_ops);
   for (auto& op : ops) {
     result[op->type()] = std::move(op);
   }
@@ -1485,10 +1524,12 @@ std::map<OperatorType, std::unique_ptr<BaseOperator>> BuildOperatorByTypeMap() {
   return result;
 }
 
-std::map<string, std::unique_ptr<BaseOperator>> BuildOperatorByNameMap() {
+std::map<string, std::unique_ptr<BaseOperator>> BuildOperatorByNameMap(
+    bool allow_flex_ops) {
   std::map<string, std::unique_ptr<BaseOperator>> result;
 
-  std::vector<std::unique_ptr<BaseOperator>> ops = BuildOperatorList();
+  std::vector<std::unique_ptr<BaseOperator>> ops =
+      BuildOperatorList(allow_flex_ops);
   for (auto& op : ops) {
     result[op->name()] = std::move(op);
   }

@@ -23,6 +23,7 @@ limitations under the License.
 #include <unordered_map>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "llvm/ADT/Triple.h"
@@ -47,7 +48,6 @@ limitations under the License.
 #include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
-#include "tensorflow/core/lib/gtl/flatmap.h"
 #include "tensorflow/core/platform/macros.h"
 #include "tensorflow/core/platform/types.h"
 
@@ -62,8 +62,8 @@ class IrEmitter : public DfsHloVisitorWithDefault,
   // Create a new LLVM IR emitter.
   //
   // hlo_module: the HLO module we are emitting IR for.
-  // assignment: a BufferAssignment from which we know which temporary buffers
-  //             are used by the HLO nodes.
+  // assignment: a BufferAssignment from which we know which buffers are used by
+  //             the HLO nodes.
   // llvm_module: the LLVM module to emit IR into.
   // instruction_to_profile_idx: the mapping from HLO instructions to their
   //              index in the profiling array.
@@ -98,7 +98,7 @@ class IrEmitter : public DfsHloVisitorWithDefault,
   StatusOr<llvm::Function*> EmitComputation(
       HloComputation* computation, const string& function_name_prefix,
       bool is_top_level_computation,
-      std::vector<const HloInstruction*>* instruction_order);
+      const std::vector<const HloInstruction*>* instruction_order);
 
   llvm::IRBuilder<>* b() { return &b_; }
 
@@ -163,6 +163,12 @@ class IrEmitter : public DfsHloVisitorWithDefault,
   Status Preprocess(HloInstruction* hlo) override;
   Status Postprocess(HloInstruction* hlo) override;
 
+  // A convenient helper for calling BufferAssignment::GetUniqueSlice.
+  BufferAllocation::Slice GetAllocationSlice(
+      const HloInstruction& hlo, const ShapeIndex& index = {}) const {
+    return assignment_.GetUniqueSlice(&hlo, index).ConsumeValueOrDie();
+  }
+
  private:
   // Private helper to initialize an IR function for the computation.
   void InitializeIrFunction(const string& function_name);
@@ -219,24 +225,21 @@ class IrEmitter : public DfsHloVisitorWithDefault,
   // argument of the computation function being emitted by this emitter.
   llvm::Value* GetExecutableRunOptionsArgument();
 
-  // Get the llvm::Value* that represents the "temps" argument of the
+  // Get the llvm::Value* that represents the "buffer_table" argument of the
   // computation function being emitted by this emitter.
-  llvm::Value* GetTempBuffersArgument();
+  llvm::Value* GetBufferTableArgument();
 
-  // Helper for EmitTempBufferPointer.
-  llvm::Value* EmitGlobalTempBufferPointer(const BufferAllocation::Slice& slice,
-                                           const Shape& target_shape);
+  // Helper for EmitBufferPointer.
+  llvm::Value* EmitGlobalBufferPointer(const BufferAllocation::Slice& slice,
+                                       const Shape& target_shape);
 
-  // Helper for EmitTempBufferPointer.
-  llvm::Value* EmitThreadLocalTempBufferPointer(
+  // Helper for EmitBufferPointer.
+  llvm::Value* EmitThreadLocalBufferPointer(
       const BufferAllocation::Slice& slice, const Shape& target_shape);
 
   // Emits code that computes the address of the given buffer allocation slice.
-  //
-  // TODO(sanjoy): This should be renamed to reflect that it no longer provides
-  // access to just temporaries.
-  llvm::Value* EmitTempBufferPointer(const BufferAllocation::Slice& slice,
-                                     const Shape& target_shape);
+  llvm::Value* EmitBufferPointer(const BufferAllocation::Slice& slice,
+                                 const Shape& target_shape);
 
   // Emits a function into the current module. This can be used for
   // computations embedded inside other computations, such as the
@@ -390,8 +393,8 @@ class IrEmitter : public DfsHloVisitorWithDefault,
                             const llvm_ir::IrArray& target_array,
                             const llvm_ir::IrArray& source_array);
 
-  // Assignment of the temporary buffers needed by the computation and their
-  // shape information.
+  // Assignment of the buffers needed by the computation and their shape
+  // information.
   const BufferAssignment& assignment_;
 
   // The LLVM module into which IR will be emitted.
@@ -424,7 +427,7 @@ class IrEmitter : public DfsHloVisitorWithDefault,
   // Maps the buffer allocation slices for the parameters to the computation
   // being compiled to their parameter numbers.  Only relevant for thread local
   // computations.
-  tensorflow::gtl::FlatMap<BufferAllocation::Index, int64>
+  absl::flat_hash_map<BufferAllocation::Index, int64>
       computation_parameter_allocations_;
 
   // Maps HLO instructions to their index into the profile counter array.
@@ -564,11 +567,11 @@ class IrEmitter : public DfsHloVisitorWithDefault,
     }
   };
 
-  tensorflow::gtl::FlatMap<const Literal*, llvm::Constant*,
-                           LiteralPtrHashFunctor, LiteralPtrEqualityFunctor>
+  absl::flat_hash_map<const Literal*, llvm::Constant*, LiteralPtrHashFunctor,
+                      LiteralPtrEqualityFunctor>
       emitted_literals_;
 
-  tensorflow::gtl::FlatMap<BufferAllocation::Index, llvm::Constant*>
+  absl::flat_hash_map<BufferAllocation::Index, llvm::Constant*>
       constant_buffer_to_global_;
 
   std::vector<const HloComputation*> thread_local_computations_;
