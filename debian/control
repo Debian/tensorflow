@@ -20,7 +20,7 @@ Build-Depends:
  libgif-dev,
  libgrpc++-dev (>= 1.14.1~),
  libgtest-dev,
- libhighwayhash-dev [amd64 ppc64el],
+ libhighwayhash-dev,
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
