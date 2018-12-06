@@ -1,4 +1,4 @@
-tensorflow (1.10.1+dfsg-A2) UNRELEASED; urgency=medium
+tensorflow (1.10.1+dfsg-A2) experimental; urgency=medium
 
   * Require B-D highwayhash-dev on all architectures. (Closes: #914985)
   * Add Yunqiang Su (syq) to Uploaders.
@@ -13,7 +13,7 @@ tensorflow (1.10.1+dfsg-A2) UNRELEASED; urgency=medium
   + The build system is feature-frozen. It will be replaced by a new one
     for the upcoming TensorFlow 2.X series.
 
- -- Mo Zhou <cdluminate@gmail.com>  Thu, 06 Dec 2018 04:50:48 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Thu, 06 Dec 2018 05:31:39 +0000
 
 tensorflow (1.10.1+dfsg-A1) experimental; urgency=medium
 
