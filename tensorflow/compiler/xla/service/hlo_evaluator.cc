@@ -24,6 +24,7 @@ limitations under the License.
 #include <vector>
 
 #include "absl/algorithm/container.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/compiler/xla/index_util.h"
@@ -32,17 +33,18 @@ limitations under the License.
 #include "tensorflow/compiler/xla/literal_util.h"
 #include "tensorflow/compiler/xla/map_util.h"
 #include "tensorflow/compiler/xla/primitive_util.h"
+#include "tensorflow/compiler/xla/service/cpu/runtime_single_threaded_matmul.h"
 #include "tensorflow/compiler/xla/service/hlo_evaluator_typed_visitor.h"
 #include "tensorflow/compiler/xla/service/hlo_instruction.h"
 #include "tensorflow/compiler/xla/service/hlo_opcode.h"
 #include "tensorflow/compiler/xla/service/hlo_query.h"
 #include "tensorflow/compiler/xla/service/shape_inference.h"
 #include "tensorflow/compiler/xla/shape_util.h"
+#include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/types.h"
 #include "tensorflow/compiler/xla/util.h"
 #include "tensorflow/compiler/xla/window_util.h"
 #include "tensorflow/core/lib/core/bitmap.h"
-#include "tensorflow/core/lib/core/casts.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/logging.h"
@@ -188,6 +190,11 @@ HloEvaluator::HloEvaluator(int64 max_loop_iterations)
       absl::make_unique<FunctionVisitor>([](HloInstruction*) {
         return Unimplemented(
             "HloEvaluatorTypedVisitor: unhandled primitive type: OPAQUE.");
+      });
+  typed_visitors_[TOKEN] =
+      absl::make_unique<FunctionVisitor>([](HloInstruction*) {
+        return Unimplemented(
+            "HloEvaluatorTypedVisitor: unhandled primitive type: TOKEN.");
       });
 }
 
@@ -389,6 +396,16 @@ StatusOr<Literal> HloEvaluator::EvaluateDotOp(
       HloInstruction::CreateDot(dot_shape, lhs_instr.get(), rhs_instr.get(),
                                 dim_numbers, precision_config);
   return Evaluate(cloned_instruction.get());
+}
+
+Status HloEvaluator::HandleBitcast(HloInstruction* bitcast) {
+  const Literal& operand_literal = GetEvaluatedLiteralFor(bitcast->operand(0));
+  Literal result(bitcast->shape());
+  TF_RET_CHECK(operand_literal.size_bytes() == result.size_bytes());
+  memcpy(result.untyped_data(), operand_literal.untyped_data(),
+         operand_literal.size_bytes());
+  evaluated_[bitcast] = std::move(result);
+  return Status::OK();
 }
 
 Status HloEvaluator::HandleParameter(HloInstruction* parameter) {
@@ -613,8 +630,11 @@ Status HloEvaluator::HandleCompare(HloInstruction* compare) {
           evaluated_[compare],
           Compare<int64>(compare->shape(), opcode, lhs_literal, rhs_literal));
     } break;
-    case F16:
-      return Unimplemented("unhandled primitive type: F16.");
+    case F16: {
+      TF_ASSIGN_OR_RETURN(
+          evaluated_[compare],
+          Compare<half>(compare->shape(), opcode, lhs_literal, rhs_literal));
+    } break;
     case BF16: {
       TF_ASSIGN_OR_RETURN(evaluated_[compare],
                           Compare<bfloat16>(compare->shape(), opcode,
@@ -1041,8 +1061,15 @@ Status HloEvaluator::HandleBroadcast(HloInstruction* broadcast) {
   return Status::OK();
 }
 
-Status HloEvaluator::HandleAfterAll(HloInstruction* token) {
-  evaluated_[token] = LiteralUtil::CreateToken();
+Status HloEvaluator::HandleAfterAll(HloInstruction* after_all) {
+  evaluated_[after_all] = LiteralUtil::CreateToken();
+  return Status::OK();
+}
+
+Status HloEvaluator::HandleAddDependency(HloInstruction* add_dependency) {
+  // AddDedendency just forwards its zero-th operand.
+  evaluated_[add_dependency] =
+      GetEvaluatedLiteralFor(add_dependency->operand(0)).Clone();
   return Status::OK();
 }
 
@@ -1228,7 +1255,7 @@ StatusOr<Literal> EvaluateSortInternal(HloInstruction* sort,
   TF_RET_CHECK(
       ShapeUtil::SameDimensions(keys_literal.shape(), values_literal.shape()))
       << "Sort keys and values must have the same dimensions";
-  TF_RET_CHECK(sort->operand_count() == 2) << "Expected key-value sort";
+  TF_RET_CHECK(sort->operand_count() >= 2) << "Expected key-value sort";
   // We need to sort an array of keys and an array of values, where the
   // sorted order of the values is determined by the keys. The simplest(?)
   // way to do this is to go to an array-of-pairs representation, sort the
@@ -1274,12 +1301,14 @@ StatusOr<Literal> EvaluateSortInternal(HloInstruction* sort,
           key_value_vector.push_back(
               std::make_pair(keys_data[i], values_data[i]));
         }
-        std::sort(key_value_vector.begin(), key_value_vector.end(),
-                  [](const kv_pair& a, const kv_pair& b) {
-                    return SafeLess<KeyType>(a.first, b.first);
-                  });
+        std::stable_sort(key_value_vector.begin(), key_value_vector.end(),
+                         [](const kv_pair& a, const kv_pair& b) {
+                           return SafeLess<KeyType>(a.first, b.first);
+                         });
         std::vector<KeyType> result_keys;
-        std::vector<ValueType> result_values;
+        // We use a InlinedVector here because we need to convert it to an
+        // absl::Span later, and this would not work with std::vector<bool>.
+        absl::InlinedVector<ValueType, 10> result_values;
         for (const auto& key_value : key_value_vector) {
           result_keys.push_back(key_value.first);
           result_values.push_back(key_value.second);
@@ -1315,7 +1344,10 @@ template <typename KeyType>
 StatusOr<Literal> EvaluateSortCurried(HloInstruction* sort,
                                       const Literal& keys_literal,
                                       const Literal& values_literal) {
-  switch (sort->operand(1)->shape().element_type()) {
+  switch (values_literal.shape().element_type()) {
+    case PRED:
+      return EvaluateSortInternal<KeyType, bool>(sort, keys_literal,
+                                                 values_literal);
     case F32:
       return EvaluateSortInternal<KeyType, float>(sort, keys_literal,
                                                   values_literal);
@@ -1355,14 +1387,24 @@ Status HloEvaluator::HandleSort(HloInstruction* sort) {
   if (!ShapeUtil::IsTuple(sort->shape())) {
     return DefaultAction(sort);
   } else {
-    auto result = EvaluateSort(sort, GetEvaluatedLiteralFor(sort->operand(0)),
-                               GetEvaluatedLiteralFor(sort->operand(1)));
-    if (result.ok()) {
-      evaluated_[sort] = std::move(result.ValueOrDie());
-      return Status::OK();
-    } else {
-      return result.status();
+    // This is a really stupid work-around for the fact it's hard to support a
+    // multi-value sort directly, due to the fact we need to template the
+    // evaluation function on all of the value types.
+    std::vector<Literal> sort_results_backing;
+    for (int64 i = 0; i < sort->operand_count(); ++i) {
+      auto result = EvaluateSort(sort, GetEvaluatedLiteralFor(sort->operand(0)),
+                                 GetEvaluatedLiteralFor(sort->operand(i)));
+      if (!result.ok()) {
+        return result.status();
+      }
+      sort_results_backing.push_back(
+          std::move(result.ValueOrDie().DecomposeTuple()[1]));
     }
+    std::vector<const Literal*> sort_results;
+    absl::c_transform(sort_results_backing, std::back_inserter(sort_results),
+                      [](const Literal& literal) { return &literal; });
+    evaluated_[sort] = LiteralUtil::MakeTuple(sort_results);
+    return Status::OK();
   }
 }
 
@@ -1378,7 +1420,7 @@ Status HloEvaluator::HandleReduce(HloInstruction* reduce) {
             "unsupported");
       }
     }
-    return reduce->Visit(typed_visitors_.at(first_element_type).get());
+    return reduce->Visit(typed_visitors_[first_element_type].get());
   }
 }
 
@@ -1410,5 +1452,47 @@ template StatusOr<Literal> HloEvaluator::Evaluate<const Literal*>(
 
 template StatusOr<Literal> HloEvaluator::Evaluate<const Literal*>(
     HloInstruction* instruction, absl::Span<const Literal* const> arg_literals);
+
+namespace {
+template <typename T>
+std::unique_ptr<Array2D<T>> MatmulArray2DImpl(
+    const Array2D<T>& lhs, const Array2D<T>& rhs,
+    const std::function<void(
+        const void* run_options_ptr, T* out, T* lhs, T* rhs, int64 m, int64 n,
+        int64 k, int32 transpose_lhs, int32 transpose_rhs)>& impl_fn) {
+  CHECK_EQ(lhs.width(), rhs.height());
+  int m = lhs.height();
+  int n = rhs.width();
+  int k = lhs.width();
+  auto result = absl::make_unique<Array2D<T>>(m, n);
+  // Because Eigen is a header-oriented library, make sure that the Eigen code
+  // is the same as the code used by the CPU backend (otherwise the linker will
+  // randomly pick *some* definition).
+  impl_fn(
+      /*run_options_ptr=*/nullptr, result->data(), rhs.data(), lhs.data(), n, m,
+      k,
+      /*transpose_lhs=*/0,
+      /*transpose_rhs=*/0);
+  return result;
+}
+}  // namespace
+
+std::unique_ptr<Array2D<Eigen::half>> HloEvaluator::MatmulArray2D(
+    const Array2D<Eigen::half>& lhs, const Array2D<Eigen::half>& rhs) {
+  return MatmulArray2DImpl<Eigen::half>(
+      lhs, rhs, __xla_cpu_runtime_EigenSingleThreadedMatMulF16);
+}
+
+std::unique_ptr<Array2D<float>> HloEvaluator::MatmulArray2D(
+    const Array2D<float>& lhs, const Array2D<float>& rhs) {
+  return MatmulArray2DImpl<float>(
+      lhs, rhs, __xla_cpu_runtime_EigenSingleThreadedMatMulF32);
+}
+
+std::unique_ptr<Array2D<double>> HloEvaluator::MatmulArray2D(
+    const Array2D<double>& lhs, const Array2D<double>& rhs) {
+  return MatmulArray2DImpl<double>(
+      lhs, rhs, __xla_cpu_runtime_EigenSingleThreadedMatMulF64);
+}
 
 }  // namespace xla
