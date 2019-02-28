@@ -14,8 +14,8 @@
 # ==============================================================================
 """Utilities for API compatibility between TensorFlow release versions.
 
-See
-@{$guide/version_compat#backward_and_partial_forward_compatibility}
+See [Version
+Compatibility](https://tensorflow.org/guide/version_compat#backward_forward)
 """
 
 from __future__ import absolute_import
@@ -23,13 +23,24 @@ from __future__ import division
 from __future__ import print_function
 
 import datetime
+
+from tensorflow.python import tf2
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.ops import variable_scope
+
 from tensorflow.python.util import tf_contextlib
+from tensorflow.python.util.tf_export import tf_export
 
-_FORWARD_COMPATIBILITY_HORIZON = datetime.date(2018, 8, 1)
+_FORWARD_COMPATIBILITY_HORIZON = datetime.date(2018, 12, 13)
 
 
+@tf_export("compat.forward_compatible")
 def forward_compatible(year, month, day):
   """Return true if the forward compatibility window has expired.
+
+  See [Version
+  compatibility](https://tensorflow.org/guide/version_compat#backward_forward).
 
   Forward-compatibility refers to scenarios where the producer of a TensorFlow
   model (a GraphDef or SavedModel) is compiled against a version of the
@@ -82,9 +93,13 @@ def forward_compatible(year, month, day):
   return _FORWARD_COMPATIBILITY_HORIZON > datetime.date(year, month, day)
 
 
+@tf_export("compat.forward_compatibility_horizon")
 @tf_contextlib.contextmanager
 def forward_compatibility_horizon(year, month, day):
   """Context manager for testing forward compatibility of generated graphs.
+
+  See [Version
+  compatibility](https://tensorflow.org/guide/version_compat#backward_forward).
 
   To ensure forward compatibility of generated graphs (see `forward_compatible`)
   with older binaries, new features can be gated with:
@@ -123,3 +138,40 @@ def forward_compatibility_horizon(year, month, day):
     yield
   finally:
     _FORWARD_COMPATIBILITY_HORIZON = old_compat_date
+
+
+@tf_export(v1=["enable_v2_behavior"])
+def enable_v2_behavior():
+  """Enables TensorFlow 2.x behaviors.
+
+  This function can be called at the beginning of the program (before `Tensors`,
+  `Graphs` or other structures have been created, and before devices have been
+  initialized. It switches all global behaviors that are different between
+  TensorFlow 1.x and 2.x to behave as intended for 2.x.
+
+  This function is called in the main TensorFlow `__init__.py` file, user should
+  not need to call it, except during complex migrations.
+  """
+  tf2.enable()  # Switches TensorArrayV2 and control flow V2
+  ops.enable_eager_execution()
+  tensor_shape.enable_v2_tensorshape()  # Also switched by tf2
+  variable_scope.enable_resource_variables()
+
+
+@tf_export(v1=["disable_v2_behavior"])
+def disable_v2_behavior():
+  """Disables TensorFlow 2.x behaviors.
+
+  This function can be called at the beginning of the program (before `Tensors`,
+  `Graphs` or other structures have been created, and before devices have been
+  initialized. It switches all global behaviors that are different between
+  TensorFlow 1.x and 2.x to behave as intended for 1.x.
+
+  User can call this function to disable 2.x behavior during complex migrations.
+  """
+  tf2.disable()  # Switches TensorArrayV2 and control flow V2
+  ops.disable_eager_execution()
+  tensor_shape.disable_v2_tensorshape()  # Also switched by tf2
+  variable_scope.disable_resource_variables()
+
+

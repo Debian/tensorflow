@@ -28,9 +28,7 @@ llvm_host_triple = "x86_64-unknown-linux_gnu"
 
 llvm_targets = [
     "AArch64",
-    # Uncomment to enable the AMDGPU backend.
-    # TODO(phawkins): use a configure-time test.
-    # "AMDGPU",
+    "AMDGPU",
     "ARM",
     "NVPTX",
     "PowerPC",
@@ -111,16 +109,23 @@ template_rule(
 )
 
 # A common library that all LLVM targets depend on.
+# TODO(b/113996071): We need to glob all potentially #included files and stage
+# them here because LLVM's build files are not strict headers clean, and remote
+# build execution requires all inputs to be depended upon.
 cc_library(
     name = "config",
-    hdrs = [
+    hdrs = glob([
+        "**/*.h",
+        "**/*.def",
+        "**/*.inc.cpp",
+    ]) + [
         "include/llvm/Config/AsmParsers.def",
         "include/llvm/Config/AsmPrinters.def",
         "include/llvm/Config/Disassemblers.def",
         "include/llvm/Config/Targets.def",
-        "include/llvm/Config/abi-breaking.h",
         "include/llvm/Config/config.h",
         "include/llvm/Config/llvm-config.h",
+        "include/llvm/Config/abi-breaking.h",
     ],
     defines = llvm_defines,
     includes = ["include"],
@@ -256,13 +261,31 @@ llvm_target_list = [
             ("-gen-dag-isel", "lib/Target/AMDGPU/AMDGPUGenDAGISel.inc"),
             ("-gen-callingconv", "lib/Target/AMDGPU/AMDGPUGenCallingConv.inc"),
             ("-gen-subtarget", "lib/Target/AMDGPU/AMDGPUGenSubtargetInfo.inc"),
-            ("-gen-tgt-intrinsic", "lib/Target/AMDGPU/AMDGPUGenIntrinsics.inc"),
+            ("-gen-tgt-intrinsic-impl", "lib/Target/AMDGPU/AMDGPUGenIntrinsicImpl.inc"),
+            ("-gen-tgt-intrinsic-enums", "lib/Target/AMDGPU/AMDGPUGenIntrinsicEnums.inc"),
             ("-gen-emitter", "lib/Target/AMDGPU/AMDGPUGenMCCodeEmitter.inc"),
             ("-gen-dfa-packetizer", "lib/Target/AMDGPU/AMDGPUGenDFAPacketizer.inc"),
             ("-gen-asm-writer", "lib/Target/AMDGPU/AMDGPUGenAsmWriter.inc"),
             ("-gen-asm-matcher", "lib/Target/AMDGPU/AMDGPUGenAsmMatcher.inc"),
             ("-gen-disassembler", "lib/Target/AMDGPU/AMDGPUGenDisassemblerTables.inc"),
             ("-gen-pseudo-lowering", "lib/Target/AMDGPU/AMDGPUGenMCPseudoLowering.inc"),
+            ("-gen-searchable-tables", "lib/Target/AMDGPU/AMDGPUGenSearchableTables.inc"),
+            ("-gen-global-isel", "lib/Target/AMDGPU/AMDGPUGenGlobalISel.inc"),
+        ],
+    },
+    {
+        "name": "AMDGPU",
+        "lower_name": "amdgpu_r600",
+        "short_name": "R600",
+        "tbl_outs": [
+            ("-gen-asm-writer", "lib/Target/AMDGPU/R600GenAsmWriter.inc"),
+            ("-gen-callingconv", "lib/Target/AMDGPU/R600GenCallingConv.inc"),
+            ("-gen-dag-isel", "lib/Target/AMDGPU/R600GenDAGISel.inc"),
+            ("-gen-dfa-packetizer", "lib/Target/AMDGPU/R600GenDFAPacketizer.inc"),
+            ("-gen-instr-info", "lib/Target/AMDGPU/R600GenInstrInfo.inc"),
+            ("-gen-emitter", "lib/Target/AMDGPU/R600GenMCCodeEmitter.inc"),
+            ("-gen-register-info", "lib/Target/AMDGPU/R600GenRegisterInfo.inc"),
+            ("-gen-subtarget", "lib/Target/AMDGPU/R600GenSubtargetInfo.inc"),
         ],
     },
     {
@@ -670,6 +693,7 @@ cc_library(
     ]),
     copts = llvm_copts + ["-Iexternal/llvm/lib/Target/AMDGPU"],
     deps = [
+        ":amdgpu_r600_target_gen",
         ":amdgpu_target_gen",
         ":config",
         ":core",
@@ -692,6 +716,7 @@ cc_library(
     ]),
     copts = llvm_copts + ["-Iexternal/llvm/lib/Target/AMDGPU"],
     deps = [
+        ":amdgpu_r600_target_gen",
         ":amdgpu_target_gen",
         ":config",
         ":core",
@@ -798,6 +823,7 @@ cc_library(
     ]),
     copts = llvm_copts + ["-Iexternal/llvm/lib/Target/ARM"],
     deps = [
+        ":arm_asm_printer",
         ":arm_desc",
         ":arm_info",
         ":arm_utils",
@@ -1924,7 +1950,7 @@ cc_library(
         "include/llvm/BinaryFormat/COFF.h",
         "include/llvm/BinaryFormat/MachO.h",
         "lib/Support/*.h",
-    ] + llvm_support_platform_specific_srcs_glob),
+    ]) + llvm_support_platform_specific_srcs_glob(),
     hdrs = glob([
         "include/llvm/Support/*.h",
         "include/llvm/Support/*.def",
@@ -2116,6 +2142,7 @@ cc_library(
         ":core",
         ":global_i_sel",
         ":mc",
+        ":profile_data",
         ":selection_dag",
         ":support",
         ":target",
@@ -2214,7 +2241,6 @@ cc_library(
     deps = [
         ":code_gen",
         ":config",
-        ":core",
         ":support",
     ],
 )

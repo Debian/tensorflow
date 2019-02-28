@@ -18,7 +18,7 @@ limitations under the License.
 #include "tensorflow/compiler/tf2xla/xla_helpers.h"
 #include "tensorflow/compiler/tf2xla/xla_op_kernel.h"
 #include "tensorflow/compiler/tf2xla/xla_op_registry.h"
-#include "tensorflow/compiler/xla/client/xla_client/xla_builder.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/util/tensor_format.h"
@@ -107,11 +107,11 @@ class BiasAddGradOp : public XlaOpKernel {
     const DataType accumulation_type =
         XlaHelpers::SumAccumulationType(input_type(0));
     auto converted =
-        XlaHelpers::ConvertElementType(b, ctx->Input(0), accumulation_type);
+        XlaHelpers::ConvertElementType(ctx->Input(0), accumulation_type);
     auto reduce =
         xla::Reduce(converted, XlaHelpers::Zero(b, accumulation_type),
                     *ctx->GetOrCreateAdd(accumulation_type), reduce_dims);
-    ctx->SetOutput(0, XlaHelpers::ConvertElementType(b, reduce, input_type(0)));
+    ctx->SetOutput(0, XlaHelpers::ConvertElementType(reduce, input_type(0)));
   }
 
  private:

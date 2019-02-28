@@ -39,12 +39,13 @@ import numpy as np
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import linalg_ops_impl
 from tensorflow.python.ops import gen_linalg_ops
+from tensorflow.python.ops import linalg_ops_impl
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import random_ops
-from tensorflow.python.util.deprecation import (
-    deprecated, deprecated_arg_values)
+from tensorflow.python.util import deprecation
+from tensorflow.python.util.deprecation import deprecated
+from tensorflow.python.util.deprecation import  deprecated_arg_values
 from tensorflow.python.util.tf_export import tf_export
 
 
@@ -54,6 +55,15 @@ class Initializer(object):
   """
 
   def __call__(self, shape, dtype=None, partition_info=None):
+    """Returns a tensor object initialized as specified by the initializer.
+
+    Args:
+      shape: Shape of the tensor.
+      dtype: Optional dtype of the tensor. If not provided use the initializer
+        dtype.
+      partition_info: Optional information about the possible partitioning of a
+        tensor.
+    """
     raise NotImplementedError
 
   def get_config(self):
@@ -142,7 +152,8 @@ class Constant(Initializer):
     value: A Python scalar, list or tuple of values, or a N-dimensional numpy
       array. All elements of the initialized variable will be set to the
       corresponding value in the `value` argument.
-    dtype: The data type.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer.
     verify_shape: Boolean that enables verification of the shape of `value`. If
       `True`, the initializer will throw an error if the shape of `value` is not
       compatible with the shape of the initialized tensor.
@@ -215,7 +226,7 @@ class Constant(Initializer):
       dtype = self.dtype
     if verify_shape is None:
       verify_shape = self._verify_shape
-    return constant_op.constant(
+    return constant_op.constant_v1(
         self.value, dtype=dtype, shape=shape, verify_shape=verify_shape)
 
   def get_config(self):
@@ -226,9 +237,7 @@ class Constant(Initializer):
     return {"value": self.value, "dtype": self.dtype.name}
 
 
-@tf_export("keras.initializers.RandomUniform", "initializers.random_uniform",
-           "random_uniform_initializer", "keras.initializers.uniform",
-           "keras.initializers.random_uniform")
+@tf_export("initializers.random_uniform", "random_uniform_initializer")
 class RandomUniform(Initializer):
   """Initializer that generates tensors with a uniform distribution.
 
@@ -238,9 +247,10 @@ class RandomUniform(Initializer):
     maxval: A python scalar or a scalar tensor. Upper bound of the range
       of random values to generate.  Defaults to 1 for float types.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer.
   """
 
   def __init__(self, minval=0, maxval=None, seed=None, dtype=dtypes.float32):
@@ -264,9 +274,7 @@ class RandomUniform(Initializer):
     }
 
 
-@tf_export("keras.initializers.RandomNormal", "initializers.random_normal",
-           "random_normal_initializer", "keras.initializers.normal",
-           "keras.initializers.random_normal")
+@tf_export("initializers.random_normal", "random_normal_initializer")
 class RandomNormal(Initializer):
   """Initializer that generates tensors with a normal distribution.
 
@@ -276,9 +284,10 @@ class RandomNormal(Initializer):
     stddev: a python scalar or a scalar tensor. Standard deviation of the
       random values to generate.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type. Only floating point types are supported.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
   """
 
   def __init__(self, mean=0.0, stddev=1.0, seed=None, dtype=dtypes.float32):
@@ -302,9 +311,7 @@ class RandomNormal(Initializer):
     }
 
 
-@tf_export("keras.initializers.TruncatedNormal",
-           "initializers.truncated_normal", "truncated_normal_initializer",
-           "keras.initializers.truncated_normal")
+@tf_export("initializers.truncated_normal", "truncated_normal_initializer")
 class TruncatedNormal(Initializer):
   """Initializer that generates a truncated normal distribution.
 
@@ -319,9 +326,10 @@ class TruncatedNormal(Initializer):
     stddev: a python scalar or a scalar tensor. Standard deviation of the
       random values to generate.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type. Only floating point types are supported.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
   """
 
   def __init__(self, mean=0.0, stddev=1.0, seed=None, dtype=dtypes.float32):
@@ -345,8 +353,12 @@ class TruncatedNormal(Initializer):
     }
 
 
-@tf_export("initializers.uniform_unit_scaling",
-           "uniform_unit_scaling_initializer")
+@tf_export(
+    "initializers.uniform_unit_scaling",
+    v1=[
+        "initializers.uniform_unit_scaling", "uniform_unit_scaling_initializer"
+    ])
+@deprecation.deprecated_endpoints("uniform_unit_scaling_initializer")
 class UniformUnitScaling(Initializer):
   """Initializer that generates tensors without scaling variance.
 
@@ -361,17 +373,21 @@ class UniformUnitScaling(Initializer):
   A similar calculation for convolutional networks gives an analogous result
   with `dim` equal to the product of the first 3 dimensions.  When
   nonlinearities are present, we need to multiply this by a constant `factor`.
-  See [Sussillo et al., 2014](https://arxiv.org/abs/1412.6558)
-  ([pdf](http://arxiv.org/pdf/1412.6558.pdf)) for deeper motivation, experiments
+  See (Sussillo et al., 2014) for deeper motivation, experiments
   and the calculation of constants. In section 2.3 there, the constants were
   numerically computed: for a linear layer it's 1.0, relu: ~1.43, tanh: ~1.15.
 
   Args:
     factor: Float.  A multiplicative factor by which the values will be scaled.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type. Only floating point types are supported.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Sussillo et al., 2014](https://arxiv.org/abs/1412.6558)
+      ([pdf](http://arxiv.org/pdf/1412.6558.pdf))
   """
 
   @deprecated(None,
@@ -405,8 +421,14 @@ class UniformUnitScaling(Initializer):
     return {"factor": self.factor, "seed": self.seed, "dtype": self.dtype.name}
 
 
-@tf_export("keras.initializers.VarianceScaling",
-           "initializers.variance_scaling", "variance_scaling_initializer")
+@tf_export(
+    "keras.initializers.VarianceScaling",
+    "initializers.variance_scaling",
+    v1=[
+        "keras.initializers.VarianceScaling", "initializers.variance_scaling",
+        "variance_scaling_initializer"
+    ])
+@deprecation.deprecated_endpoints("variance_scaling_initializer")
 class VarianceScaling(Initializer):
   """Initializer capable of adapting its scale to the shape of weights tensors.
 
@@ -427,9 +449,10 @@ class VarianceScaling(Initializer):
     mode: One of "fan_in", "fan_out", "fan_avg".
     distribution: Random distribution to use. One of "normal", "uniform".
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type. Only floating point types are supported.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
 
   Raises:
     ValueError: In case of an invalid value for the "scale", mode" or
@@ -475,7 +498,7 @@ class VarianceScaling(Initializer):
     else:
       scale /= max(1., (fan_in + fan_out) / 2.)
     if self.distribution == "normal" or self.distribution == "truncated_normal":
-      # constant taken from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
+    # constant taken from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
       stddev = math.sqrt(scale) / .87962566103423978
       return random_ops.truncated_normal(
           shape, 0.0, stddev, dtype, seed=self.seed)
@@ -498,8 +521,15 @@ class VarianceScaling(Initializer):
     }
 
 
-@tf_export("keras.initializers.Orthogonal", "initializers.orthogonal",
-           "orthogonal_initializer", "keras.initializers.orthogonal")
+@tf_export(
+    "keras.initializers.Orthogonal",
+    "initializers.orthogonal",
+    "keras.initializers.orthogonal",
+    v1=[
+        "keras.initializers.Orthogonal", "initializers.orthogonal",
+        "orthogonal_initializer", "keras.initializers.orthogonal"
+    ])
+@deprecation.deprecated_endpoints("orthogonal_initializer")
 class Orthogonal(Initializer):
   """Initializer that generates an orthogonal matrix.
 
@@ -517,9 +547,14 @@ class Orthogonal(Initializer):
   Args:
     gain: multiplicative factor to apply to the orthogonal matrix
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Saxe et al., 2014](https://openreview.net/forum?id=_wzZwKpTDF_9C)
+      ([pdf](https://arxiv.org/pdf/1312.6120.pdf))
   """
 
   def __init__(self, gain=1.0, seed=None, dtype=dtypes.float32):
@@ -564,16 +599,21 @@ class ConvolutionDeltaOrthogonal(Initializer):
   The shape of the tensor must have length 3, 4 or 5. The number of input
   filters must not exceed the number of output filters. The center pixels of the
   tensor form an orthogonal matrix. Other pixels are set to be zero. See
-  algorithm 2 in [Xiao et al., 2018]: https://arxiv.org/abs/1806.05393
+  algorithm 2 in (Xiao et al., 2018).
 
 
   Args:
-    gain: Multiplicative factor to apply to the orthogonal matrix. Default is 1.
-      The 2-norm of an input is multiplied by a factor of 'sqrt(gain)' after
-      applying this convolution.
+    gain: Multiplicative factor to apply to the orthogonal
+      matrix. Default is 1. The 2-norm of an input is multiplied by a factor of
+      `gain` after applying this convolution.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed} for behavior.
-    dtype: The data type.
+      `tf.set_random_seed` for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Xiao et al., 2018](http://proceedings.mlr.press/v80/xiao18a.html)
+      ([pdf](http://proceedings.mlr.press/v80/xiao18a/xiao18a.pdf))
   """
 
   def __init__(self, gain=1.0, seed=None, dtype=dtypes.float32):
@@ -601,7 +641,7 @@ class ConvolutionDeltaOrthogonal(Initializer):
     d = array_ops.diag_part(r)
     q *= math_ops.sign(d)
     q = q[:shape[-2], :]
-    q *= math_ops.sqrt(math_ops.cast(self.gain, dtype=dtype))
+    q *= math_ops.cast(self.gain, dtype=dtype)
     if len(shape) == 3:
       weight = array_ops.scatter_nd([[(shape[0]-1)//2]],
                                     array_ops.expand_dims(q, 0), shape)
@@ -624,12 +664,17 @@ class ConvolutionOrthogonal(Initializer):
   Base class used to construct 1D, 2D and 3D orthogonal kernels for convolution.
 
   Args:
-    gain: multiplicative factor to apply to the orthogonal matrix. Default is 1.
-      The 2-norm of an input is multiplied by a factor of 'sqrt(gain)' after
-      applying this convolution.
+    gain: multiplicative factor to apply to the orthogonal
+      matrix. Default is 1. The 2-norm of an input is multiplied by a factor of
+      `gain` after applying this convolution.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed} for behavior.
-    dtype: The data type.
+      `tf.set_random_seed` for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Xiao et al., 2018](http://proceedings.mlr.press/v80/xiao18a.html)
+      ([pdf](http://proceedings.mlr.press/v80/xiao18a/xiao18a.pdf))
   """
 
   def __init__(self, gain=1.0, seed=None, dtype=dtypes.float32):
@@ -686,15 +731,20 @@ class ConvolutionOrthogonal2D(ConvolutionOrthogonal):
   filters must not exceed the number of output filters.
   The orthogonality(==isometry) is exact when the inputs are circular padded.
   There are finite-width effects with non-circular padding (e.g. zero padding).
-  See algorithm 1 in [Xiao et al., 2018]: https://arxiv.org/abs/1806.05393
+  See algorithm 1 in (Xiao et al., 2018).
 
   Args:
-    gain: Multiplicative factor to apply to the orthogonal matrix. Default is 1.
-      This has the effect of scaling the output 2-norm by a factor of
-      `sqrt(gain)`.
+    gain: Multiplicative factor to apply to the orthogonal
+      matrix. Default is 1. This has the effect of scaling the output 2-norm by
+      a factor of `gain`.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed} for behavior.
-    dtype: The data type.
+      `tf.set_random_seed` for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Xiao et al., 2018](http://proceedings.mlr.press/v80/xiao18a.html)
+      ([pdf](http://proceedings.mlr.press/v80/xiao18a/xiao18a.pdf))
   """
 
   def __call__(self, shape, dtype=None, partition_info=None):
@@ -710,7 +760,7 @@ class ConvolutionOrthogonal2D(ConvolutionOrthogonal):
       raise ValueError("Kernel sizes must be equal.")
 
     kernel = self._orthogonal_kernel(shape[0], shape[2], shape[3])
-    kernel *= math_ops.sqrt(math_ops.cast(self.gain, dtype=dtype))
+    kernel *= math_ops.cast(self.gain, dtype=dtype)
     return kernel
 
   def _dict_to_tensor(self, x, k1, k2):
@@ -822,16 +872,21 @@ class ConvolutionOrthogonal1D(ConvolutionOrthogonal):
   filters must not exceed the number of output filters.
   The orthogonality(==isometry) is exact when the inputs are circular padded.
   There are finite-width effects with non-circular padding (e.g. zero padding).
-  See algorithm 1 in [Xiao et al., 2018]: https://arxiv.org/abs/1806.05393
+  See algorithm 1 in (Xiao et al., 2018).
 
   Args:
-    gain: Multiplicative factor to apply to the orthogonal matrix. Default is 1.
-      The 2-norm of an input is multiplied by a factor of 'sqrt(gain)' after
-      applying this convolution.
+    gain: Multiplicative factor to apply to the orthogonal
+      matrix. Default is 1. The 2-norm of an input is multiplied by a factor of
+      `gain` after applying this convolution.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
+      `tf.set_random_seed`
       for behavior.
-    dtype: The data type.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Xiao et al., 2018](http://proceedings.mlr.press/v80/xiao18a.html)
+      ([pdf](http://proceedings.mlr.press/v80/xiao18a/xiao18a.pdf))
   """
 
   def __call__(self, shape, dtype=None, partition_info=None):
@@ -844,7 +899,7 @@ class ConvolutionOrthogonal1D(ConvolutionOrthogonal):
       raise ValueError("In_filters cannot be greater than out_filters.")
 
     kernel = self._orthogonal_kernel(shape[0], shape[-2], shape[-1])
-    kernel *= math_ops.sqrt(math_ops.cast(self.gain, dtype=dtype))
+    kernel *= math_ops.cast(self.gain, dtype=dtype)
     return kernel
 
   def _dict_to_tensor(self, x, k):
@@ -939,15 +994,20 @@ class ConvolutionOrthogonal3D(ConvolutionOrthogonal):
   filters must not exceed the number of output filters.
   The orthogonality(==isometry) is exact when the inputs are circular padded.
   There are finite-width effects with non-circular padding (e.g. zero padding).
-  See algorithm 1 [Xiao et al., 2018] in: https://arxiv.org/abs/1806.05393
+  See algorithm 1 (Xiao et al., 2018).
 
   Args:
-    gain: Multiplicative factor to apply to the orthogonal matrix. Default is 1.
-      The 2-norm of an input is multiplied by a factor of 'sqrt(gain)' after
-      applying this convolution.
+    gain: Multiplicative factor to apply to the orthogonal
+      matrix. Default is 1. The 2-norm of an input is multiplied by a factor of
+      `gain` after applying this convolution.
     seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed} for behavior.
-    dtype: The data type.
+      `tf.set_random_seed` for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Xiao et al., 2018](http://proceedings.mlr.press/v80/xiao18a.html)
+      ([pdf](http://proceedings.mlr.press/v80/xiao18a/xiao18a.pdf))
   """
 
   def __call__(self, shape, dtype=None, partition_info=None):
@@ -963,7 +1023,7 @@ class ConvolutionOrthogonal3D(ConvolutionOrthogonal):
       raise ValueError("Kernel sizes must be equal.")
 
     kernel = self._orthogonal_kernel(shape[0], shape[-2], shape[-1])
-    kernel *= math_ops.sqrt(math_ops.cast(self.gain, dtype=dtype))
+    kernel *= math_ops.cast(self.gain, dtype=dtype)
     return kernel
 
   def _dict_to_tensor(self, x, k1, k2, k3):
@@ -1093,7 +1153,8 @@ class Identity(Initializer):
 
   Args:
     gain: Multiplicative factor to apply to the identity matrix.
-    dtype: The type of the output.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
   """
 
   def __init__(self, gain=1.0, dtype=dtypes.float32):
@@ -1116,6 +1177,80 @@ class Identity(Initializer):
   def get_config(self):
     return {"gain": self.gain, "dtype": self.dtype.name}
 
+
+@tf_export("glorot_uniform_initializer", "keras.initializers.glorot_uniform",
+           "initializers.glorot_uniform")
+class GlorotUniform(VarianceScaling):
+  """The Glorot uniform initializer, also called Xavier uniform initializer.
+
+  It draws samples from a uniform distribution within [-limit, limit]
+  where `limit` is `sqrt(6 / (fan_in + fan_out))`
+  where `fan_in` is the number of input units in the weight tensor
+  and `fan_out` is the number of output units in the weight tensor.
+
+  Args:
+    seed: A Python integer. Used to create random seeds. See
+      `tf.set_random_seed`
+      for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Glorot et al., 2010](http://proceedings.mlr.press/v9/glorot10a.html)
+      ([pdf](http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf))
+  """
+
+  def __init__(self, seed=None, dtype=dtypes.float32):
+    super(GlorotUniform, self).__init__(
+        scale=1.0,
+        mode="fan_avg",
+        distribution="uniform",
+        seed=seed,
+        dtype=dtype)
+
+  def get_config(self):
+    return {"seed": self.seed, "dtype": self.dtype.name}
+
+
+@tf_export(
+    "keras.initializers.glorot_normal",
+    "initializers.glorot_normal",
+    v1=[
+        "glorot_normal_initializer", "keras.initializers.glorot_normal",
+        "initializers.glorot_normal"
+    ])
+@deprecation.deprecated_endpoints("glorot_normal_initializer")
+class GlorotNormal(VarianceScaling):
+  """The Glorot normal initializer, also called Xavier normal initializer.
+
+  It draws samples from a truncated normal distribution centered on 0
+  with `stddev = sqrt(2 / (fan_in + fan_out))`
+  where `fan_in` is the number of input units in the weight tensor
+  and `fan_out` is the number of output units in the weight tensor.
+
+  Args:
+    seed: A Python integer. Used to create random seeds. See
+      `tf.set_random_seed` for behavior.
+    dtype: Default data type, used if no `dtype` argument is provided when
+      calling the initializer. Only floating point types are supported.
+
+  References:
+      [Glorot et al., 2010](http://proceedings.mlr.press/v9/glorot10a.html)
+      ([pdf](http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf))
+  """
+
+  def __init__(self, seed=None, dtype=dtypes.float32):
+    super(GlorotNormal, self).__init__(
+        scale=1.0,
+        mode="fan_avg",
+        distribution="truncated_normal",
+        seed=seed,
+        dtype=dtype)
+
+  def get_config(self):
+    return {"seed": self.seed, "dtype": self.dtype.name}
+
+
 # Aliases.
 
 # pylint: disable=invalid-name
@@ -1127,6 +1262,8 @@ random_normal_initializer = RandomNormal
 truncated_normal_initializer = TruncatedNormal
 uniform_unit_scaling_initializer = UniformUnitScaling
 variance_scaling_initializer = VarianceScaling
+glorot_uniform_initializer = GlorotUniform
+glorot_normal_initializer = GlorotNormal
 orthogonal_initializer = Orthogonal
 identity_initializer = Identity
 convolutional_delta_orthogonal = ConvolutionDeltaOrthogonal
@@ -1136,52 +1273,98 @@ convolutional_orthogonal_3d = ConvolutionOrthogonal3D
 # pylint: enable=invalid-name
 
 
-@tf_export("glorot_uniform_initializer", "keras.initializers.glorot_uniform")
-def glorot_uniform_initializer(seed=None, dtype=dtypes.float32):
-  """The Glorot uniform initializer, also called Xavier uniform initializer.
-
-  It draws samples from a uniform distribution within [-limit, limit]
-  where `limit` is `sqrt(6 / (fan_in + fan_out))`
-  where `fan_in` is the number of input units in the weight tensor
-  and `fan_out` is the number of output units in the weight tensor.
-
-  Reference: http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf
-
-  Args:
-    seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
-      for behavior.
-    dtype: The data type. Only floating point types are supported.
-
-  Returns:
-    An initializer.
-  """
-  return variance_scaling_initializer(
-      scale=1.0, mode="fan_avg", distribution="uniform", seed=seed, dtype=dtype)
-
-
-@tf_export("glorot_normal_initializer", "keras.initializers.glorot_normal")
-def glorot_normal_initializer(seed=None, dtype=dtypes.float32):
-  """The Glorot normal initializer, also called Xavier normal initializer.
+@tf_export("keras.initializers.lecun_normal", "initializers.lecun_normal")
+def lecun_normal(seed=None):
+  """LeCun normal initializer.
 
   It draws samples from a truncated normal distribution centered on 0
-  with `stddev = sqrt(2 / (fan_in + fan_out))`
-  where `fan_in` is the number of input units in the weight tensor
-  and `fan_out` is the number of output units in the weight tensor.
+  with `stddev = sqrt(1 / fan_in)`
+  where `fan_in` is the number of input units in the weight tensor.
 
-  Reference: http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf
-
-  Args:
-    seed: A Python integer. Used to create random seeds. See
-      @{tf.set_random_seed}
-      for behavior.
-    dtype: The data type. Only floating point types are supported.
+  Arguments:
+      seed: A Python integer. Used to seed the random generator.
 
   Returns:
-    An initializer.
+      An initializer.
+
+  References:
+      - Self-Normalizing Neural Networks,
+      [Klambauer et al., 2017](https://papers.nips.cc/paper/6698-self-normalizing-neural-networks)
+      ([pdf](https://papers.nips.cc/paper/6698-self-normalizing-neural-networks.pdf))
+      - Efficient Backprop,
+      [Lecun et al., 1998](http://yann.lecun.com/exdb/publis/pdf/lecun-98b.pdf)
   """
-  return variance_scaling_initializer(
-      scale=1.0, mode="fan_avg", distribution="normal", seed=seed, dtype=dtype)
+  return VarianceScaling(
+      scale=1., mode="fan_in", distribution="truncated_normal", seed=seed)
+
+
+@tf_export("keras.initializers.lecun_uniform", "initializers.lecun_uniform")
+def lecun_uniform(seed=None):
+  """LeCun uniform initializer.
+
+  It draws samples from a uniform distribution within [-limit, limit]
+  where `limit` is `sqrt(3 / fan_in)`
+  where `fan_in` is the number of input units in the weight tensor.
+
+  Arguments:
+      seed: A Python integer. Used to seed the random generator.
+
+  Returns:
+      An initializer.
+
+  References:
+      - Self-Normalizing Neural Networks,
+      [Klambauer et al., 2017](https://papers.nips.cc/paper/6698-self-normalizing-neural-networks)
+      ([pdf](https://papers.nips.cc/paper/6698-self-normalizing-neural-networks.pdf))
+      - Efficient Backprop,
+      [Lecun et al., 1998](http://yann.lecun.com/exdb/publis/pdf/lecun-98b.pdf)
+  """
+  return VarianceScaling(
+      scale=1., mode="fan_in", distribution="uniform", seed=seed)
+
+
+@tf_export("keras.initializers.he_normal", "initializers.he_normal")
+def he_normal(seed=None):
+  """He normal initializer.
+
+  It draws samples from a truncated normal distribution centered on 0
+  with `stddev = sqrt(2 / fan_in)`
+  where `fan_in` is the number of input units in the weight tensor.
+
+  Arguments:
+      seed: A Python integer. Used to seed the random generator.
+
+  Returns:
+      An initializer.
+
+  References:
+      [He et al., 2015](https://www.cv-foundation.org/openaccess/content_iccv_2015/html/He_Delving_Deep_into_ICCV_2015_paper.html)
+      ([pdf](https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/He_Delving_Deep_into_ICCV_2015_paper.pdf))
+  """
+  return VarianceScaling(
+      scale=2., mode="fan_in", distribution="truncated_normal", seed=seed)
+
+
+@tf_export("keras.initializers.he_uniform", "initializers.he_uniform")
+def he_uniform(seed=None):
+  """He uniform variance scaling initializer.
+
+  It draws samples from a uniform distribution within [-limit, limit]
+  where `limit` is `sqrt(6 / fan_in)`
+  where `fan_in` is the number of input units in the weight tensor.
+
+  Arguments:
+      seed: A Python integer. Used to seed the random generator.
+
+  Returns:
+      An initializer.
+
+  References:
+      [He et al., 2015](https://www.cv-foundation.org/openaccess/content_iccv_2015/html/He_Delving_Deep_into_ICCV_2015_paper.html)
+      ([pdf](https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/He_Delving_Deep_into_ICCV_2015_paper.pdf))
+  """
+  return VarianceScaling(
+      scale=2., mode="fan_in", distribution="uniform", seed=seed)
 
 
 # Utility functions.

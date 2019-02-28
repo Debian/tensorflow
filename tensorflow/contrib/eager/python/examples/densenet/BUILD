@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2.0
 package(default_visibility = ["//tensorflow:internal"])
 
 load("//tensorflow:tensorflow.bzl", "cuda_py_test")
+load("//tensorflow:tensorflow.bzl", "py_binary")
 
 py_binary(
     name = "densenet",
@@ -16,6 +17,7 @@ py_binary(
 
 cuda_py_test(
     name = "densenet_test",
+    size = "large",
     srcs = ["densenet_test.py"],
     additional_deps = [
         ":densenet",
@@ -24,6 +26,24 @@ cuda_py_test(
     ],
     tags = [
         "no_pip",
+        "optonly",
+    ],
+)
+
+cuda_py_test(
+    name = "densenet_graph_test",
+    size = "large",
+    srcs = ["densenet_graph_test.py"],
+    additional_deps = [
+        ":densenet",
+        "//third_party/py/numpy",
+        "//tensorflow:tensorflow_py",
+    ],
+    tags = [
+        "no_pip",
+        "noasan",
+        "nomsan",
+        "notsan",
         "optonly",
     ],
 )

@@ -25,6 +25,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
+from tensorflow.python.keras.engine import training
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
@@ -71,6 +72,7 @@ def variable_scoped_function_with_local_variable():
 
 class TemplateTest(test.TestCase):
 
+  @test_util.run_deprecated_v1
   def test_end_to_end(self):
     """This test shows a very simple line model with test_loss.
 
@@ -103,10 +105,10 @@ class TemplateTest(test.TestCase):
     train_op = optimizer.minimize(train_loss)
 
     with session.Session() as sess:
-      sess.run(variables.global_variables_initializer())
-      initial_test_loss = sess.run(test_loss)
-      sess.run(train_op)
-      final_test_loss = sess.run(test_loss)
+      self.evaluate(variables.global_variables_initializer())
+      initial_test_loss = self.evaluate(test_loss)
+      self.evaluate(train_op)
+      final_test_loss = self.evaluate(test_loss)
 
     # Parameters are tied, so the loss should have gone down when we trained it.
     self.assertLess(final_test_loss, initial_test_loss)
@@ -171,6 +173,7 @@ class TemplateTest(test.TestCase):
     self.assertEqual("s1/dummy:0", v1.name)
     self.assertEqual("s1_1/dummy:0", v3.name)
 
+  @test_util.run_deprecated_v1
   def test_same_unique_name_raise_error(self):
     tmpl1 = template.make_template(
         "_", variable_scoped_function, unique_name_="s1")
@@ -189,6 +192,7 @@ class TemplateTest(test.TestCase):
         template.make_template(
             "_", variable_scoped_function, unique_name_="s1")
 
+  @test_util.run_deprecated_v1
   def test_unique_name_and_reuse(self):
     tmpl1 = template.make_template(
         "_", variable_scoped_function, unique_name_="s1")
@@ -259,6 +263,7 @@ class TemplateTest(test.TestCase):
     self.assertEqual("s1/test/dummy:0", v1.name)
     self.assertEqual("s1_1/test/dummy:0", v3.name)
 
+  @test_util.run_deprecated_v1
   def test_enforces_no_extra_trainable_variables(self):
     tmpl = template.make_template("s", function_with_create, trainable=True)
 
@@ -359,6 +364,23 @@ class TemplateTest(test.TestCase):
     self.assertEqual(2, len(tmpl1._checkpoint_dependencies))
     self.assertEqual("nested", tmpl1._checkpoint_dependencies[0].name)
     self.assertEqual("nested_1", tmpl1._checkpoint_dependencies[1].name)
+    model = training.Model()
+    model.template = tmpl1
+    self.assertEqual(model.variables, [v1, v2])
+    self.assertEqual(model.trainable_variables, [v1, v2])
+    self.assertEqual(len(model.non_trainable_variables), 0)
+    model.templates = [tmpl2]
+    self.assertEqual(model.variables, [v1, v2, v5, v6])
+    self.assertEqual(model.trainable_variables, [v1, v2, v5, v6])
+    self.assertEqual(len(model.non_trainable_variables), 0)
+    # Make sure losses, layers, and updates aren't broken by having a Template
+    # in the mix, which does not expose any updates or losses.
+    self.assertEqual([], model.layers)
+    self.assertEqual([], model.updates)
+    self.assertEqual([], model.losses)
+    self.assertEqual([], model.templates.layers)
+    self.assertEqual([], model.templates.updates)
+    self.assertEqual([], model.templates.losses)
 
   @test_util.run_in_graph_and_eager_modes
   def test_nested_templates_with_defun(self):
@@ -657,6 +679,7 @@ class TemplateTest(test.TestCase):
     self.assertEqual(1, len(tb.variables))
 
   # TODO(apassos) handle local variables in Eager
+  @test_util.run_deprecated_v1
   def test_local_variables(self):
     # Make sure trainable_variables are created.
     with variable_scope.variable_scope("foo3"):

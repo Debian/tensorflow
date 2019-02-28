@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef TENSORFLOW_COMMON_RUNTIME_EXECUTOR_H_
-#define TENSORFLOW_COMMON_RUNTIME_EXECUTOR_H_
+#ifndef TENSORFLOW_CORE_COMMON_RUNTIME_EXECUTOR_H_
+#define TENSORFLOW_CORE_COMMON_RUNTIME_EXECUTOR_H_
 
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/framework/rendezvous.h"
@@ -83,7 +83,7 @@ class Executor {
   struct Args {
     int64 step_id = 0;
     Rendezvous* rendezvous = nullptr;
-    StepStatsCollector* stats_collector = nullptr;
+    StepStatsCollectorInterface* stats_collector = nullptr;
     CallFrameInterface* call_frame = nullptr;
     CancellationManager* cancellation_manager = nullptr;
     SessionState* session_state = nullptr;
@@ -97,12 +97,6 @@ class Executor {
     typedef std::function<void()> Closure;
     typedef std::function<void(Closure)> Runner;
     Runner runner = nullptr;
-
-    // A callback that is invoked each time a node has finished executing.
-    typedef std::function<Status(const string& node_name, const int output_slot,
-                                 const Tensor* tensor, const bool is_ref,
-                                 OpKernelContext* ctx)>
-        NodeOutputsCallback;
   };
   typedef std::function<void(const Status&)> DoneCallback;
   virtual void RunAsync(const Args& args, DoneCallback done) = 0;
@@ -179,21 +173,38 @@ class ExecutorBarrier {
   int pending_ GUARDED_BY(mu_) = 0;
   Status status_ GUARDED_BY(mu_);
 
+  void MergeStatusLocked(const Status& s) EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    if (s.ok()) {
+      return;
+    }
+
+    // Prefer primary failures over cancellations.  A cancellation may finish
+    // _before_ the original status is propagated; we override it in this case.
+    if (status_.ok() ||
+        str_util::StrContains(status_.error_message(), "[CHILD]")) {
+      status_ = s;
+    }
+  }
+
   void WhenDone(const Status& s) {
-    bool error = false;
     Rendezvous* error_rendez = nullptr;
     StatusCallback done = nullptr;
     Status status;
+
     {
       mutex_lock l(mu_);
-      // If we are the first error encountered, mark the status
-      // appropriately and later trigger an abort of the Rendezvous
-      // object by this thread only.
+
+      // If we are the first error encountered, trigger an abort of the
+      // Rendezvous object by this thread only.
       if (status_.ok() && !s.ok()) {
-        error = true;
         error_rendez = rendez_;
         error_rendez->Ref();
-        status_ = s;
+      }
+
+      MergeStatusLocked(s);
+
+      if (!status_.ok()) {
+        status = status_;
       }
 
       // If this is the last call to WhenDone, call the final callback
@@ -202,16 +213,13 @@ class ExecutorBarrier {
         CHECK(done_cb_ != nullptr);
         std::swap(done, done_cb_);
       }
-
-      if (!status_.ok()) {
-        status = status_;
-      }
     }
 
-    if (error) {
+    if (error_rendez != nullptr) {
       error_rendez->StartAbort(status);
       error_rendez->Unref();
     }
+
     if (done != nullptr) {
       delete this;
       done(status);
@@ -235,4 +243,4 @@ void DeleteNonCachedKernel(OpKernel* kernel);
 
 }  // end namespace tensorflow
 
-#endif  // TENSORFLOW_COMMON_RUNTIME_EXECUTOR_H_
+#endif  // TENSORFLOW_CORE_COMMON_RUNTIME_EXECUTOR_H_

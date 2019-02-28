@@ -18,6 +18,7 @@ cc_library(
     srcs = glob([
         "src/common/*.cpp",
         "src/cpu/*.cpp",
+        "src/cpu/gemm/*.cpp",
     ]),
     hdrs = glob(["include/*"]),
     copts = [
@@ -41,6 +42,7 @@ cc_library(
         "src",
         "src/common",
         "src/cpu",
+        "src/cpu/gemm",
         "src/cpu/xbyak",
     ],
     nocopts = "-fno-exceptions",
@@ -60,4 +62,28 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "mkldnn_single_threaded",
+    srcs = glob([
+        "src/common/*.cpp",
+        "src/cpu/*.cpp",
+        "src/cpu/gemm/*.cpp",
+    ]),
+    hdrs = glob(["include/*"]),
+    copts = [
+        "-fexceptions",
+        "-DMKLDNN_THR=MKLDNN_THR_SEQ",  # Disables threading.
+    ],
+    includes = [
+        "include",
+        "src",
+        "src/common",
+        "src/cpu",
+        "src/cpu/gemm",
+        "src/cpu/xbyak",
+    ],
+    nocopts = "-fno-exceptions",
+    visibility = ["//visibility:public"],
 )

@@ -43,6 +43,10 @@ limitations under the License.
 #include "tensorflow/core/util/use_cudnn.h"
 #include "tensorflow/core/util/work_sharder.h"
 
+#if defined(TENSORFLOW_USE_CUSTOM_CONTRACTION_KERNEL)
+#include "tensorflow/core/kernels/eigen_contraction_kernel.h"
+#endif
+
 #if GOOGLE_CUDA
 #include "tensorflow/core/kernels/conv_ops_gpu.h"
 #include "tensorflow/core/platform/stream_executor.h"
@@ -901,7 +905,8 @@ void LaunchConv2DBackpropInputOp<GPUDevice, T>::operator()(
                               &transformed_filter));
 
   functor::TransformFilter<GPUDevice, T, int, 4>()(
-      ctx->eigen_device<GPUDevice>(), To32Bit(filter.tensor<T, 4>()),
+      ctx->eigen_device<GPUDevice>(), FORMAT_OIHW,
+      To32Bit(filter.tensor<T, 4>()),
       To32Bit(transformed_filter.tensor<T, 4>()));
 
   Tensor transformed_out_backprop;
@@ -946,10 +951,10 @@ void LaunchConv2DBackpropInputOp<GPUDevice, T>::operator()(
       AsDeviceMemory(pre_transformed_in_backprop.template flat<T>().data(),
                      pre_transformed_in_backprop.template flat<T>().size());
 
-  static int64 ConvolveBackwardDataScratchSize = GetCudnnWorkspaceLimit(
+  static int64 ConvolveBackwardDataScratchSize = GetDnnWorkspaceLimit(
       "TF_CUDNN_WORKSPACE_LIMIT_IN_MB", 1LL << 32  // 4GB by default
   );
-  CudnnScratchAllocator scratch_allocator(ConvolveBackwardDataScratchSize, ctx);
+  DnnScratchAllocator scratch_allocator(ConvolveBackwardDataScratchSize, ctx);
   int device_id = stream->parent()->device_ordinal();
   DataType dtype = out_backprop.dtype();
   ConvParameters conv_parameters = {
@@ -957,6 +962,7 @@ void LaunchConv2DBackpropInputOp<GPUDevice, T>::operator()(
       dims.in_depth,                       // in_depths
       {{input_desc.height(),               // in_rows
         input_desc.width()}},              // in_cols
+      FORMAT_NCHW,                         // compute_data_format
       dims.out_depth,                      // out_depths
       {{dims.spatial_dims[0].filter_size,  // filter_rows
         dims.spatial_dims[1].filter_size,  // filter_cols
@@ -982,8 +988,8 @@ void LaunchConv2DBackpropInputOp<GPUDevice, T>::operator()(
     for (auto profile_algorithm : algorithms) {
       // TODO(zhengxq): profile each algorithm multiple times to better
       // accuracy.
-      CudnnScratchAllocator scratch_allocator(ConvolveBackwardDataScratchSize,
-                                              ctx);
+      DnnScratchAllocator scratch_allocator(ConvolveBackwardDataScratchSize,
+                                            ctx);
       ProfileResult profile_result;
       bool cudnn_launch_status =
           stream
@@ -1089,7 +1095,8 @@ namespace functor {
   extern template struct InflatePadAndShuffle<GPUDevice, T, 4, int>;     \
   template <>                                                            \
   void TransformFilter<GPUDevice, T, int, 4>::operator()(                \
-      const GPUDevice& d, typename TTypes<T, 4, int>::ConstTensor in,    \
+      const GPUDevice& d, FilterTensorFormat dst_filter_format,          \
+      typename TTypes<T, 4, int>::ConstTensor in,                        \
       typename TTypes<T, 4, int>::Tensor out);                           \
   extern template struct TransformFilter<GPUDevice, T, int, 4>;          \
   template <>                                                            \

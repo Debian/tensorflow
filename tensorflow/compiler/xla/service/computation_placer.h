@@ -55,6 +55,8 @@ class DeviceAssignment : public Array2D<int> {
   // due to a StatusOr of an incomplete type (DeviceAssignment).
   static StatusOr<std::unique_ptr<DeviceAssignment>> Deserialize(
       const DeviceAssignmentProto& proto);
+
+  string ToString() const;
 };
 
 // A generic implementation of the XLA computation placer, which assigns device
@@ -102,8 +104,6 @@ class ComputationPlacer {
 
   // Map from platform kind to computation placer singleton.
   static std::map<se::Platform::Id, State>* GetPlatformComputationPlacers();
-
-  se::Platform::Id platform_id_;
 
   TF_DISALLOW_COPY_AND_ASSIGN(ComputationPlacer);
 };

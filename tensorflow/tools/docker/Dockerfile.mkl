@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 LABEL maintainer="Clayne Robison <clayne.b.robison@intel.com>"
 
@@ -6,7 +6,7 @@ LABEL maintainer="Clayne Robison <clayne.b.robison@intel.com>"
 ARG TF_WHL_URL
 
 # Optional parameters
-ARG TF_BUILD_VERSION=r1.9
+ARG TF_BUILD_VERSION=r1.13
 ARG PYTHON="python"
 ARG PYTHON_DEV="python-dev"
 ARG PIP="pip"
@@ -17,10 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         libfreetype6-dev \
         libhdf5-serial-dev \
-        libpng12-dev \
+        libpng-dev \
         libzmq3-dev \
         pkg-config \
-        python \
+        ${PYTHON} \
         ${PYTHON_DEV} \
         rsync \
         software-properties-common \
@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py && \
+    ${PYTHON} get-pip.py && \
     rm get-pip.py
 
 RUN ${PIP} --no-cache-dir install \
@@ -38,13 +38,15 @@ RUN ${PIP} --no-cache-dir install \
         h5py \
         ipykernel \
         jupyter \
+        keras_applications \
+        keras_preprocessing \
         matplotlib \
         numpy \
         pandas \
         scipy \
         sklearn \
         && \
-    python -m ipykernel.kernelspec
+    ${PYTHON} -m ipykernel.kernelspec
 
 COPY ${TF_WHL_URL} /
 RUN ${PIP} install --no-cache-dir --force-reinstall /${TF_WHL_URL} && \

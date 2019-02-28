@@ -19,6 +19,7 @@ limitations under the License.
 
 #include <atomic>
 #include "tensorflow/core/common_runtime/gpu/gpu_init.h"
+#include "tensorflow/core/lib/core/notification.h"
 #include "tensorflow/core/platform/stream_executor.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/protobuf/config.pb.h"
@@ -77,7 +78,8 @@ static std::atomic_int_fast64_t live_tensor_bytes(0);
 // A TensorBuffer that counts live memory usage for testing
 class TestTensorBuffer : public TensorBuffer {
  public:
-  explicit TestTensorBuffer(size_t bytes) : bytes_(bytes) {
+  explicit TestTensorBuffer(size_t bytes)
+      : TensorBuffer(nullptr), bytes_(bytes) {
     live_tensor_bytes += bytes_;
   }
   ~TestTensorBuffer() override { live_tensor_bytes -= bytes_; }
@@ -85,7 +87,6 @@ class TestTensorBuffer : public TensorBuffer {
   size_t size() const override { return bytes_; }
 
   // Not used in this test
-  void* data() const override { return nullptr; }
   TensorBuffer* root_buffer() override { return nullptr; }
   void FillAllocationDescription(AllocationDescription* arg) const override {}
 
@@ -241,6 +242,28 @@ TEST(EventMgr, NonEmptyShutdown) {
     EXPECT_EQ(1 + i, th.queue_size());
     EXPECT_EQ(0, th.free_size());
   }
+}
+
+// Tests that WarnIfInCallback() triggers correctly.
+TEST(EventMgr, WarnIfInCallback) {
+  auto stream_exec = GPUMachineManager()->ExecutorForDevice(0).ValueOrDie();
+  EventMgr em(stream_exec, GPUOptions());
+  TEST_EventMgrHelper th(&em);
+  std::unique_ptr<se::Stream> stream(new se::Stream(stream_exec));
+  CHECK(stream);
+  stream->Init();
+  bool hit = false;
+  gpu_event_mgr::WarnIfInCallback([&hit] { hit = true; });
+  EXPECT_FALSE(hit);
+  Notification note;
+  em.ThenExecute(stream.get(), [&hit, &note]() {
+    gpu_event_mgr::WarnIfInCallback([&hit, &note] {
+      hit = true;
+      note.Notify();
+    });
+  });
+  note.WaitForNotification();
+  EXPECT_TRUE(hit);
 }
 
 }  // namespace

@@ -86,7 +86,8 @@ string AttrSlice::SummarizeNode() const {
 string SummarizeNode(const Node& node) { return SummarizeNodeDef(node.def()); }
 
 string SummarizeNodeDef(const NodeDef& node_def) {
-  string ret = strings::StrCat(node_def.name(), " = ", node_def.op(), "[");
+  string ret = strings::StrCat(errors::FormatNodeNameForError(node_def.name()),
+                               " = ", node_def.op(), "[");
   strings::StrAppend(&ret, SummarizeAttrsHelper(node_def, node_def.device()));
   strings::StrAppend(&ret, "](");
 
@@ -99,6 +100,56 @@ string SummarizeNodeDef(const NodeDef& node_def) {
   }
   strings::StrAppend(&ret, ")");
   return ret;
+}
+
+string SummarizeAttrs(const NodeDef& node_def) {
+  return SummarizeAttrsHelper(node_def, node_def.device());
+}
+
+string FormatNodeForError(const NodeDebugInfo& debug_info) {
+  return debug_info.original_node_names.empty()
+             ? errors::FormatNodeNameForError(debug_info.name)
+             : errors::FormatNodeNamesForError(debug_info.original_node_names);
+}
+
+string FormatNodeForError(const Node& node) {
+  return FormatNodeForError(NodeDebugInfo(node));
+}
+
+string FormatNodeDefForError(const NodeDef& node_def) {
+  return FormatNodeForError(NodeDebugInfo(node_def));
+}
+
+void GetMergedOriginalNodeNames(const NodeDebugInfo& from,
+                                const NodeDebugInfo& to,
+                                std::set<string>* names) {
+  if (!from.original_node_names.empty()) {
+    names->insert(from.original_node_names.begin(),
+                  from.original_node_names.end());
+  } else {
+    names->insert(from.name);
+  }
+  names->insert(to.original_node_names.begin(), to.original_node_names.end());
+}
+
+void MergeDebugInfo(const NodeDebugInfo& from, Node* to) {
+  std::set<string> names;
+  GetMergedOriginalNodeNames(from, NodeDebugInfo(*to), &names);
+  to->set_original_node_names({names.begin(), names.end()});
+}
+
+void MergeDebugInfo(const NodeDebugInfo& from, NodeDef* to) {
+  std::set<string> names;
+  GetMergedOriginalNodeNames(from, NodeDebugInfo(*to), &names);
+  to->mutable_experimental_debug_info()->clear_original_node_names();
+  if (!names.empty()) {
+    *to->mutable_experimental_debug_info()->mutable_original_node_names() = {
+        names.begin(), names.end()};
+  }
+}
+
+void MergeDebugInfo(const NodeDef& from, NodeDef* to) {
+  MergeDebugInfo(NodeDebugInfo(from), to);
 }
 
 const AttrValue* AttrSlice::Find(StringPiece attr_name) const {
@@ -245,7 +296,7 @@ DEFINE_GET_ATTR(NameAttrList, func, "func", emplace_back, v, ;);
 #undef DEFINE_GET_ATTR
 
 bool HasNodeAttr(const NodeDef& node_def, StringPiece attr_name) {
-  return node_def.attr().find(std::string(attr_name)) != node_def.attr().end();
+  return node_def.attr().find(string(attr_name)) != node_def.attr().end();
 }
 
 static const string& kEmptyString = *new string();
@@ -363,6 +414,14 @@ Status InputTypeForNode(const NodeDef& node_def, const OpDef& op_def,
                                  node_def.name());
 }
 
+Status InputTypesForNode(const NodeDef& node_def, const OpDef& op_def,
+                         DataTypeVector* inputs) {
+  for (const auto& arg : op_def.input_arg()) {
+    TF_RETURN_IF_ERROR(AddArgToSig(node_def, arg, inputs));
+  }
+  return Status::OK();
+}
+
 Status OutputTypeForNode(const NodeDef& node_def, const OpDef& op_def,
                          int output_port, DataType* output_type) {
   DataTypeVector output_types;
@@ -388,17 +447,23 @@ Status OutputTypesForNode(const NodeDef& node_def, const OpDef& op_def,
 
 Status InOutTypesForNode(const NodeDef& node_def, const OpDef& op_def,
                          DataTypeVector* inputs, DataTypeVector* outputs) {
-  for (const auto& arg : op_def.input_arg()) {
-    TF_RETURN_IF_ERROR(AddArgToSig(node_def, arg, inputs));
-  }
+  TF_RETURN_IF_ERROR(InputTypesForNode(node_def, op_def, inputs));
   return OutputTypesForNode(node_def, op_def, outputs);
+}
+
+Status NumOutputsForNode(const NodeDef& node_def, const OpDef& op_def,
+                         int* num_outputs) {
+  DataTypeVector outputs;
+  TF_RETURN_IF_ERROR(OutputTypesForNode(node_def, op_def, &outputs));
+  *num_outputs = outputs.size();
+  return Status::OK();
 }
 
 Status ValidateNodeDef(const NodeDef& node_def, const OpDef& op_def) {
   if (node_def.op() != op_def.name()) {
-    return errors::InvalidArgument("NodeDef op '", node_def.op(),
-                                   "' does not match ", SummarizeOpDef(op_def),
-                                   "; NodeDef: ", SummarizeNodeDef(node_def));
+    return errors::InvalidArgument(
+        "NodeDef op '", node_def.op(), "' does not match ",
+        SummarizeOpDef(op_def), "; NodeDef: ", FormatNodeDefForError(node_def));
   }
 
   bool seen_control = false;
@@ -408,14 +473,14 @@ Status ValidateNodeDef(const NodeDef& node_def, const OpDef& op_def) {
     if (str_util::StartsWith(input, "^")) {
       seen_control = true;
       if (input.find(':') != string::npos) {
-        return errors::InvalidArgument(
-            "Control input '", input,
-            "' must not have ':' in NodeDef: ", SummarizeNodeDef(node_def));
+        return errors::InvalidArgument("Control input '", input,
+                                       "' must not have ':' in NodeDef: ",
+                                       FormatNodeDefForError(node_def));
       }
     } else if (seen_control) {
-      return errors::InvalidArgument(
-          "Non-control input '", input,
-          "' after control input in NodeDef: ", SummarizeNodeDef(node_def));
+      return errors::InvalidArgument("Non-control input '", input,
+                                     "' after control input in NodeDef: ",
+                                     FormatNodeDefForError(node_def));
     } else {
       ++num_inputs;
     }
@@ -445,13 +510,14 @@ Status ValidateNodeDef(const NodeDef& node_def, const OpDef& op_def) {
       // the binary producing it.
       return errors::InvalidArgument(
           "NodeDef mentions attr '", attr.first, "' not in ",
-          SummarizeOpDef(op_def), "; NodeDef: ", SummarizeNodeDef(node_def),
+          SummarizeOpDef(op_def),
+          "; NodeDef: ", FormatNodeDefForError(node_def),
           ". (Check whether your GraphDef-interpreting binary is up to date "
           "with your GraphDef-generating binary.).");
     }
     TF_RETURN_WITH_CONTEXT_IF_ERROR(
         ValidateAttrValue(attr.second, *iter->second),
-        "; NodeDef: ", SummarizeNodeDef(node_def), "; ",
+        "; NodeDef: ", FormatNodeDefForError(node_def), "; ",
         SummarizeOpDef(op_def));
     // Keep track of which attr names have (not) been found in the NodeDef.
     op_attrs.erase(iter);
@@ -464,10 +530,10 @@ Status ValidateNodeDef(const NodeDef& node_def, const OpDef& op_def) {
       if (!attrs.empty()) strings::StrAppend(&attrs, "', '");
       strings::StrAppend(&attrs, attr_pair.first);
     }
-    return errors::InvalidArgument("NodeDef missing attr",
-                                   op_attrs.size() == 1 ? " '" : "s '", attrs,
-                                   "' from ", SummarizeOpDef(op_def),
-                                   "; NodeDef: ", SummarizeNodeDef(node_def));
+    return errors::InvalidArgument(
+        "NodeDef missing attr", op_attrs.size() == 1 ? " '" : "s '", attrs,
+        "' from ", SummarizeOpDef(op_def),
+        "; NodeDef: ", FormatNodeDefForError(node_def));
   }
 
   // Validate the number of inputs.
@@ -478,7 +544,7 @@ Status ValidateNodeDef(const NodeDef& node_def, const OpDef& op_def) {
     return errors::InvalidArgument(
         "NodeDef expected inputs '", DataTypeVectorString(inputs),
         "' do not match ", num_inputs, " inputs specified; ",
-        SummarizeOpDef(op_def), "; NodeDef: ", SummarizeNodeDef(node_def));
+        SummarizeOpDef(op_def), "; NodeDef: ", FormatNodeDefForError(node_def));
   }
 
   return Status::OK();
@@ -634,7 +700,7 @@ Status ValidateExternalNodeDefSyntax(const NodeDef& node_def) {
 Status AttachDef(const Status& status, const NodeDef& node_def) {
   Status ret = status;
   errors::AppendToMessage(
-      &ret, strings::StrCat(" [[Node: ", SummarizeNodeDef(node_def), "]]"));
+      &ret, strings::StrCat(" [[", FormatNodeDefForError(node_def), "]]"));
   return ret;
 }
 
@@ -644,7 +710,7 @@ Status AttachDef(const Status& status, const Node& node) {
 
 void AddNodeAttr(StringPiece name, const AttrValue& value, NodeDef* node_def) {
   node_def->mutable_attr()->insert(
-      AttrValueMap::value_type(std::string(name), value));
+      AttrValueMap::value_type(string(name), value));
 }
 
 #define ADD_NODE_ATTR(T)                                           \
@@ -682,7 +748,7 @@ ADD_NODE_ATTR(gtl::ArraySlice<NameAttrList>)
 #undef ADD_NODE_ATTR
 
 void AddAttr(StringPiece name, const AttrValue& value, AttrValueMap* map) {
-  map->insert(AttrValueMap::value_type(std::string(name), value));
+  map->insert(AttrValueMap::value_type(string(name), value));
 }
 
 #define ADD_ATTR(T)                                            \

@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifndef TENSORFLOW_C_EAGER_RUNTIME_H_
-#define TENSORFLOW_C_EAGER_RUNTIME_H_
+#ifndef TENSORFLOW_CORE_COMMON_RUNTIME_EAGER_ATTR_BUILDER_H_
+#define TENSORFLOW_CORE_COMMON_RUNTIME_EAGER_ATTR_BUILDER_H_
 
 // Support for eager execution of TensorFlow kernels.
 
@@ -23,7 +23,6 @@ limitations under the License.
 
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/common_runtime/device.h"
-#include "tensorflow/core/common_runtime/eager/kernel_and_device.h"
 #include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/types.h"
@@ -44,7 +43,11 @@ typedef std::unordered_map<string, uint32> AttrTypeMap;
 Status OpDefForOp(const char* op_name, const OpDef** op_def);
 
 // Returns the AttrTypeMap for the TensorFlow operation named op_name.
-Status AttrTypeMapForOp(const char* op_name, const AttrTypeMap** out);
+// If op_name is not registered in global op registry, AttrTypeMapForOp assumes
+// the op to be a function and returns the default attributes for a function.
+// `is_function` is set to true in this case.
+Status AttrTypeMapForOp(const char* op_name, const AttrTypeMap** out,
+                        bool* is_function);
 
 // Looks for 'attr_name' in 'm' and sets 'out' and 'is_list'.
 Status AttrTypeByName(const AttrTypeMap& m, const string& attr_name,
@@ -96,7 +99,7 @@ class AttrBuilder {
   template <class T>
   AttrBuilder& Set(StringPiece attr_name, T&& value) {
     MayBeInitializeNodeDef();
-    SetInAttrValueMap(node_def_->mutable_attr(), attr_name, value);
+    SetInAttrValueMap(node_def_->mutable_attr(), string(attr_name), value);
     return *this;
   }
 
@@ -107,13 +110,19 @@ class AttrBuilder {
 
  private:
   template <class T>
-  using AttrVec = tensorflow::gtl::InlinedVector<std::pair<StringPiece, T>, 2>;
+  using AttrVec = tensorflow::gtl::InlinedVector<std::pair<string, T>, 2>;
 
   void MayBeInitializeNodeDef();
+  // Fill `m` with the attr-value pairs set via AttrBuilder::Set() so far, as
+  // well as any default attr-value pairs from the associated op_def, if there
+  // is one.
+  //
+  // If `include_those_in_node_def` is true, also include any attr-value pairs
+  // from `node_def_`.
   void FillAttrValueMap(AttrValueMap* m, bool include_those_in_node_def) const;
 
   template <class T>
-  void SetInAttrValueMap(AttrValueMap* m, StringPiece attr_name,
+  void SetInAttrValueMap(AttrValueMap* m, const string& attr_name,
                          T&& value) const {
     DCHECK(!node_def_finalized_)
         << "Calling SetInAttrValueMap after BuildNodeDef.";
@@ -122,16 +131,15 @@ class AttrBuilder {
     AttrValue attr_value;
     if (found == nullptr) {
       SetAttrValue(value, &attr_value);
-      m->insert(AttrValueMap::value_type(attr_name.ToString(), attr_value));
+      m->insert(AttrValueMap::value_type(attr_name, attr_value));
     } else {
       // TODO(ashankar): Do what is done in
       // NodeDefBuilder::CheckInconsistency(attr_name, *found, attr_value);
       SetAttrValue(std::forward<T>(value), &attr_value);
-      (*m)[attr_name.ToString()] = attr_value;
+      (*m)[attr_name] = attr_value;
     }
   }
 
-  AttrVec<StringPiece> string_attrs_;
   AttrVec<int> int_attrs_;
   AttrVec<float> float_attrs_;
   AttrVec<bool> bool_attrs_;
@@ -143,8 +151,6 @@ class AttrBuilder {
 };  // namespace tensorflow
 
 template <>
-AttrBuilder& AttrBuilder::Set(StringPiece attr_name, StringPiece&& value);
-template <>
 AttrBuilder& AttrBuilder::Set(StringPiece attr_name, int&& value);
 template <>
 AttrBuilder& AttrBuilder::Set(StringPiece attr_name, float&& value);
@@ -154,7 +160,6 @@ template <>
 AttrBuilder& AttrBuilder::Set(StringPiece attr_name,
                               tensorflow::DataType&& value);
 
-
 }  // namespace tensorflow
 
-#endif  // TENSORFLOW_C_EAGER_RUNTIME_H_
+#endif  // TENSORFLOW_CORE_COMMON_RUNTIME_EAGER_ATTR_BUILDER_H_

@@ -74,33 +74,102 @@ void AddAssetsTensorsToInputs(const StringPiece export_dir,
   }
 }
 
-bool HasMainOp(const MetaGraphDef& meta_graph_def) {
-  const auto& collection_def_map = meta_graph_def.collection_def();
-  if (collection_def_map.find(kSavedModelMainOpKey) !=
-      collection_def_map.end()) {
-    return true;
+// Like Session::Run(), but uses the Make/Run/ReleaseCallable() API to avoid
+// leaving behind non-GC'ed state.
+//
+// Detailed motivation behind this approach, from ashankar@:
+//
+// Each call to Session::Run() that identifies a new subgraph (based on feeds
+// and fetches) creates some datastructures that live as long as the session
+// (the partitioned graph, associated executors etc.).
+//
+// A pathological case of this would be if say the initialization op
+// (main_op/legacy_init_op) involves the use of a large constant. Then we
+// allocate memory for that large constant that will just stick around till the
+// session dies. With this Callable mechanism, that memory will be released
+// right after ReleaseCallable returns.
+//
+// However, the resource manager state remains.
+Status RunOnce(const RunOptions& run_options,
+               const std::vector<std::pair<string, Tensor>>& inputs,
+               const std::vector<string>& output_tensor_names,
+               const std::vector<string>& target_node_names,
+               std::vector<Tensor>* outputs, RunMetadata* run_metadata,
+               Session* session) {
+  CallableOptions callable_options;
+  std::vector<Tensor> feed_tensors;
+  *callable_options.mutable_run_options() = run_options;
+  for (const auto& input : inputs) {
+    const string& name = input.first;
+    const Tensor& tensor = input.second;
+    callable_options.add_feed(name);
+    feed_tensors.push_back(tensor);
   }
-  return false;
+  for (const string& output_tensor_name : output_tensor_names) {
+    callable_options.add_fetch(output_tensor_name);
+  }
+  for (const string& target_node_name : target_node_names) {
+    callable_options.add_target(target_node_name);
+  }
+
+  Session::CallableHandle callable_handle;
+  TF_RETURN_IF_ERROR(session->MakeCallable(callable_options, &callable_handle));
+  const Status run_status = session->RunCallable(callable_handle, feed_tensors,
+                                                 outputs, run_metadata);
+  // Be sure to call ReleaseCallable() regardless of the outcome of
+  // RunCallable().
+  session->ReleaseCallable(callable_handle).IgnoreError();
+  return run_status;
 }
 
-Status RunMainOp(const RunOptions& run_options, const string& export_dir,
+// RunInitOp will return OK if the initialization op was run successfully.
+// An empty init_op_name indicates that there are no init ops to run.
+Status RunInitOp(const RunOptions& run_options, const string& export_dir,
                  const MetaGraphDef& meta_graph_def,
                  const std::vector<AssetFileDef>& asset_file_defs,
-                 Session* session) {
-  LOG(INFO) << "Running MainOp on SavedModel bundle.";
-  const auto& collection_def_map = meta_graph_def.collection_def();
-  const auto main_op_it = collection_def_map.find(kSavedModelMainOpKey);
-  if (main_op_it != collection_def_map.end()) {
-    if (main_op_it->second.node_list().value_size() != 1) {
-      return errors::FailedPrecondition(
-          strings::StrCat("Expected exactly one main op in : ", export_dir));
-    }
+                 Session* session, const string& init_op_name) {
+  if (!init_op_name.empty()) {
+    LOG(INFO) << "Running initialization op on SavedModel bundle.";
     std::vector<std::pair<string, Tensor>> inputs;
     AddAssetsTensorsToInputs(export_dir, asset_file_defs, &inputs);
     RunMetadata run_metadata;
-    const StringPiece main_op_name = main_op_it->second.node_list().value(0);
-    return session->Run(run_options, inputs, {}, {main_op_name.ToString()},
-                        nullptr /* outputs */, &run_metadata);
+    return RunOnce(run_options, inputs, {}, {init_op_name},
+                   nullptr /* outputs */, &run_metadata, session);
+  }
+  return Status::OK();
+}
+
+// A SavedModel may store the name of the initialization op to run in the
+// in the SignatureDef (v2) or a collection (v1). If an init_op collection
+// exists, then the collection must contain exactly one op.
+Status GetInitOp(const string& export_dir, const MetaGraphDef& meta_graph_def,
+                 string* init_op_name) {
+  const auto& sig_def_map = meta_graph_def.signature_def();
+  const auto& init_op_sig_it =
+      meta_graph_def.signature_def().find(kSavedModelInitOpSignatureKey);
+  if (init_op_sig_it != sig_def_map.end()) {
+    *init_op_name = init_op_sig_it->second.outputs()
+                        .find(kSavedModelInitOpSignatureKey)
+                        ->second.name();
+    return Status::OK();
+  }
+
+  const auto& collection_def_map = meta_graph_def.collection_def();
+  string init_op_collection_key;
+  if (collection_def_map.find(kSavedModelMainOpKey) !=
+      collection_def_map.end()) {
+    init_op_collection_key = kSavedModelMainOpKey;
+  } else {
+    init_op_collection_key = kSavedModelLegacyInitOpKey;
+  }
+
+  const auto init_op_it = collection_def_map.find(init_op_collection_key);
+  if (init_op_it != collection_def_map.end()) {
+    if (init_op_it->second.node_list().value_size() != 1) {
+      return errors::FailedPrecondition(
+          strings::StrCat("Expected exactly one main op in : ", export_dir));
+    }
+    *init_op_name = init_op_it->second.node_list().value(0);
   }
   return Status::OK();
 }
@@ -121,7 +190,8 @@ Status RunRestore(const RunOptions& run_options, const string& export_dir,
       variables_directory, MetaFilename(kSavedModelVariablesFilename));
   if (!Env::Default()->FileExists(variables_index_path).ok()) {
     LOG(INFO) << "The specified SavedModel has no variables; no checkpoints "
-                 "were restored.";
+                 "were restored. File does not exist: "
+              << variables_index_path;
     return Status::OK();
   }
   const string variables_path =
@@ -132,41 +202,26 @@ Status RunRestore(const RunOptions& run_options, const string& export_dir,
   variables_path_tensor.scalar<string>()() = variables_path;
 
   std::vector<std::pair<string, Tensor>> inputs = {
-      {variable_filename_const_op_name.ToString(), variables_path_tensor}};
+      {string(variable_filename_const_op_name), variables_path_tensor}};
 
   AddAssetsTensorsToInputs(export_dir, asset_file_defs, &inputs);
 
   RunMetadata run_metadata;
-  return session->Run(run_options, inputs, {}, {restore_op_name.ToString()},
-                      nullptr /* outputs */, &run_metadata);
-}
-
-Status RunLegacyInitOp(const RunOptions& run_options, const string& export_dir,
-                       const MetaGraphDef& meta_graph_def,
-                       const std::vector<AssetFileDef>& asset_file_defs,
-                       Session* session) {
-  LOG(INFO) << "Running LegacyInitOp on SavedModel bundle.";
-  const auto& collection_def_map = meta_graph_def.collection_def();
-  const auto init_op_it = collection_def_map.find(kSavedModelLegacyInitOpKey);
-  if (init_op_it != collection_def_map.end()) {
-    if (init_op_it->second.node_list().value_size() != 1) {
-      return errors::FailedPrecondition(strings::StrCat(
-          "Expected exactly one serving init op in : ", export_dir));
-    }
-    std::vector<std::pair<string, Tensor>> inputs;
-    AddAssetsTensorsToInputs(export_dir, asset_file_defs, &inputs);
-    RunMetadata run_metadata;
-    const StringPiece legacy_init_op_name =
-        init_op_it->second.node_list().value(0);
-    return session->Run(run_options, inputs, {},
-                        {legacy_init_op_name.ToString()}, nullptr /* outputs */,
-                        &run_metadata);
-  }
-  return Status::OK();
+  return RunOnce(run_options, inputs, {}, {string(restore_op_name)},
+                 nullptr /* outputs */, &run_metadata, session);
 }
 
 Status GetAssetFileDefs(const MetaGraphDef& meta_graph_def,
                         std::vector<AssetFileDef>* asset_file_defs) {
+  // With SavedModel v2, we write asset file def into metagraph instead of
+  // collection, so read from metagraph first.
+  if (meta_graph_def.asset_file_def_size() > 0) {
+    for (const auto& asset : meta_graph_def.asset_file_def()) {
+      asset_file_defs->push_back(asset);
+    }
+    return Status::OK();
+  }
+  // Fall back to read from collection to be backward compatible with v1.
   const auto& collection_def_map = meta_graph_def.collection_def();
   const auto assets_it = collection_def_map.find(kSavedModelAssetsKey);
   if (assets_it == collection_def_map.end()) {
@@ -201,15 +256,12 @@ Status LoadSavedModelInternal(const SessionOptions& session_options,
                  bundle->meta_graph_def.saver_def().restore_op_name(),
                  bundle->meta_graph_def.saver_def().filename_tensor_name(),
                  asset_file_defs, bundle->session.get()));
-  if (HasMainOp(bundle->meta_graph_def)) {
-    TF_RETURN_IF_ERROR(RunMainOp(run_options, export_dir,
-                                 bundle->meta_graph_def, asset_file_defs,
-                                 bundle->session.get()));
-  } else {
-    TF_RETURN_IF_ERROR(RunLegacyInitOp(run_options, export_dir,
-                                       bundle->meta_graph_def, asset_file_defs,
-                                       bundle->session.get()));
-  }
+  string init_op_name;
+  TF_RETURN_IF_ERROR(
+      GetInitOp(export_dir, bundle->meta_graph_def, &init_op_name));
+  TF_RETURN_IF_ERROR(RunInitOp(run_options, export_dir, bundle->meta_graph_def,
+                               asset_file_defs, bundle->session.get(),
+                               init_op_name));
   return Status::OK();
 }
 

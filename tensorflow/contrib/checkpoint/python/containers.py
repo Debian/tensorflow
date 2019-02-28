@@ -35,9 +35,9 @@ class UniqueNameTracker(data_structures.CheckpointableDataStructure):
       self.slotdeps = tf.contrib.checkpoint.UniqueNameTracker()
       slotdeps = self.slotdeps
       slots = []
-      slots.append(slotdeps.track(tfe.Variable(3.), "x"))  # Named "x"
-      slots.append(slotdeps.track(tfe.Variable(4.), "y"))
-      slots.append(slotdeps.track(tfe.Variable(5.), "x"))  # Named "x_1"
+      slots.append(slotdeps.track(tf.Variable(3.), "x"))  # Named "x"
+      slots.append(slotdeps.track(tf.Variable(4.), "y"))
+      slots.append(slotdeps.track(tf.Variable(5.), "x"))  # Named "x_1"
   ```
   """
 
@@ -45,6 +45,10 @@ class UniqueNameTracker(data_structures.CheckpointableDataStructure):
     super(UniqueNameTracker, self).__init__()
     self._maybe_initialize_checkpointable()
     self._name_counts = {}
+
+  @property
+  def _values(self):
+    return [dep.ref for dep in self._checkpoint_dependencies]
 
   def track(self, checkpointable, base_name):
     """Add a dependency on `checkpointable`.

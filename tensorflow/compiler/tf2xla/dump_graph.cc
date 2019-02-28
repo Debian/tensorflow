@@ -18,80 +18,26 @@ limitations under the License.
 
 #include "tensorflow/compiler/tf2xla/dump_graph.h"
 
-#include "tensorflow/compiler/tf2xla/dump_graph_flags.h"
-#include "tensorflow/core/lib/strings/strcat.h"
-#include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/platform/mutex.h"
+#include "tensorflow/compiler/jit/flags.h"
+#include "tensorflow/core/util/dump_graph.h"
 
 namespace tensorflow {
 namespace dump_graph {
 
-namespace {
-
-struct NameCounts {
-  mutex counts_mutex;
-  std::unordered_map<string, int> counts;
-};
-
-string MakeUniquePath(string name) {
-  static NameCounts& instance = *new NameCounts;
-
-  // Remove illegal characters from `name`.
-  for (int i = 0; i < name.size(); ++i) {
-    char ch = name[i];
-    if (ch == '/' || ch == '[' || ch == ']' || ch == '*' || ch == '?') {
-      name[i] = '_';
-    }
-  }
-
-  int count;
-  {
-    mutex_lock lock(instance.counts_mutex);
-    count = instance.counts[name]++;
-  }
-
-  legacy_flags::DumpGraphFlags* flags = legacy_flags::GetDumpGraphFlags();
-  string path = strings::StrCat(flags->tf_dump_graph_prefix, "/", name);
-  if (count > 0) {
-    strings::StrAppend(&path, "_", count);
-  }
-  strings::StrAppend(&path, ".pbtxt");
-  return path;
-}
-
-}  // anonymous namespace
-
 string DumpGraphDefToFile(const string& name, GraphDef const& graph_def) {
-  string path = MakeUniquePath(name);
-  Status status = WriteTextProto(Env::Default(), path, graph_def);
-  if (!status.ok()) {
-    VLOG(1) << "Failed to dump GraphDef to file: " << path << " : " << status;
-    path.clear();
-    path = "(unavailable)";
-  }
-  return path;
+  return tensorflow::DumpGraphDefToFile(
+      name, graph_def, GetDumpGraphFlags()->tf_dump_graph_prefix);
 }
 
 string DumpGraphToFile(const string& name, Graph const& graph,
                        const FunctionLibraryDefinition* flib_def) {
-  GraphDef graph_def;
-  graph.ToGraphDef(&graph_def);
-  if (flib_def) {
-    *graph_def.mutable_library() = flib_def->ToProto();
-  }
-  return DumpGraphDefToFile(name, graph_def);
+  return tensorflow::DumpGraphToFile(name, graph, flib_def,
+                                     GetDumpGraphFlags()->tf_dump_graph_prefix);
 }
 
 string DumpFunctionDefToFile(const string& name, FunctionDef const& fdef) {
-  string path = MakeUniquePath(name);
-  Status status = WriteTextProto(Env::Default(), path, fdef);
-  if (!status.ok()) {
-    VLOG(1) << "Failed to dump FunctionDef to file: " << path << " : "
-            << status;
-    path.clear();
-    path = "(unavailable)";
-  }
-  return path;
+  return tensorflow::DumpFunctionDefToFile(
+      name, fdef, GetDumpGraphFlags()->tf_dump_graph_prefix);
 }
 
 }  // namespace dump_graph

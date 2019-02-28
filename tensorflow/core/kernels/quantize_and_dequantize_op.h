@@ -19,8 +19,23 @@ limitations under the License.
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor_types.h"
+#include "tensorflow/core/kernels/cwise_ops.h"
 
 namespace tensorflow {
+
+enum QuantizerRoundMode {
+  // Round half up: if the fraction of y is exactly 0.5, then
+  // round(y) = y + 0.5
+  // E.g., -5.5 gets rounded to -5, -5.4 goes to -5,
+  // 5.4 goes to 5, and 5.5 goes to 6.
+  ROUND_HALF_UP,
+  // Round half to even: if the fraction of y is exactly 0.5, then round(y) is
+  // the nearest even integer to y.
+  // E.g., 23.5 gets rounded to 24, 24.5 gets rounded to 24, while -23.5 becomes
+  // -24, and -24.5 gets rounded to 24.
+  ROUND_HALF_TO_EVEN,
+};
+
 namespace functor {
 
 // TODO(pauldonnelly): 'signed_input' should really be called 'signed_output'.
@@ -30,8 +45,61 @@ struct QuantizeAndDequantizeOneScaleFunctor {
   void operator()(const Device& d, typename TTypes<T>::ConstVec input,
                   bool signed_input, int num_bits, bool range_given,
                   Tensor* input_min_tensor, Tensor* input_max_tensor,
-                  typename TTypes<T>::Vec out);
+                  QuantizerRoundMode round_mode, typename TTypes<T>::Vec out);
 };
+
+// The implementation below runs on both CPU and GPU.
+template <typename Device, typename T, typename Func>
+void ClampScaleAndRound(const Device& d, typename TTypes<T>::ConstVec input,
+                        T min_range, T max_range, T scale, T inverse_scale,
+                        Func round_func, typename TTypes<T>::Vec out) {
+  out.device(d) = (input.cwiseMin(max_range).cwiseMax(min_range) * scale)
+                      .unaryExpr(round_func) *
+                  inverse_scale;
+}
+
+// The implementation below runs on both CPU and GPU.
+template <typename Device, typename T>
+void ClampScaleAndRound(const Device& d, typename TTypes<T>::ConstVec input,
+                        T min_range, T max_range, T scale, T inverse_scale,
+                        QuantizerRoundMode round_mode,
+                        typename TTypes<T>::Vec out) {
+  switch (round_mode) {
+    case ROUND_HALF_TO_EVEN:
+      ClampScaleAndRound(d, input, min_range, max_range, scale, inverse_scale,
+                         Eigen::internal::scalar_round_op_google<T>(), out);
+      break;
+    case ROUND_HALF_UP:
+      ClampScaleAndRound(d, input, min_range, max_range, scale, inverse_scale,
+                         Eigen::internal::scalar_round_up_op<T>(), out);
+      break;
+  }
+}
+
+// The implementation below runs on both CPU and GPU.
+template <typename Device, typename T, typename Func>
+void ScaleAndRound(const Device& d, typename TTypes<T>::ConstVec input, T scale,
+                   T inverse_scale, Func round_func,
+                   typename TTypes<T>::Vec out) {
+  out.device(d) = (input * scale).unaryExpr(round_func) * inverse_scale;
+}
+
+// The implementation below runs on both CPU and GPU.
+template <typename Device, typename T>
+void ScaleAndRound(const Device& d, typename TTypes<T>::ConstVec input, T scale,
+                   T inverse_scale, QuantizerRoundMode round_mode,
+                   typename TTypes<T>::Vec out) {
+  switch (round_mode) {
+    case ROUND_HALF_TO_EVEN:
+      ScaleAndRound(d, input, scale, inverse_scale,
+                    Eigen::internal::scalar_round_op_google<T>(), out);
+      break;
+    case ROUND_HALF_UP:
+      ScaleAndRound(d, input, scale, inverse_scale,
+                    Eigen::internal::scalar_round_up_op<T>(), out);
+      break;
+  }
+}
 
 // The implementation below runs on both CPU and GPU.
 template <typename Device, typename T>
@@ -39,6 +107,7 @@ struct QuantizeAndDequantizeOneScaleImpl {
   static void Compute(const Device& d, typename TTypes<T>::ConstVec input,
                       bool signed_input, int num_bits, bool range_given,
                       Tensor* input_min_tensor, Tensor* input_max_tensor,
+                      QuantizerRoundMode round_mode,
                       typename TTypes<T>::Vec out) {
     T min_range;
     T max_range;
@@ -88,18 +157,10 @@ struct QuantizeAndDequantizeOneScaleImpl {
       // The semantics of the op does not guarantee to clamp to the specified
       // min_range and max_range - because we may have changed either min_range
       // or max_range.
-      out.device(d) =
-          ((input.cwiseMin(max_range).cwiseMax(min_range) - min_range) * scale +
-           T(0.5))
-                  .floor() *
-              inverse_scale +
-          min_range;
+      ClampScaleAndRound(d, input, min_range, max_range, scale, inverse_scale,
+                         round_mode, out);
     } else {
-      // No need to clamp to min_range and max_range in this case as they were
-      // measured from the tensor.
-      out.device(d) =
-          ((input - min_range) * scale + T(0.5)).floor() * inverse_scale +
-          min_range;
+      ScaleAndRound(d, input, scale, inverse_scale, round_mode, out);
     }
   }
 };

@@ -33,11 +33,13 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/eval_const_tensor.h"
 #include "tensorflow/core/common_runtime/shape_refiner.h"
 #include "tensorflow/core/framework/allocation_description.pb.h"
+#include "tensorflow/core/framework/kernel_def.pb.h"
 #include "tensorflow/core/framework/log_memory.h"
 #include "tensorflow/core/framework/node_def_util.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/partial_tensor_shape.h"
 #include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/framework/tensor.pb.h"  // NOLINT
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.h"
@@ -51,6 +53,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/core/stringpiece.h"
 #include "tensorflow/core/lib/gtl/array_slice.h"
+#include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/mem.h"
 #include "tensorflow/core/platform/mutex.h"
@@ -133,16 +136,22 @@ const char* TF_Message(const TF_Status* s) {
 namespace {
 class TF_ManagedBuffer : public TensorBuffer {
  public:
-  void* data_;
-  size_t len_;
-  void (*deallocator_)(void* data, size_t len, void* arg);
-  void* deallocator_arg_;
+  TF_ManagedBuffer(void* data, size_t len,
+                   void (*deallocator)(void* data, size_t len, void* arg),
+                   void* deallocator_arg)
+      : TensorBuffer(data),
+        len_(len),
+        deallocator_(deallocator),
+        deallocator_arg_(deallocator_arg) {}
+
+  const size_t len_;
+  void (*const deallocator_)(void* data, size_t len, void* arg);
+  void* const deallocator_arg_;
 
   ~TF_ManagedBuffer() override {
-    (*deallocator_)(data_, len_, deallocator_arg_);
+    (*deallocator_)(data(), len_, deallocator_arg_);
   }
 
-  void* data() const override { return data_; }
   size_t size() const override { return len_; }
   TensorBuffer* root_buffer() override { return this; }
   void FillAllocationDescription(AllocationDescription* proto) const override {
@@ -196,11 +205,11 @@ TF_Tensor* TF_NewTensor(TF_DataType dtype, const int64_t* dims, int num_dims,
     dimvec[i] = static_cast<tensorflow::int64>(dims[i]);
   }
 
-  TF_ManagedBuffer* buf = new TF_ManagedBuffer;
-  buf->len_ = len;
+  TF_ManagedBuffer* buf = nullptr;
   if (dtype != TF_STRING && dtype != TF_RESOURCE &&
       tensorflow::DataTypeCanUseMemcpy(static_cast<DataType>(dtype)) &&
-      reinterpret_cast<intptr_t>(data) % EIGEN_MAX_ALIGN_BYTES != 0) {
+      reinterpret_cast<intptr_t>(data) % std::max(1, EIGEN_MAX_ALIGN_BYTES) !=
+          0) {
     // TF_STRING and TF_RESOURCE tensors have a different representation in
     // TF_Tensor than they do in tensorflow::Tensor. So a copy here is a waste
     // (any alignment requirements will be taken care of by TF_TensorToTensor
@@ -208,17 +217,15 @@ TF_Tensor* TF_NewTensor(TF_DataType dtype, const int64_t* dims, int num_dims,
     //
     // Other types have the same representation, so copy only if it is safe to
     // do so.
-    buf->data_ = allocate_tensor("TF_NewTensor", len);
-    std::memcpy(buf->data_, data, len);
-    buf->deallocator_ = deallocate_buffer;
-    buf->deallocator_arg_ = nullptr;
+    buf = new TF_ManagedBuffer(allocate_tensor("TF_NewTensor", len), len,
+                               deallocate_buffer, nullptr);
+    std::memcpy(buf->data(), data, len);
     // Free the original buffer.
     deallocator(data, len, deallocator_arg);
   } else {
-    buf->data_ = data;
-    buf->deallocator_ = deallocator;
-    buf->deallocator_arg_ = deallocator_arg;
+    buf = new TF_ManagedBuffer(data, len, deallocator, deallocator_arg);
   }
+
   TF_Tensor* ret = new TF_Tensor{dtype, TensorShape(dimvec), buf};
   size_t elem_size = TF_DataTypeSize(dtype);
   if (elem_size > 0 && len < (elem_size * ret->shape.num_elements())) {
@@ -327,6 +334,7 @@ TF_Buffer* TF_NewBufferFromString(const void* proto, size_t proto_len) {
 }
 
 void TF_DeleteBuffer(TF_Buffer* buffer) {
+  if (buffer == nullptr) return;
   if (buffer->data_deallocator != nullptr) {
     (*buffer->data_deallocator)(const_cast<void*>(buffer->data),
                                 buffer->length);
@@ -356,6 +364,7 @@ void TF_CloseDeprecatedSession(TF_DeprecatedSession* s, TF_Status* status) {
 
 void TF_DeleteDeprecatedSession(TF_DeprecatedSession* s, TF_Status* status) {
   status->status = Status::OK();
+  if (s == nullptr) return;
   delete s->session;
   delete s;
 }
@@ -471,14 +480,15 @@ static TF_Tensor* EmptyTensor(TF_DataType dtype, const TensorShape& shape) {
   CHECK_EQ(nelems, 0);
   static_assert(sizeof(int64_t) == sizeof(tensorflow::int64),
                 "64-bit int types should match in size");
-  return TF_NewTensor(dtype, reinterpret_cast<const int64_t*>(dims.data()),
-                      shape.dims(), reinterpret_cast<void*>(&empty), 0,
-                      [](void*, size_t, void*) {}, nullptr);
+  return TF_NewTensor(
+      dtype, reinterpret_cast<const int64_t*>(dims.data()), shape.dims(),
+      reinterpret_cast<void*>(&empty), 0, [](void*, size_t, void*) {}, nullptr);
 }
 
 // Non-static for testing.
 TF_Tensor* TF_TensorFromTensor(const tensorflow::Tensor& src,
                                TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
   if (!src.IsInitialized()) {
     status->status = FailedPrecondition(
         "attempt to use a tensor with an uninitialized value");
@@ -906,6 +916,7 @@ TF_Library* TF_LoadLibrary(const char* library_filename, TF_Status* status) {
 TF_Buffer TF_GetOpList(TF_Library* lib_handle) { return lib_handle->op_list; }
 
 void TF_DeleteLibraryHandle(TF_Library* lib_handle) {
+  if (lib_handle == nullptr) return;
   tensorflow::port::Free(const_cast<void*>(lib_handle->op_list.data));
   delete lib_handle;
 }
@@ -963,6 +974,7 @@ TF_DEVICELIST_METHOD(const char*, TF_DeviceListName, name().c_str(), nullptr);
 TF_DEVICELIST_METHOD(const char*, TF_DeviceListType, device_type().c_str(),
                      nullptr);
 TF_DEVICELIST_METHOD(int64_t, TF_DeviceListMemoryBytes, memory_limit(), -1);
+TF_DEVICELIST_METHOD(uint64_t, TF_DeviceListIncarnation, incarnation(), 0);
 
 #undef TF_DEVICELIST_METHOD
 
@@ -1233,7 +1245,7 @@ void TF_SetAttrTypeList(TF_OperationDescription* desc, const char* attr_name,
 void TF_SetAttrFuncName(TF_OperationDescription* desc, const char* attr_name,
                         const char* value, size_t length) {
   tensorflow::NameAttrList func_name;
-  func_name.set_name(std::string(value, value + length));
+  func_name.set_name(string(value, value + length));
   desc->node_builder.Attr(attr_name, func_name);
 }
 
@@ -1584,18 +1596,20 @@ TF_AttrMetadata TF_OperationGetAttrMetadata(TF_Operation* oper,
     break;                                            \
   }
 
-      LIST_CASE(s, TF_ATTR_STRING, metadata.total_size = 0;
-                for (int i = 0; i < attr->list().s_size();
-                     ++i) { metadata.total_size += attr->list().s(i).size(); });
+      LIST_CASE(
+          s, TF_ATTR_STRING, metadata.total_size = 0;
+          for (int i = 0; i < attr->list().s_size();
+               ++i) { metadata.total_size += attr->list().s(i).size(); });
       LIST_CASE(i, TF_ATTR_INT);
       LIST_CASE(f, TF_ATTR_FLOAT);
       LIST_CASE(b, TF_ATTR_BOOL);
       LIST_CASE(type, TF_ATTR_TYPE);
-      LIST_CASE(shape, TF_ATTR_SHAPE, metadata.total_size = 0;
-                for (int i = 0; i < attr->list().shape_size(); ++i) {
-                  const auto& s = attr->list().shape(i);
-                  metadata.total_size += s.unknown_rank() ? 0 : s.dim_size();
-                });
+      LIST_CASE(
+          shape, TF_ATTR_SHAPE, metadata.total_size = 0;
+          for (int i = 0; i < attr->list().shape_size(); ++i) {
+            const auto& s = attr->list().shape(i);
+            metadata.total_size += s.unknown_rank() ? 0 : s.dim_size();
+          });
       LIST_CASE(tensor, TF_ATTR_TENSOR);
       LIST_CASE(tensor, TF_ATTR_FUNC);
 #undef LIST_CASE
@@ -1852,6 +1866,7 @@ TF_Graph::TF_Graph()
 TF_Graph* TF_NewGraph() { return new TF_Graph; }
 
 void TF_DeleteGraph(TF_Graph* g) {
+  if (g == nullptr) return;
   g->mu.lock();
   g->delete_requested = true;
   const bool del = g->sessions.empty();
@@ -1932,6 +1947,10 @@ void TF_DeleteImportGraphDefOptions(TF_ImportGraphDefOptions* opts) {
 void TF_ImportGraphDefOptionsSetPrefix(TF_ImportGraphDefOptions* opts,
                                        const char* prefix) {
   opts->opts.prefix = prefix;
+}
+void TF_ImportGraphDefOptionsSetDefaultDevice(TF_ImportGraphDefOptions* opts,
+                                              const char* device) {
+  opts->opts.default_device = device;
 }
 
 void TF_ImportGraphDefOptionsSetUniquifyNames(TF_ImportGraphDefOptions* opts,
@@ -2057,7 +2076,7 @@ static void GraphImportGraphDefLocked(TF_Graph* graph, const GraphDef& def,
 
   for (int i = 0; i < size; ++i) {
     TensorId id = results.missing_unused_input_map_keys[i];
-    tf_results->missing_unused_key_names_data.push_back(std::string(id.first));
+    tf_results->missing_unused_key_names_data.emplace_back(id.first);
     tf_results->missing_unused_key_names[i] =
         tf_results->missing_unused_key_names_data.back().c_str();
     tf_results->missing_unused_key_indexes[i] = id.second;
@@ -2383,6 +2402,12 @@ void TF_AbortWhile(const TF_WhileParams* params) { FreeWhileResources(params); }
 
 void TF_AddGradients(TF_Graph* g, TF_Output* y, int ny, TF_Output* x, int nx,
                      TF_Output* dx, TF_Status* status, TF_Output* dy) {
+  TF_AddGradientsWithPrefix(g, nullptr, y, ny, x, nx, dx, status, dy);
+}
+
+void TF_AddGradientsWithPrefix(TF_Graph* g, const char* prefix, TF_Output* y,
+                               int ny, TF_Output* x, int nx, TF_Output* dx,
+                               TF_Status* status, TF_Output* dy) {
 #ifdef __ANDROID__
   status->status = tensorflow::errors::Unimplemented(
       "Adding gradients is not supported in Android. File a bug at "
@@ -2399,9 +2424,29 @@ void TF_AddGradients(TF_Graph* g, TF_Output* y, int ny, TF_Output* x, int nx,
 
     const int first_new_node_id = g->graph.num_node_ids();
 
+    string prefix_cmp;
+    const char* child_scope_name;
+    if (prefix == nullptr) {
+      child_scope_name = "gradients";
+    } else {
+      prefix_cmp = string(prefix) + "/";
+      // The operation should fail if the provided name prefix has already been
+      // used in this graph
+      for (const auto& pair : g->name_map) {
+        const string& name = pair.first;
+        if (name.compare(prefix) == 0 ||
+            tensorflow::str_util::StartsWith(name, prefix_cmp)) {
+          status->status = InvalidArgument(
+              "prefix [", prefix,
+              "] conflicts with existing node in the graph named [", name, "]");
+          return;
+        }
+      }
+      child_scope_name = prefix;
+    }
     tensorflow::Scope scope =
         NewInternalScope(&g->graph, &status->status, &g->refiner)
-            .NewSubScope("gradients");
+            .NewSubScope(child_scope_name);
 
     if (dx != nullptr) {
       std::vector<tensorflow::Output> dx_arg = OutputsFromTFOutputs(dx, ny);
@@ -2416,6 +2461,18 @@ void TF_AddGradients(TF_Graph* g, TF_Output* y, int ny, TF_Output* x, int nx,
     for (int i = first_new_node_id; i < g->graph.num_node_ids(); ++i) {
       Node* n = g->graph.FindNodeId(i);
       if (n == nullptr) continue;
+
+      // Adding the gradients to the graph can alter the prefix to prevent
+      // name collisions only if this prefix has not been provided explicitly
+      // by the user. If it was provided, assert that it remained intact.
+      if (prefix != nullptr &&
+          !tensorflow::str_util::StartsWith(n->name(), prefix_cmp)) {
+        status->status = tensorflow::errors::Internal(
+            "BUG: The gradients prefix have been unexpectedly altered when "
+            "adding the nodes to the graph. This is a bug. Please file an "
+            "issue at https://github.com/tensorflow/tensorflow/issues.");
+        return;
+      }
       // We have a convoluted scheme here: Using the C++ graph construction API
       // to add potentially many nodes to the graph without running the checks
       // (such as uniqueness of the names of nodes) we run with other functions
@@ -2527,6 +2584,7 @@ void TF_CloseSession(TF_Session* s, TF_Status* status) {
 
 void TF_DeleteSession(TF_Session* s, TF_Status* status) {
   status->status = Status::OK();
+  if (s == nullptr) return;
   TF_Graph* const graph = s->graph;
   if (graph != nullptr) {
     graph->mu.lock();
@@ -2722,10 +2780,107 @@ TF_Buffer* TF_ApiDefMapGet(TF_ApiDefMap* api_def_map, const char* name,
   }
   string name_str(name, name_len);
   const auto* api_def = api_def_map->api_def_map.GetApiDef(name_str);
+  if (api_def == nullptr) {
+    return nullptr;
+  }
 
   TF_Buffer* ret = TF_NewBuffer();
   status->status = MessageToBuffer(*api_def, ret);
+  if (!status->status.ok()) {
+    TF_DeleteBuffer(ret);
+    return nullptr;
+  }
   return ret;
 #endif  // __ANDROID__
 }
+
+TF_Buffer* TF_GetAllRegisteredKernels(TF_Status* status) {
+  tensorflow::KernelList kernel_list = tensorflow::GetAllRegisteredKernels();
+  TF_Buffer* ret = TF_NewBuffer();
+  status->status = MessageToBuffer(kernel_list, ret);
+  if (!status->status.ok()) {
+    TF_DeleteBuffer(ret);
+    return nullptr;
+  }
+  return ret;
+}
+
+TF_Buffer* TF_GetRegisteredKernelsForOp(const char* name, TF_Status* status) {
+  tensorflow::KernelList kernel_list =
+      tensorflow::GetRegisteredKernelsForOp(name);
+  TF_Buffer* ret = TF_NewBuffer();
+  status->status = MessageToBuffer(kernel_list, ret);
+  if (!status->status.ok()) {
+    TF_DeleteBuffer(ret);
+    return nullptr;
+  }
+  return ret;
+}
+
+// TF_Server functions ----------------------------------------------
+
+#ifndef __ANDROID__
+TF_Server::TF_Server(std::unique_ptr<tensorflow::ServerInterface> server)
+    : target(server->target()), server(std::move(server)) {}
+#endif  // __ANDROID__
+
+TF_Server* TF_NewServer(const void* proto, size_t proto_len,
+                        TF_Status* status) {
+#ifdef __ANDROID__
+  status->status = tensorflow::errors::Unimplemented(
+      "Server functionality is not supported in Android");
+  return nullptr;
+#else
+  tensorflow::ServerDef server_def;
+  if (!server_def.ParseFromArray(proto, static_cast<int>(proto_len))) {
+    status->status = InvalidArgument(
+        "Could not parse provided bytes into a ServerDef protocol buffer");
+    return nullptr;
+  }
+
+  std::unique_ptr<tensorflow::ServerInterface> out_server;
+  status->status = tensorflow::NewServer(server_def, &out_server);
+  if (!status->status.ok()) return nullptr;
+
+  return new TF_Server(std::move(out_server));
+#endif
+}
+
+void TF_ServerStart(TF_Server* server, TF_Status* status) {
+#ifdef __ANDROID__
+  status->status = tensorflow::errors::Unimplemented(
+      "Server functionality is not supported in Android");
+#else
+  status->status = server->server->Start();
+#endif
+}
+
+void TF_ServerStop(TF_Server* server, TF_Status* status) {
+#ifdef __ANDROID__
+  status->status = tensorflow::errors::Unimplemented(
+      "Server functionality is not supported in Android");
+#else
+  status->status = server->server->Stop();
+#endif
+}
+
+void TF_ServerJoin(TF_Server* server, TF_Status* status) {
+#ifdef __ANDROID__
+  status->status = tensorflow::errors::Unimplemented(
+      "Server functionality is not supported in Android");
+#else
+  status->status = server->server->Join();
+#endif
+}
+
+const char* TF_ServerTarget(TF_Server* server) {
+#ifdef __ANDROID__
+  return nullptr;
+#else
+  return server->target.c_str();
+#endif
+}
+
+void TF_DeleteServer(TF_Server* server) { delete server; }
+
 }  // end extern "C"

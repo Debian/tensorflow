@@ -45,6 +45,24 @@ struct FusedBatchNorm;
 template <typename Device, typename T, typename U>
 struct FusedBatchNormGrad;
 
+template <bool IsSame, typename Y, typename X, typename T>
+struct CastIfNecessary {
+  static inline void process(
+      Y& y, X& x_shifted, const Eigen::DSizes<Eigen::Index, 2>& rest_by_depth,
+      const CPUDevice& d) {
+    y.reshape(rest_by_depth).device(d) = x_shifted.template cast<T>();
+  }
+};
+
+template <typename Y, typename X, typename T>
+struct CastIfNecessary<true, Y, X, T> {
+  static inline void process(
+      Y& y, X& x_shifted, const Eigen::DSizes<Eigen::Index, 2>& rest_by_depth,
+      const CPUDevice& d) {
+    y.reshape(rest_by_depth).device(d) = x_shifted;
+  }
+};
+
 template <typename T, typename U>
 struct FusedBatchNorm<CPUDevice, T, U> {
   void operator()(OpKernelContext* context, const Tensor& x_input,
@@ -125,7 +143,11 @@ struct FusedBatchNorm<CPUDevice, T, U> {
     auto x_shifted =
         x_scaled + offset.reshape(one_by_depth).broadcast(bcast_spec);
 
-    y.reshape(rest_by_depth).device(d) = x_shifted.template cast<T>();
+    // Explicitly checks the types of T and U and only casts x_shifted when
+    // T != U. (Not doing so caused a 35-50% performance slowdown for
+    // some compiler flags.)
+    CastIfNecessary<std::is_same<T, U>::value, decltype(y), decltype(x_shifted),
+                    T>::process(y, x_shifted, rest_by_depth, d);
   }
 };
 
@@ -226,7 +248,7 @@ struct FusedBatchNorm<GPUDevice, T, U> {
                   Tensor* saved_inv_var, TensorFormat tensor_format,
                   bool is_training) {
     auto* stream = context->op_device_context()->stream();
-    OP_REQUIRES(context, stream, errors::Internal("No GPU stream avalible"));
+    OP_REQUIRES(context, stream, errors::Internal("No GPU stream available"));
 
     const int64 batch_size = GetTensorDim(x, tensor_format, 'N');
     const int64 channels = GetTensorDim(x, tensor_format, 'C');
@@ -367,7 +389,7 @@ struct FusedBatchNormGrad<GPUDevice, T, U> {
                   Tensor* scale_backprop, Tensor* offset_backprop,
                   TensorFormat tensor_format) {
     auto* stream = context->op_device_context()->stream();
-    OP_REQUIRES(context, stream, errors::Internal("No GPU stream avalible"));
+    OP_REQUIRES(context, stream, errors::Internal("No GPU stream available"));
 
     const int64 batch_size = GetTensorDim(x, tensor_format, 'N');
     const int64 channels = GetTensorDim(x, tensor_format, 'C');

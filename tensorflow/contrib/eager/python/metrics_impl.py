@@ -24,6 +24,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.eager import function
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import smart_cond
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import check_ops
 from tensorflow.python.ops import control_flow_ops
@@ -291,8 +292,6 @@ class Metric(checkpointable.CheckpointableBase):
 
 class Mean(Metric):
   """Computes the (weighted) mean of the given values."""
-  # TODO(josh11b): Maybe have a dtype argument that defaults to tf.float64?
-  # Or defaults to type of the input if it is tf.float32, else tf.float64?
 
   def __init__(self, name=None, dtype=dtypes.float64,
                use_global_variables=False):
@@ -338,9 +337,28 @@ class Mean(Metric):
       return values
     return values, weights
 
-  def result(self):
+  def result(self, write_summary=True):
+    """Returns the result of the Metric.
+
+    Args:
+      write_summary: bool indicating whether to feed the result to the summary
+        before returning.
+    Returns:
+      aggregated metric as float.
+    Raises:
+      ValueError: if the optional argument is not bool
+    """
+    # Convert the boolean to tensor for tf.cond, if it is not.
+    if not isinstance(write_summary, ops.Tensor):
+      write_summary = ops.convert_to_tensor(write_summary)
     t = self.numer / self.denom
-    summary_ops.scalar(name=self.name, tensor=t)
+    def write_summary_f():
+      summary_ops.scalar(name=self.name, tensor=t)
+      return t
+    smart_cond.smart_cond(write_summary,
+                          write_summary_f,
+                          lambda: t,
+                          name="")
     return t
 
 
@@ -377,7 +395,7 @@ class Accuracy(Mean):
         array_ops.shape(labels), array_ops.shape(predictions),
         message="Shapes of labels and predictions are unequal")
     matches = math_ops.equal(labels, predictions)
-    matches = math_ops.cast(matches, dtypes.float64)
+    matches = math_ops.cast(matches, self.dtype)
     super(Accuracy, self).call(matches, weights=weights)
     if weights is None:
       return labels, predictions
@@ -421,7 +439,7 @@ class CategoricalAccuracy(Mean):
     labels = math_ops.argmax(labels, axis=-1)
     predictions = math_ops.argmax(predictions, axis=-1)
     matches = math_ops.equal(labels, predictions)
-    matches = math_ops.cast(matches, dtypes.float64)
+    matches = math_ops.cast(matches, self.dtype)
     super(CategoricalAccuracy, self).call(matches, weights=weights)
     if weights is None:
       return labels, predictions
@@ -471,8 +489,10 @@ class BinaryAccuracy(Mean):
         message="Shapes of labels and predictions are unequal")
     predictions = ops.convert_to_tensor(predictions)
     predictions = predictions > self.threshold
+    # Convert labels to bool to match predictions.
+    labels = math_ops.cast(labels, dtypes.bool)
     matches = math_ops.equal(labels, predictions)
-    matches = math_ops.cast(matches, dtypes.float64)
+    matches = math_ops.cast(matches, self.dtype)
     super(BinaryAccuracy, self).call(matches, weights=weights)
     if weights is None:
       return labels, predictions
@@ -520,7 +540,7 @@ class SparseAccuracy(Mean):
     predictions = math_ops.argmax(predictions, axis=-1)
     labels = math_ops.cast(labels, dtypes.int64)
     matches = math_ops.equal(labels, predictions)
-    matches = math_ops.cast(matches, dtypes.float64)
+    matches = math_ops.cast(matches, self.dtype)
     super(SparseAccuracy, self).call(matches, weights=weights)
     if weights is None:
       return labels, predictions

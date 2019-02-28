@@ -16,6 +16,7 @@ limitations under the License.
 #include "tensorflow/core/grappler/optimizers/loop_optimizer.h"
 #include "tensorflow/cc/ops/standard_ops.h"
 #include "tensorflow/core/framework/node_def.pb.h"
+#include "tensorflow/core/framework/tensor_testutil.h"
 #include "tensorflow/core/grappler/grappler_item.h"
 #include "tensorflow/core/grappler/inputs/trivial_test_graph_input_yielder.h"
 #include "tensorflow/core/grappler/utils.h"
@@ -100,27 +101,30 @@ TEST_F(LoopOptimizerTest, Basic) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).back(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd")).back(), 0);
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).back(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd")).back(), 0);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd")).back(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd")).back(), 0);
+  }
 }
 
 TEST_F(LoopOptimizerTest, Const) {
@@ -148,26 +152,29 @@ TEST_F(LoopOptimizerTest, Const) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).back(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const")).back(), 0);
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).back(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("Const")).back(), 0);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const")).size(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const")).size(), 0);
+  }
 }
 
 TEST_F(LoopOptimizerTest, ControlOutput) {
@@ -196,24 +203,27 @@ TEST_F(LoopOptimizerTest, ControlOutput) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).back(), 0);
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).back(), 0);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).back(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).back(), 0);
+  }
 }
 
 TEST_F(LoopOptimizerTest, NestedLoop1) {
@@ -257,31 +267,34 @@ TEST_F(LoopOptimizerTest, NestedLoop1) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).back(), 0);
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).back(), 0);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd")).size(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd")).size(), 0);
+  }
 }
 
 TEST_F(LoopOptimizerTest, NestedLoop2) {
@@ -325,27 +338,30 @@ TEST_F(LoopOptimizerTest, NestedLoop2) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).back(), 1);
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).back(), 1);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("VariantAdd2")).back(), 1);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("VariantAdd2")).back(), 1);
+  }
 }
 
 TEST_F(LoopOptimizerTest, NestedLoopConst1) {
@@ -389,28 +405,31 @@ TEST_F(LoopOptimizerTest, NestedLoopConst1) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).back(), 1);
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("Const2")).back(), 1);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).size(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).back(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const2")).size(), 1);
+    EXPECT_EQ(frames.Frames(*view.GetNode("Const2")).back(), 0);
+  }
 }
 
 TEST_F(LoopOptimizerTest, NestedLoopConst2) {
@@ -454,26 +473,29 @@ TEST_F(LoopOptimizerTest, NestedLoopConst2) {
   LoopOptimizer optimizer;
   EnableOnlyLoopInvariantNodeMotion(&optimizer);
   GraphDef output;
-  Status status = optimizer.Optimize(nullptr, item, &output);
-  TF_EXPECT_OK(status);
+  TF_EXPECT_OK(optimizer.Optimize(nullptr, item, &output));
 
-  std::unique_ptr<NodeMap> node_map;
-  std::unordered_map<const NodeDef*, std::vector<int>> frames;
-  int num_frames;
+  {  // Original graph.
+    GraphView view(&graph);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
 
-  node_map.reset(new NodeMap(&graph));
-  EXPECT_TRUE(IdentifyFrames(graph, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).back(), 1);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).size(), 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).back(), 1);
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).back(), 1);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const2")).size(), 2);
+    EXPECT_EQ(frames.Frames(*view.GetNode("Const2")).back(), 1);
+  }
 
-  node_map.reset(new NodeMap(&output));
-  EXPECT_TRUE(IdentifyFrames(output, &frames, &num_frames).ok());
-  EXPECT_EQ(num_frames, 2);
-  EXPECT_EQ(frames.at(node_map->GetNode("InvariantAdd2")).size(), 0);
-  EXPECT_EQ(frames.at(node_map->GetNode("Const2")).size(), 0);
+  {  // Optimized graph.
+    GraphView view(&output);
+    FrameView frames;
+    TF_EXPECT_OK(frames.InferFromGraphView(view));
+
+    EXPECT_EQ(frames.num_frames(), 2);
+    ASSERT_EQ(frames.Frames(*view.GetNode("InvariantAdd2")).size(), 0);
+    ASSERT_EQ(frames.Frames(*view.GetNode("Const2")).size(), 0);
+  }
 }
 
 void VerifyGraphsEqual(const GraphDef& original_graph,
@@ -526,6 +548,29 @@ TEST_F(LoopOptimizerTest, RemovePush_NoOp) {
   AddSimpleNode("stack3", "StackV2", {}, &graph);
   AddSimpleNode("push3", "StackPushV2", {"stack3", "c"}, &graph);
   AddSimpleNode("stop", "StopGradient", {"stack3"}, &graph);
+
+  LoopOptimizer optimizer;
+  EnableOnlyStackPushRemoval(&optimizer);
+  GraphDef output;
+  Status status = optimizer.Optimize(nullptr, item, &output);
+  TF_EXPECT_OK(status);
+  VerifyGraphsEqual(item.graph, output, __FUNCTION__);
+}
+
+TEST_F(LoopOptimizerTest, RemovePush_NoPopButStackLives) {
+  GrapplerItem item;
+  GraphDef& graph = item.graph;
+  AddSimpleNode("c", "Const", {}, &graph);
+  // Stack with corresponding push
+  AddSimpleNode("stack1", "StackV2", {}, &graph);
+  AddSimpleNode("push1", "StackPushV2", {"stack1", "c"}, &graph);
+  // Stack with corresponding push behind Enter.
+  AddSimpleNode("stack2", "StackV2", {}, &graph);
+  AddEnterNode("enter2_c", "frame_name", false, 1, {"c"}, &graph);
+  AddEnterNode("enter2_stack2", "frame_name", false, 1, {"stack2"}, &graph);
+  AddSimpleNode("push2", "StackPushV2", {"enter2_stack2", "enter2_c"}, &graph);
+  item.keep_ops.push_back("stack1");
+  item.keep_ops.push_back("stack2");
 
   LoopOptimizer optimizer;
   EnableOnlyStackPushRemoval(&optimizer);
@@ -589,7 +634,7 @@ TEST_F(LoopOptimizerTest, RemovePushWithoutMatchingPop) {
   }
 }
 
-TEST_F(LoopOptimizerTest, RemoveDeadBranches) {
+TEST_F(LoopOptimizerTest, RemoveDeadBranches_ConstantCondition) {
   Scope scope = Scope::NewRootScope();
   Output v_in = ops::Variable(scope.WithOpName("v_in"), {3}, DT_FLOAT);
 
@@ -639,7 +684,7 @@ TEST_F(LoopOptimizerTest, RemoveDeadBranches) {
 
   TF_CHECK_OK(scope.ToGraphDef(&item.graph));
 
-  LoopOptimizer optimizer(RewriterConfig::AGGRESSIVE);
+  LoopOptimizer optimizer(RewriterConfig::AGGRESSIVE, nullptr);
   GraphDef output;
   Status status = optimizer.Optimize(nullptr, item, &output);
   TF_CHECK_OK(status);
@@ -694,6 +739,650 @@ TEST_F(LoopOptimizerTest, RemoveDeadBranches) {
       EXPECT_EQ("id4", node.input(1));
     }
   }
+}
+
+TEST_F(LoopOptimizerTest, RemoveDeadBranches_FullyRemoveDeadBranches) {
+  const string gdef_ascii = R"EOF(
+node {
+  name: "episodicreplaybuffer_add_readvariableop_resource"
+  op: "_Arg"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_RESOURCE
+    }
+  }
+  attr {
+    key: "index"
+    value {
+      i: 0
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/and_1/x"
+  op: "Const"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_BOOL
+        tensor_shape {
+        }
+        bool_val: true
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/begin_episode"
+  op: "Const"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_BOOL
+        tensor_shape {
+        }
+        bool_val: false
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Switch"
+  op: "Switch"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/NoOp"
+  op: "NoOp"
+  input: "^EpisodicReplayBuffer/add/and_1/x"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch"
+  op: "Switch"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@EpisodicReplayBuffer/add/assert_equal/All"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch_1"
+  op: "Switch"
+  input: "EpisodicReplayBuffer/add/begin_episode"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@EpisodicReplayBuffer/add/begin_episode"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch_2"
+  op: "Switch"
+  input: "EpisodicReplayBuffer/add/begin_episode"
+  input: "EpisodicReplayBuffer/add/and_1/x"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@EpisodicReplayBuffer/add/end_episode"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/switch_f"
+  op: "Identity"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Switch"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/control_dependency"
+  op: "Const"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/NoOp"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_BOOL
+        tensor_shape {
+        }
+        tensor_content: "\001"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert"
+  op: "Assert"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch_1"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert/Switch_2"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      list {
+        type: DT_BOOL
+        type: DT_BOOL
+      }
+    }
+  }
+  attr {
+    key: "summarize"
+    value {
+      i: 3
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/control_dependency_1"
+  op: "Identity"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/switch_f"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/switch_f"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge"
+  op: "Merge"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/control_dependency_1"
+  input: "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/control_dependency"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Assert"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "N"
+    value {
+      i: 2
+    }
+  }
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/FloorMod/y"
+  op: "Const"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT64
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_INT64
+        tensor_shape {
+        }
+        int64_val: 5000
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/ReadVariableOp"
+  op: "ReadVariableOp"
+  input: "episodicreplaybuffer_add_readvariableop_resource"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT64
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/Less/y"
+  op: "Const"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT64
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_INT64
+        tensor_shape {
+        }
+        int64_val: 0
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/Less"
+  op: "Less"
+  input: "EpisodicReplayBuffer/add/ReadVariableOp"
+  input: "EpisodicReplayBuffer/add/Less/y"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT64
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/or"
+  op: "LogicalOr"
+  input: "EpisodicReplayBuffer/add/begin_episode"
+  input: "EpisodicReplayBuffer/add/Less"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+}
+node {
+  name: "EpisodicReplayBuffer/add/get_episode_id/pred_id"
+  op: "Identity"
+  input: "EpisodicReplayBuffer/add/or"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/get_episode_id/Switch"
+  op: "Switch"
+  input: "EpisodicReplayBuffer/add/or"
+  input: "EpisodicReplayBuffer/add/or"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_BOOL
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/get_episode_id/critical_section_execute/AssignVariableOp/Switch"
+  op: "Switch"
+  input: "episodicreplaybuffer_add_readvariableop_resource"
+  input: "EpisodicReplayBuffer/add/get_episode_id/pred_id"
+  input: "^EpisodicReplayBuffer/add/ReadVariableOp"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "T"
+    value {
+      type: DT_RESOURCE
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@EpisodicReplayBuffer/add/ReadVariableOp/resource"
+      }
+    }
+  }
+}
+node {
+  name: "EpisodicReplayBuffer/add/get_episode_id/critical_section_execute/ReadVariableOp_3"
+  op: "ReadVariableOp"
+  input: "^EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge"
+  device: "/job:localhost/replica:0/task:0/device:CPU:0"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT64
+    }
+  }
+}
+library {
+}
+versions {
+  producer: 27
+}
+  )EOF";
+
+  GrapplerItem item;
+  CHECK(protobuf::TextFormat::ParseFromString(gdef_ascii, &item.graph));
+  item.fetch = {
+      "EpisodicReplayBuffer/add/get_episode_id/critical_section_execute/"
+      "ReadVariableOp_3"};
+
+  LoopOptimizer optimizer(RewriterConfig::AGGRESSIVE, nullptr);
+  GraphDef output;
+  Status status = optimizer.Optimize(nullptr, item, &output);
+  TF_CHECK_OK(status);
+
+  bool found_merge = false;
+  for (const auto& node : output.node()) {
+    if (node.name() ==
+        "EpisodicReplayBuffer/add/assert_equal/Assert/AssertGuard/Merge") {
+      found_merge = true;
+    }
+  }
+
+  EXPECT_TRUE(found_merge)
+      << "Merge node was deleted, but it shouldn't have been.";
+}
+
+TEST_F(LoopOptimizerTest, RemoveDeadBranches_ZeroIterWhile) {
+  const string gdef_ascii = R"EOF(
+node {
+  name: "Const"
+  op: "Const"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT32
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_INT32
+        tensor_shape {
+        }
+        int_val: 20
+      }
+    }
+  }
+}
+node {
+  name: "while/Enter"
+  op: "Enter"
+  input: "Const"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+  attr {
+    key: "frame_name"
+    value {
+      s: "while/while/"
+    }
+  }
+  attr {
+    key: "is_constant"
+    value {
+      b: false
+    }
+  }
+  attr {
+    key: "parallel_iterations"
+    value {
+      i: 1
+    }
+  }
+}
+node {
+  name: "while/Merge"
+  op: "Merge"
+  input: "while/Enter"
+  input: "while/NextIteration"
+  attr {
+    key: "N"
+    value {
+      i: 2
+    }
+  }
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+node {
+  name: "while/Less/y"
+  op: "Const"
+  input: "^while/Merge"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT32
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_INT32
+        tensor_shape {
+        }
+        int_val: 10
+      }
+    }
+  }
+}
+node {
+  name: "while/Less"
+  op: "Less"
+  input: "while/Merge"
+  input: "while/Less/y"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+node {
+  name: "while/LoopCond"
+  op: "LoopCond"
+  input: "while/Less"
+}
+node {
+  name: "while/Switch"
+  op: "Switch"
+  input: "while/Merge"
+  input: "while/LoopCond"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+  attr {
+    key: "_class"
+    value {
+      list {
+        s: "loc:@while/Merge"
+      }
+    }
+  }
+}
+node {
+  name: "while/Identity"
+  op: "Identity"
+  input: "while/Switch:1"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+node {
+  name: "while/add/y"
+  op: "Const"
+  input: "^while/Identity"
+  attr {
+    key: "dtype"
+    value {
+      type: DT_INT32
+    }
+  }
+  attr {
+    key: "value"
+    value {
+      tensor {
+        dtype: DT_INT32
+        tensor_shape {
+        }
+        int_val: 1
+      }
+    }
+  }
+}
+node {
+  name: "while/add"
+  op: "Add"
+  input: "while/Identity"
+  input: "while/add/y"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+node {
+  name: "while/NextIteration"
+  op: "NextIteration"
+  input: "while/add"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+node {
+  name: "while/Exit"
+  op: "Exit"
+  input: "while/Switch"
+  attr {
+    key: "T"
+    value {
+      type: DT_INT32
+    }
+  }
+}
+versions {
+  producer: 21
+}
+  )EOF";
+
+  GrapplerItem item;
+  CHECK(protobuf::TextFormat::ParseFromString(gdef_ascii, &item.graph));
+  item.fetch = {"while/Exit"};
+  auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
+  EXPECT_EQ(1, tensors_expected.size());
+
+  LoopOptimizer optimizer(RewriterConfig::AGGRESSIVE, nullptr);
+  GraphDef output;
+  Status status = optimizer.Optimize(nullptr, item, &output);
+  TF_CHECK_OK(status);
+  auto tensors_got = EvaluateNodes(output, item.fetch);
+  EXPECT_EQ(1, tensors_got.size());
+  test::ExpectTensorEqual<int32>(tensors_expected[0], tensors_got[0]);
+
+  int nodes_present = 0;
+  for (const NodeDef& node : output.node()) {
+    // All nodes connected to Switch's positive check should be pruned.
+    if (node.name() == "while/add") {
+      LOG(ERROR) << "while/add is present after optimization";
+    } else if (node.name() == "while/add/y") {
+      LOG(ERROR) << "while/add/y is present after optimization";
+    } else if (node.name() == "while/NextIteration") {
+      LOG(ERROR) << "while/NextIteration is present after optimization";
+    } else if (node.name() == "while/Identity") {
+      LOG(ERROR) << "while/Identity is present after optimization";
+    }
+    ++nodes_present;
+  }
+  EXPECT_EQ(8, nodes_present);
 }
 
 }  // namespace grappler

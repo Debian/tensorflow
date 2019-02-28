@@ -88,7 +88,7 @@ class HostExecutor : public internal::StreamExecutorInterface {
                 uint64 size) override;
 
   // No "synchronize all activity" implemented for this platform at the moment.
-  bool SynchronizeAllActivity() override { return false; }
+  bool SynchronizeAllActivity() override { return true; }
   bool SynchronousMemZero(DeviceMemoryBase *location, uint64 size) override;
 
   bool SynchronousMemSet(DeviceMemoryBase *location, int value,
@@ -103,7 +103,8 @@ class HostExecutor : public internal::StreamExecutorInterface {
                                                const DeviceMemoryBase &gpu_src,
                                                uint64 size) override;
 
-  bool HostCallback(Stream *stream, std::function<void()> callback) override;
+  bool HostCallback(Stream *stream,
+                    std::function<port::Status()> callback) override;
 
   port::Status AllocateEvent(Event *event) override {
     return port::Status(port::error::UNIMPLEMENTED, "");
@@ -202,7 +203,7 @@ class HostExecutor : public internal::StreamExecutorInterface {
     return std::unique_ptr<internal::TimerInterface>(new HostTimer());
   }
 
-  void *CudaContextHack() override { return nullptr; }
+  void *GpuContextHack() override { return nullptr; }
 
  private:
   const PluginConfig plugin_config_;
