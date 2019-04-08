@@ -6,12 +6,11 @@ Cite-As: "TensorFlow https://www.tensorflow.org"
 Repository: https://github.com/tensorflow/tensorflow/
 Repository-Browse: https://github.com/tensorflow/tensorflow/
 Reference:
-  Author: "Martín Abadi, Ashish Agarwal, Paul Barham, Eugene Brevdo, Zhifeng Chen, Craig Citro, Greg S. Corrado, Andy Davis, Jeffrey Dean, Matthieu Devin, Sanjay Ghemawat, Ian Goodfellow, Andrew Harp, Geoffrey Irving, Michael Isard, Rafal Jozefowicz, Yangqing Jia, Lukasz Kaiser, Manjunath Kudlur, Josh Levenberg, Dan Mané, Mike Schuster, Rajat Monga, Sherry Moore, Derek Murray, Chris Olah, Jonathon Shlens, Benoit Steiner, Ilya Sutskever, Kunal Talwar, Paul Tucker, Vincent Vanhoucke, Vijay Vasudevan, Fernanda Viégas, Oriol Vinyals, Pete Warden, Martin Wattenberg, Martin Wicke, Yuan Yu, and Xiaoqiang Zheng."
-  Title: "TensorFlow: Large-scale machine learning on heterogeneous systems."
-  URL: "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/45166.pdf"
-  Year: 2015
-Reference:
-  Author: "Martín Abadi, Paul Barham, Jianmin Chen, Zhifeng Chen, Andy Davis, Jeffrey Dean, Matthieu Devin, Sanjay Ghemawat, Geoffrey Irving, Michael Isard, Manjunath Kudlur, Josh Levenberg, Rajat Monga, Sherry Moore, Derek G. Murray, Benoit Steiner, Paul Tucker, Vijay Vasudevan, Pete Warden, Martin Wicke, Yuan Yu, and Xiaoqiang Zheng, Google Brain"
-  Title: "TensorFlow: A System for Large-Scale Machine Learning"
-  URL: "https://www.usenix.org/system/files/conference/osdi16/osdi16-abadi.pdf"
-  Year: 2016
+ - Author: "Martín Abadi and Ashish Agarwal and Paul Barham and Eugene Brevdo and Zhifeng Chen and Craig Citro and Greg S. Corrado and Andy Davis and Jeffrey Dean and Matthieu Devin and Sanjay Ghemawat and Ian Goodfellow and Andrew Harp and Geoffrey Irving and Michael Isard and Rafal Jozefowicz and Yangqing Jia and Lukasz Kaiser and Manjunath Kudlur and Josh Levenberg and Dan Mané and Mike Schuster and Rajat Monga and Sherry Moore and Derek Murray and Chris Olah and Jonathon Shlens and Benoit Steiner and Ilya Sutskever and Kunal Talwar and Paul Tucker and Vincent Vanhoucke and Vijay Vasudevan and Fernanda Viégas and Oriol Vinyals and Pete Warden and Martin Wattenberg and Martin Wicke and Yuan Yu and and Xiaoqiang Zheng"
+   Title: "TensorFlow: Large-scale machine learning on heterogeneous systems."
+   URL: "https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/45166.pdf"
+   Year: 2015
+ - Author: "Martín Abadi and Paul Barham and Jianmin Chen and Zhifeng Chen and Andy Davis and Jeffrey Dean and Matthieu Devin and Sanjay Ghemawat and Geoffrey Irving and Michael Isard and Manjunath Kudlur and Josh Levenberg and Rajat Monga and Sherry Moore and Derek G. Murray and Benoit Steiner and Paul Tucker and Vijay Vasudevan and Pete Warden and Martin Wicke and Yuan Yu and and Xiaoqiang Zheng and Google Brain"
+   Title: "TensorFlow: A System for Large-Scale Machine Learning"
+   URL: "https://www.usenix.org/system/files/conference/osdi16/osdi16-abadi.pdf"
+   Year: 2016
