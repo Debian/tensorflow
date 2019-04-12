@@ -36,6 +36,7 @@ export TF_DOWNLOAD_CLANG=0
 export TF_CUDA_CLANG=0
 export TF_IGNORE_MAX_BAZEL_VERSION=0
 export TF_NEED_CUDA=0
+export CC_OPT_FLAGS="-march=x86-64"
 ./configure
 # ---
 
