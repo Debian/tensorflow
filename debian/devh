@@ -12,8 +12,7 @@ case $1 in
 		;;
 	pre)
 		sh debian/embedded.sh
-		quilt push -a
-		patch -p1 < debian/patches/fft-cxx-no-mangle.patch
+		cp debian/patches/version_info.cc tensorflow/core/util/version_info.cc
 		sh debian/shogun-gen.sh
 		;;
 	post)
