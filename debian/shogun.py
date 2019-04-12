@@ -94,7 +94,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now ' + str(os.getenv('LDFLAGS', '')))
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/'
             + ' -I/usr/include/gemmlowp -I/usr/include/llvm-c-7'
-            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/gpus/cuda/'
+            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/preconfig/ubuntu14.04/cuda10.0-cudnn7/cuda/cuda/'
             + ' -I./debian/embedded/abseil/')
     cursor.variable('LIBS', '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion'
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
@@ -364,6 +364,7 @@ def shogunTFLib(argv):
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
     _, srclist = eGrep('.*.cu.cc$', srclist) # no CUDA file for CPU-only build
+    _, srclist = eGrep('.*cuda.*', srclist) # no CUDA stuff
     _, srclist = eGrep('.*.pbtxt$', srclist) # not for us
     _, srclist = eGrep('.*platform/cloud.*', srclist) # SSL 1.1.1 broke it.
     _, srclist = eGrep('.*platform/s3.*', srclist) # we don't have https://github.com/aws/aws-sdk-cpp
