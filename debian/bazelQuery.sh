@@ -40,13 +40,15 @@ bazelDump () {
 
 	# query all required source files
 	bazel query "kind(\"source file\", deps($1))" \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+		--incompatible_disallow_dict_plus=false \
+	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
 	> $datadir/SRC$mq
 
 	# query all required generated files
 	bazel query "kind(\"generated file\", deps($1))" \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+		--incompatible_disallow_dict_plus=false \
+	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
 	> $datadir/GEN$mq
 }
@@ -60,10 +62,10 @@ bazelDumpNonPythonTestTargets () {
 		bazel query "kind(\"generated file\", deps($target))" >> $datadir/TMPGEN$1
 	done
 	cat $datadir/TMPSRC$1 \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq > $datadir/SRC$1
 	cat $datadir/TMPGEN$1 \
-	| gawk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
+	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq > $datadir/GEN$1
 }
 
