@@ -7,3 +7,6 @@ fi
 if ! test -d debian/embedded/fft; then
   tar -zxf debian/embedded/fft.tgz -C debian/embedded/
 fi
+if ! test -d debian/embedded/abseil/build; then
+  cd debian/embedded/abseil; sh build-abseil-static.sh
+fi
