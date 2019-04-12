@@ -72,30 +72,6 @@ Build-Depends:
 # TensorFlow provides stable Python API and C APIs as well as without API
 # backwards compatibility guarantee like C++, Go, Java, JavaScript and Swift.
 
-Package: tensorflow-doc
-Section: doc
-Architecture: all
-Multi-Arch: foreign
-Depends: ${misc:Depends},
-Description: Computation using data flow graphs for scalable machine learning (doc)
- TensorFlow is an open source software library for numerical computation
- using data flow graphs. The graph nodes represent mathematical operations,
- while the graph edges represent the multidimensional data arrays (tensors)
- that flow between them. This flexible architecture enables you to deploy
- computation to one or more CPUs or GPUs in a desktop, server, or mobile
- device without rewriting code.
- .
- TensorFlow was originally developed by researchers and engineers working
- on the Google Brain team within Google's Machine Intelligence Research
- organization for the purposes of conducting machine learning and deep
- neural networks research. The system is general enough to be applicable
- in a wide variety of other domains, as well.
- .
- TensorFlow provides stable Python API and C APIs as well as without API
- backwards compatibility guarantee like C++, Go, Java, JavaScript and Swift.
- .
- This package ships tensorflow documentation.
-
 Package: libtensorflow-framework1.10
 Section: libs
 Architecture: any
@@ -184,21 +160,6 @@ Description: Computation using data flow graphs for scalable machine learning (d
  device without rewriting code.
  .
  This package ships C and C++ headers files for tensorflow.
-
-#Package: libtensorflow-bin
-#Architecture: any
-#Multi-Arch: foreign
-#Depends: ${misc:Depends}, ${shlibs:Depends},
-# libtensorflow1.10 (= ${binary:Version}),
-#Description: Computation using data flow graphs for scalable machine learning (bin)
-# TensorFlow is an open source software library for numerical computation
-# using data flow graphs. The graph nodes represent mathematical operations,
-# while the graph edges represent the multidimensional data arrays (tensors)
-# that flow between them. This flexible architecture enables you to deploy
-# computation to one or more CPUs or GPUs in a desktop, server, or mobile
-# device without rewriting code.
-# .
-# This package ships binary utilities of tensorflow.
 
 #Package: python3-tensorflow
 #Architecture: any
