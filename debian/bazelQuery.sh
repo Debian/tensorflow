@@ -12,27 +12,32 @@ export LANG=C.UTF-8
 
 datadir="debian/bazelDumps"
 
-cat > .bazelrc << EOF
-build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
-build --action_env PYTHON_LIB_PATH="/usr/lib/python3/dist-packages"
-build --python_path="/usr/bin/python3"
-build --define with_jemalloc=true
-build --define with_gcp_support=true
-build --define with_hdfs_support=true
-build --define with_aws_support=true
-build --define with_kafka_support=true
-build:xla --define with_xla_support=true
-build:gdr --define with_gdr_support=true
-build:verbs --define with_verbs_support=true
-build --action_env TF_NEED_OPENCL_SYCL="0"
-build --action_env TF_NEED_CUDA="0"
-build --action_env TF_DOWNLOAD_CLANG="0"
-build --define grpc_no_ares=true
-build:opt --copt=-march=native
-build:opt --host_copt=-march=native
-build:opt --define with_default_optimizations=true
-build --strip=always
-EOF
+# ---
+export PYTHON_BIN_PATH=/usr/bin/python3
+export USE_DEFAULT_PYTHON_LIB_PATH=1
+export TF_NEED_JEMALLOC=0
+export TF_NEED_KAFKA=0
+export TF_NEED_OPENCL_SYCL=0
+export TF_NEED_AWS=0
+export TF_NEED_GCP=0
+export TF_NEED_HDFS=0
+export TF_NEED_S3=0
+export TF_ENABLE_XLA=1
+export TF_NEED_GDR=0
+export TF_NEED_VERBS=0
+export TF_NEED_OPENCL=0
+export TF_NEED_MPI=0
+export TF_NEED_TENSORRT=0
+export TF_NEED_NGRAPH=0
+export TF_NEED_IGNITE=0
+export TF_NEED_ROCM=0
+export TF_SET_ANDROID_WORKSPACE=0
+export TF_DOWNLOAD_CLANG=0
+export TF_CUDA_CLANG=0
+export TF_IGNORE_MAX_BAZEL_VERSION=0
+export TF_NEED_CUDA=0
+./configure
+# ---
 
 bazelDump () {
 	# generate mangled query to be used as filename
