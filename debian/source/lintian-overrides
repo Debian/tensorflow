@@ -1,4 +1,4 @@
-tensorflow source: duplicate-short-description tensorflow libtensorflow-framework1.10
+tensorflow source: duplicate-short-description tensorflow libtensorflow-framework2.0
 tensorflow source: source-contains-prebuilt-binary tensorflow/compiler/aot/codegen_test_o.golden
 tensorflow source: source-contains-empty-directory tensorflow/core/lib/bmp/testdata/
 tensorflow source: source-contains-prebuilt-java-object tensorflow/contrib/lite/java/demo/gradle/wrapper/gradle-wrapper.jar

@@ -5,7 +5,7 @@
  *  tensorflow/core/util/version_info.cc
  */
 #include <string>
-const char* tf_git_version() {return "v1.10.1/Debian";}
+const char* tf_git_version() {return "v2.0/Debian";}
 const char* tf_compiler_version() {
 #ifdef _MSC_VER
 #define STRINGIFY(x) #x

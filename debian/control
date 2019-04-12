@@ -72,7 +72,7 @@ Build-Depends:
 # TensorFlow provides stable Python API and C APIs as well as without API
 # backwards compatibility guarantee like C++, Go, Java, JavaScript and Swift.
 
-Package: libtensorflow-framework1.10
+Package: libtensorflow-framework2.0
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -86,7 +86,7 @@ Description: Computation using data flow graphs for scalable machine learning
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships shared object libtensorflow_framework.so.1.10
+ This package ships shared object libtensorflow_framework.so.2.0
  .
  A shared object which includes registration mechanisms for ops and
  kernels. Does not include the implementations of any ops or kernels.
@@ -106,7 +106,7 @@ Description: Computation using data flow graphs for scalable machine learning
  ops. Since other languages use the same libtensorflow_framework.so, op
  libraries are language agnostic.
 
-Package: libtensorflow1.10
+Package: libtensorflow2.0
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -119,10 +119,10 @@ Description: Computation using data flow graphs for scalable machine learning (C
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships shared object libtensorflow.so.1.10, which exports
+ This package ships shared object libtensorflow.so.2.0, which exports
  C API for TensorFlow (i.e. symbols named "*TF_*" or "*TFE_*").
 
-Package: libtensorflow-cc1.10
+Package: libtensorflow-cc2.0
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -135,7 +135,7 @@ Description: Computation using data flow graphs for scalable machine learning (C
  computation to one or more CPUs or GPUs in a desktop, server, or mobile
  device without rewriting code.
  .
- This package ships shared object libtensorflow_cc.so.1.10, which exports
+ This package ships shared object libtensorflow_cc.so.2.0, which exports
  C++ API for TensorFlow (i.e. *tensorflow* *TF_* *TFE_* *pywrap_xla*).
 
 Package: libtensorflow-dev
@@ -143,9 +143,9 @@ Section: libdevel
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework1.10 (= ${binary:Version}),
- libtensorflow1.10 (= ${binary:Version}),
- libtensorflow-cc1.10 (= ${binary:Version}),
+ libtensorflow-framework2.0 (= ${binary:Version}),
+ libtensorflow2.0 (= ${binary:Version}),
+ libtensorflow-cc2.0 (= ${binary:Version}),
  libprotobuf-dev (>= 3.6.0~),
  libgrpc++-dev (>= 1.14.1~),
  llvm-7-dev (>= 1:7~+rc2-1~exp1~),
@@ -165,7 +165,7 @@ Description: Computation using data flow graphs for scalable machine learning (d
 #Architecture: any
 #Multi-Arch: foreign
 #Depends: ${misc:Depends}, ${shlibs:Depends},
-# libtensorflow-framework1.10 (>= ${source:Version}~),
+# libtensorflow-framework2.0 (>= ${source:Version}~),
 #Description: Computation using data flow graphs for scalable machine learning (Py3)
 # TensorFlow is an open source software library for numerical computation
 # using data flow graphs. The graph nodes represent mathematical operations,

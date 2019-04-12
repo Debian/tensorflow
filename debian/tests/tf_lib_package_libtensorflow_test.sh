@@ -12,8 +12,8 @@ $cxx $cppflags $cxxflags $ldflags $incdir $libs \
 	tensorflow/tools/lib_package/libtensorflow_test.c \
 	-o tf_libtensorflow_test
 
-if ! test -r libtensorflow.so.1.10; then
-	ln -sr libtensorflow.so libtensorflow.so.1.10 || true
+if ! test -r libtensorflow.so.2.0; then
+	ln -sr libtensorflow.so libtensorflow.so.2.0 || true
 fi
 LD_LIBRARY_PATH=. ./tf_libtensorflow_test
 

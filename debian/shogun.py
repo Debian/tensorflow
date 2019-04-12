@@ -65,7 +65,7 @@ import distutils.sysconfig
 
 
 # FIXME: don't forget to bump soversion when upstream version changes!
-tf_soversion = '1.10'
+tf_soversion = '2.0'
 py_incdir = distutils.sysconfig.get_python_inc()
 py_libdir = distutils.sysconfig.get_python_lib()
 py_ver    = distutils.sysconfig.get_python_version()

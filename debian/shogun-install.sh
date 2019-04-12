@@ -4,8 +4,8 @@
 set -e
 
 destdir="debian/tmp/"
-version="1.10.1"
-soversion="1.10"
+version="2.0.1"
+soversion="2.0"
 
 # install headers
 for hdr in $(cat libtensorflow.hdrs) $(cat libtensorflow_cc.hdrs); do

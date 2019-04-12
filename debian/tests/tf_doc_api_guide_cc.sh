@@ -12,8 +12,8 @@ $cxx $cppflags $cxxflags $ldflags $incdir $libs \
 	debian/tests/tf_doc_api_guide_cc.cc \
 	-o tf_doc_api_guide_cc
 
-if ! test -r libtensorflow_cc.so.1.10; then
-	ln -sr libtensorflow_cc.so libtensorflow_cc.so.1.10 || true
+if ! test -r libtensorflow_cc.so.2.0; then
+	ln -sr libtensorflow_cc.so libtensorflow_cc.so.2.0 || true
 fi
 LD_LIBRARY_PATH=. ./tf_doc_api_guide_cc
 

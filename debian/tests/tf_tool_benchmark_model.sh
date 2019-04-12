@@ -14,8 +14,8 @@ $cxx $cppflags $cxxflags $ldflags $incdir $libs \
 	tensorflow/tools/benchmark/benchmark_model_main.cc \
 	-o tf_benchmark_model
 
-if ! test -r libtensorflow_cc.so.1.10; then
-	ln -sr libtensorflow_cc.so libtensorflow_cc.so.1.10 || true
+if ! test -r libtensorflow_cc.so.2.0; then
+	ln -sr libtensorflow_cc.so libtensorflow_cc.so.2.0 || true
 fi
 LD_LIBRARY_PATH=. ./tf_benchmark_model
 
