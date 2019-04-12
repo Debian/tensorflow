@@ -94,7 +94,7 @@ def ninjaCommonHeader(cursor: Writer, ag: Any) -> None:
     cursor.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now ' + str(os.getenv('LDFLAGS', '')))
     cursor.variable('INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/'
             + ' -I/usr/include/gemmlowp -I/usr/include/llvm-c-7'
-            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/preconfig/ubuntu14.04/cuda10.0-cudnn7/cuda/cuda/'
+            + ' -I/usr/include/llvm-7 -Ithird_party/toolchains/preconfig/ubuntu14.04/cuda10.0-cudnn7/cuda/'
             + ' -I./debian/embedded/abseil/')
     cursor.variable('LIBS', '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion'
 	+ ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7')
@@ -299,6 +299,7 @@ def shogunTFLib_framework(argv):
     _, srclist = eGrep('^third_party', srclist)
     _, srclist = eGrep('.*/windows/.*', srclist) # no windoge source.
     _, srclist = eGrep('.*.proto$', srclist) # nothing to do
+    _, srclist = eGrep('.*cuda.*', srclist)  # NO CUDA
     Rheaders, srclist = eGrep('.*.h$', srclist)  # nothing to do
 
     # (1) Initialize ninja file and generate object targets
