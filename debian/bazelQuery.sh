@@ -22,7 +22,7 @@ export TF_NEED_AWS=0
 export TF_NEED_GCP=0
 export TF_NEED_HDFS=0
 export TF_NEED_S3=0
-export TF_ENABLE_XLA=1
+export TF_ENABLE_XLA=0
 export TF_NEED_GDR=0
 export TF_NEED_VERBS=0
 export TF_NEED_OPENCL=0
@@ -46,14 +46,12 @@ bazelDump () {
 
 	# query all required source files
 	bazel query "kind(\"source file\", deps($1))" \
-		--incompatible_disallow_dict_plus=false \
 	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
 	> $datadir/SRC$mq
 
 	# query all required generated files
 	bazel query "kind(\"generated file\", deps($1))" \
-		--incompatible_disallow_dict_plus=false \
 	| awk '{if ($0~/^@/){split($0, sp, "//"); print sp[1];} else {print}}' \
 	| sort | uniq \
 	> $datadir/GEN$mq
