@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-BURDENS=$(fdfind 'BUILD')
+BURDENS=$(fdfind '.bzl|BUILD')
 
 for burden in $BURDENS; do
 	dirname=$(dirname $burden)
@@ -17,6 +17,12 @@ for burden in $BURDENS; do
 
 	# we omit the distro-unfriendly stuff
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
+
+	# if it's a .bzl rules file
+	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null);
+		mkdir -p $(dirname $target)
+		cp -v $burden $(dirname $target)
+	fi
 
 	if ! test -r $target; then
 		mkdir -p $(dirname $target)
