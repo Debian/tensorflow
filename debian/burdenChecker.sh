@@ -41,5 +41,6 @@ for burden in $BURDENS; do
 		echo "" >> $target
 		echo "" >> $target
 		echo "f.close()" >> $target
+		echo Unresolved burden: $burden
 	fi
 done
