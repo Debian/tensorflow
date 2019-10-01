@@ -22,7 +22,7 @@ for burden in $BURDENS; do
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
 
 	# unconditionally copy the ninja syntax
-	cp $NINJA_SYNTAX $(dirname $target)/
+	cp $NINJA_SYNTAX $(dirname $target)/$(basename $NINJA_SYNTAX)
 
 	# if it's a .bzl rules file
 	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null); then
