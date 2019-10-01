@@ -3,6 +3,7 @@
 set -e
 
 BURDENS=$(fdfind '.bzl|BUILD')
+NINJA_SYNTAX=debian/ninja_syntax.py
 
 for burden in $BURDENS; do
 	dirname=$(dirname $burden)
@@ -42,5 +43,8 @@ for burden in $BURDENS; do
 		echo "" >> $target
 		echo "f.close()" >> $target
 		echo Unresolved burden: $burden
+		cp $NINJA_SYNTAX $(dirname $target)/
 	fi
 done
+
+cp -av debian/buildsys/* .
