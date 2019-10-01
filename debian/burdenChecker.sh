@@ -21,10 +21,6 @@ for burden in $BURDENS; do
 	# we omit the distro-unfriendly stuff
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
 
-	# unconditionally copy the ninja syntax
-	mkdir -p $(dirname $target)
-	cp $NINJA_SYNTAX $(dirname $target)/$(basename $NINJA_SYNTAX)
-
 	# if it's a .bzl rules file
 	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null); then
 		mkdir -p $(dirname $target)
@@ -34,20 +30,27 @@ for burden in $BURDENS; do
 	# use the bazel BUILD file as a template
 	if ! test -r $target; then
 		mkdir -p $(dirname $target)
-		touch $target
-		echo "#!/usr/bin/python3" >> $target
-		echo "# Copyright (C) 2019 Mo Zhou <lumin@debian.org>" >> $target
-		echo "import os, sys, re" >> $target
-		echo "from ninja_syntax import Writer" >> $target
-		echo "f = Writer(open('ninja.build', 'wt'))" >> $target
-		echo "" >> $target
-		echo "" >> $target
-		cat $burden >> $target
-		echo "" >> $target
-		echo "" >> $target
-		echo "f.close()" >> $target
-		echo Unresolved burden: $burden
+		cp -v $burden $target
 	fi
 done
 
-cp -av debian/buildsys/* .
+for helper in $(find debian/buildsys/ -type f -name 'ninja.py'); do
+	target=${helper#debian/buildsys/}
+	cat > $target <<EOF
+#!/usr/bin/python3
+# Copyright (C) 2019 Mo Zhou <lumin@debian.org>
+import os, sys, re
+from ninja_syntax import Writer
+f = Writer(open('build.ninja', 'wt'))
+f.rule('PROTOC', 'protoc -I. -I.. -I../.. --cpp_out=. \$in')
+EOF
+	cat $helper >> $target
+	cat >> $target <<EOF
+f.close()
+EOF
+	echo "Generating helper script $target ..."
+
+	# unconditionally copy the ninja syntax
+	mkdir -p $(dirname $target)
+	cp $NINJA_SYNTAX $(dirname $target)/$(basename $NINJA_SYNTAX)
+done

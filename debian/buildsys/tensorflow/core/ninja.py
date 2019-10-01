@@ -1,10 +1,3 @@
-#!/usr/bin/python3
-# Copyright (C) 2019 Mo Zhou <lumin@debian.org>
-import os, sys, re
-from ninja_syntax import Writer
-f = Writer(open('ninja.build', 'wt'))
-
-
 # Protos which are needed for core tensorflow, including on mobile builds.
 #
 # Note that some protos are in neither additional_core_proto_srcs nor this
@@ -81,7 +74,7 @@ ADDITIONAL_CORE_PROTO_SRCS = [
 ]
 
 for i in CORE_PROTO_SRCS + ADDITIONAL_CORE_PROTO_SRCS:
-    f.build([re.sub('.proto$', '.pb.cc', i), re.sub('.proto$', '.pb.h')],
+    f.build([re.sub('.proto$', '.pb.cc', i), re.sub('.proto$', '.pb.h', i)],
             'PROTOC', i)
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -5396,6 +5389,3 @@ alias(
     actual = ":mobile_srcs",
     visibility = ["//visibility:public"],
 )
-
-
-f.close()
