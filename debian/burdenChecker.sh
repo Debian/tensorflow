@@ -1,4 +1,5 @@
 #!/bin/sh
+# Copyright (C) 2019 Mo Zhou <lumin@debian.org>
 set -e
 
 BURDENS=$(fdfind '.bzl|BUILD')
@@ -6,7 +7,7 @@ BURDENS=$(fdfind '.bzl|BUILD')
 for burden in $BURDENS; do
 	dirname=$(dirname $burden)
 	basename=$(basename $burden)
-	target=debian/buildsys/$dirname/meson.build
+	target=debian/buildsys/$dirname/ninja.py
 
 	# any "contrib" stuff is not officially supported by TensorFlow
 	if $(echo $burden | grep 'contrib/' >/dev/null 2>/dev/null); then continue; fi
@@ -25,8 +26,20 @@ for burden in $BURDENS; do
 		cp $burden $(dirname $target)
 	fi
 
+	# use the bazel BUILD file as a template
 	if ! test -r $target; then
 		mkdir -p $(dirname $target)
-		cp -v $burden $target
+		touch $target
+		echo "#!/usr/bin/python3" >> $target
+		echo "# Copyright (C) 2019 Mo Zhou <lumin@debian.org>" >> $target
+		echo "import os, sys, re" >> $target
+		echo "from ninja_syntax import Writer" >> $target
+		echo "f = Writer(open('ninja.build', 'wt'))" >> $target
+		echo ""
+		echo ""
+		cat $burden >> $target
+		echo ""
+		echo ""
+		echo "f.close()"
 	fi
 done

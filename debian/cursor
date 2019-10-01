@@ -1,8 +1,0 @@
-(sid-lumin)lumin@wrath:/dev/shm/tensorflow.pkg/tensorflow$ PYTHONPATH=. python3 tensorflow/python/tools/api/generator/create_python_api.py --root_init_template=tensorflow/api_template.__init__.py --apidir=tensorflow --package=tensorflow.python --apiname=tensorflow api_init_files_list.txt
-Traceback (most recent call last):
-  File "tensorflow/python/tools/api/generator/create_python_api.py", line 27, in <module>
-    from tensorflow.python.tools.api.generator import doc_srcs
-  File "/dev/shm/tensorflow.pkg/tensorflow/tensorflow/__init__.py", line 31, in <module>
-    app.flags = flags  # pylint: disable=undefined-variable
-NameError: name 'app' is not defined
-
