@@ -1,26 +1,7 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-
 # colorized output reduces burden to my eye
 export NINJA_STATUS=[1;36m[%es (%p) %f/%t][0;m 
-
-# Maintainer notes:
-#
-#1. Shogun.py uses "bazel query" to dump source code and generated file
-#   dependencies for the build targets. The build system is python3 plus
-#   ninja. See debian/shogun.py for detail.
-#
-#2. This source packages provides CPU-only version of TF instead
-#   of CUDA version.
-#
-#   (1) CPU-only version is compilable on all architectures.
-#       CUDA is specific to amd64 and ppc64el, and aarch64.
-#
-#   (2) CPU-only version can stay in the main section.
-#       Once compiled with CUDA, the source must enter contrib section.
-#
-#   src:caffe and src:caffe-contrib is an example for illustration.
-#
 
 %:
 	dh $@ -Sninja -D.
@@ -29,11 +10,13 @@ override_dh_auto_clean:
 	$(SHELL) debian/shogun-clean.sh
 
 override_dh_auto_configure:
-	-find . -type f -name '.gitignore' -delete
-	-find tensorflow/examples/ -type f -exec chmod a-x '{}' +
-	$(SHELL) debian/embedded.sh
-	patch -p1 < debian/patches/fft-cxx-no-mangle.patch
-	$(SHELL) debian/shogun-gen.sh
+	$(SHELL) debian/burdenChecker.sh  # generate our ninja build generator
+
+#	-find . -type f -name '.gitignore' -delete
+#	-find tensorflow/examples/ -type f -exec chmod a-x '{}' +
+#	$(SHELL) debian/embedded.sh
+#	patch -p1 < debian/patches/fft-cxx-no-mangle.patch
+#	$(SHELL) debian/shogun-gen.sh
 
 override_dh_auto_build:
 	dh_auto_build -- -f proto_text.gen.ninja
