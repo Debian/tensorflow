@@ -21,8 +21,8 @@ import functools
 
 from tensorflow.python.data.ops import dataset_ops
 from tensorflow.python.data.util import random_seed
-from tensorflow.python.data.util import structure
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import tensor_spec
 from tensorflow.python.ops import gen_experimental_dataset_ops
 from tensorflow.python.util.tf_export import tf_export
 
@@ -33,18 +33,14 @@ class RandomDatasetV2(dataset_ops.DatasetSource):
 
   def __init__(self, seed=None):
     """A `Dataset` of pseudorandom values."""
-    super(RandomDatasetV2, self).__init__()
     self._seed, self._seed2 = random_seed.get_seed(seed)
-
-  def _as_variant_tensor(self):
-    return gen_experimental_dataset_ops.experimental_random_dataset(
-        seed=self._seed,
-        seed2=self._seed2,
-        **dataset_ops.flat_structure(self))
+    variant_tensor = gen_experimental_dataset_ops.random_dataset(
+        seed=self._seed, seed2=self._seed2, **self._flat_structure)
+    super(RandomDatasetV2, self).__init__(variant_tensor)
 
   @property
-  def _element_structure(self):
-    return structure.TensorStructure(dtypes.int64, [])
+  def element_spec(self):
+    return tensor_spec.TensorSpec([], dtypes.int64)
 
 
 @tf_export(v1=["data.experimental.RandomDataset"])

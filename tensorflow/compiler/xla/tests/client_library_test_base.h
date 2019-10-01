@@ -105,7 +105,7 @@ class ClientLibraryTestBase : public ::testing::Test {
       const Shape* shape_with_output_layout = nullptr);
 
   // This executes the computation via the reference client (which connects a
-  // interpreter backend). The result is used as the expected values of the
+  // interpreter backend). The result is used as the expected value of the
   // computation.
   StatusOr<Literal> ExecuteAndTransferReference(
       const XlaComputation& computation,
@@ -385,8 +385,11 @@ class ClientLibraryTestBase : public ::testing::Test {
   StatusOr<std::pair<Literal, Literal>> ComputeValueAndReference(
       XlaBuilder* builder, absl::Span<const Literal> arguments);
 
-  Client* client_;
-  Client* ref_client_;  // To compute reference result.
+  // Converts an f32 literal to bf16 if use_bfloat16_ is true.
+  Literal MaybeConvertLiteralToBfloat16(const Literal& literal);
+
+  LocalClient* client_;
+  LocalClient* ref_client_;  // To compute reference result.
   ExecutionOptions execution_options_;
 
  private:
@@ -402,8 +405,7 @@ class ClientLibraryTestBase : public ::testing::Test {
                                const string& error_message)>& verify_output,
       const Shape* output_with_layout = nullptr);
 
-  // Converts an f32 shape/literal to bf16 if use_bfloat16_ is true.
-  Literal MaybeConvertLiteralToBfloat16(const Literal& literal);
+  // Converts an f32 shape to bf16 if use_bfloat16_ is true.
   Shape MaybeConvertShapeToBfloat16(const Shape& shape);
 
   // Whether to run tests with all float-type input/output converted to
@@ -431,7 +433,8 @@ void ClientLibraryTestBase::ComputeAndCompareR0(
                     std::is_same<NativeT, double>::value ||
                     std::is_same<NativeT, bfloat16>::value ||
                     std::is_same<NativeT, half>::value ||
-                    std::is_same<NativeT, complex64>::value,
+                    std::is_same<NativeT, complex64>::value ||
+                    std::is_same<NativeT, complex128>::value,
                 "Float or complex type required when specifying an ErrorSpec");
   Literal expected_literal = LiteralUtil::CreateR0<NativeT>(expected);
   ClientLibraryTestBase::ComputeAndCompareLiteral(builder, expected_literal,
@@ -455,7 +458,8 @@ void ClientLibraryTestBase::ComputeAndCompareR1(
                     std::is_same<NativeT, double>::value ||
                     std::is_same<NativeT, bfloat16>::value ||
                     std::is_same<NativeT, half>::value ||
-                    std::is_same<NativeT, complex64>::value,
+                    std::is_same<NativeT, complex64>::value ||
+                    std::is_same<NativeT, complex128>::value,
                 "Float or complex type required when specifying an ErrorSpec");
   Literal expected_literal = LiteralUtil::CreateR1<NativeT>(expected);
   ClientLibraryTestBase::ComputeAndCompareLiteral(builder, expected_literal,
@@ -480,7 +484,8 @@ void ClientLibraryTestBase::ComputeAndCompareR2(
                     std::is_same<NativeT, double>::value ||
                     std::is_same<NativeT, bfloat16>::value ||
                     std::is_same<NativeT, half>::value ||
-                    std::is_same<NativeT, complex64>::value,
+                    std::is_same<NativeT, complex64>::value ||
+                    std::is_same<NativeT, complex128>::value,
                 "Float or complex type required when specifying an ErrorSpec");
   Literal expected_literal =
       LiteralUtil::CreateR2FromArray2D<NativeT>(expected);
@@ -506,7 +511,8 @@ void ClientLibraryTestBase::ComputeAndCompareR3(
                     std::is_same<NativeT, double>::value ||
                     std::is_same<NativeT, bfloat16>::value ||
                     std::is_same<NativeT, half>::value ||
-                    std::is_same<NativeT, complex64>::value,
+                    std::is_same<NativeT, complex64>::value ||
+                    std::is_same<NativeT, complex128>::value,
                 "Float or complex type required when specifying an ErrorSpec");
   Literal expected_literal =
       LiteralUtil::CreateR3FromArray3D<NativeT>(expected);
@@ -532,7 +538,8 @@ void ClientLibraryTestBase::ComputeAndCompareR4(
                     std::is_same<NativeT, double>::value ||
                     std::is_same<NativeT, bfloat16>::value ||
                     std::is_same<NativeT, half>::value ||
-                    std::is_same<NativeT, complex64>::value,
+                    std::is_same<NativeT, complex64>::value ||
+                    std::is_same<NativeT, complex128>::value,
                 "Float or complex type required when specifying an ErrorSpec");
   Literal expected_literal =
       LiteralUtil::CreateR4FromArray4D<NativeT>(expected);

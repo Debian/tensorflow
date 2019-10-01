@@ -25,6 +25,11 @@ extern "C" {
 
 // TODO(aselle): Consider using "if this then that" for testing.
 
+// Useful placeholder to put in otherwise empty structs to avoid size warnings.
+typedef struct {
+  char dummy;
+} EmptyStructPlaceholder;
+
 // IMPORTANT: All new members of structs must be added at the end to ensure
 // backwards compatibility.
 
@@ -41,9 +46,12 @@ typedef enum {
   kTfLiteMirrorPaddingSymmetric,
 } TfLiteMirrorPaddingMode;
 
+// TODO(b/130259536): We should move this out of builtin_op_data.
 typedef struct {
   int width;
   int height;
+  int width_offset;
+  int height_offset;
 } TfLitePaddingValues;
 
 typedef struct {
@@ -126,6 +134,12 @@ typedef struct {
 
   // Parameters for FullyConnected version 2 or above.
   TfLiteFullyConnectedWeightsFormat weights_format;
+
+  // Parameters for FullyConnected version 5 or above.
+  // If set to true, then the number of dimensions in the input and the output
+  // tensors are the same. Furthermore, all but the last dimension of the input
+  // and output shapes will be equal.
+  bool keep_num_dims;
 } TfLiteFullyConnectedParams;
 
 typedef enum {
@@ -152,9 +166,11 @@ typedef struct {
 } TfLiteAddParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
 } TfLiteSpaceToBatchNDParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
 } TfLiteBatchToSpaceNDParams;
 
 typedef struct {
@@ -207,13 +223,18 @@ typedef struct {
 } TfLiteUnidirectionalSequenceLSTMParams;
 
 typedef struct {
-  // Parameters for the LSTM kernel.
+  // Parameters supported by version 1:
+  // Parameters inherited for the LSTM kernel.
   TfLiteFusedActivation activation;
   float cell_clip;
   float proj_clip;
 
   // If true, store the outputs of both directions in the first output.
   bool merge_outputs;
+
+  // Parameters supported by version 2:
+  // If set to true then the first dimension is time, otherwise batch.
+  bool time_major;
 } TfLiteBidirectionalSequenceLSTMParams;
 
 typedef struct {
@@ -225,9 +246,11 @@ typedef struct {
 } TfLiteResizeNearestNeighborParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
 } TfLitePadParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
 } TfLitePadV2Params;
 
 typedef struct {
@@ -267,6 +290,7 @@ typedef struct {
 } TfLiteGatherParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
 } TfLiteTransposeParams;
 
 typedef struct {
@@ -319,6 +343,10 @@ typedef struct {
 } TfLiteShapeParams;
 
 typedef struct {
+  EmptyStructPlaceholder placeholder;
+} TfLiteRankParams;
+
+typedef struct {
   // Parameters supported by version 1:
   float min;
   float max;
@@ -345,6 +373,33 @@ typedef struct {
 typedef struct {
   float alpha;
 } TfLiteLeakyReluParams;
+
+typedef struct {
+  TfLiteType index_out_type;
+} TfLiteUniqueParams;
+
+typedef struct {
+  int seq_dim;
+  int batch_dim;
+} TfLiteReverseSequenceParams;
+
+typedef struct {
+  EmptyStructPlaceholder placeholder;
+} TfLiteMatrixDiagParams;
+
+typedef struct {
+  EmptyStructPlaceholder placeholder;
+} TfLiteMatrixSetDiagParams;
+
+typedef struct {
+  int then_subgraph_index;
+  int else_subgraph_index;
+} TfLiteIfParams;
+
+typedef struct {
+  int cond_subgraph_index;
+  int body_subgraph_index;
+} TfLiteWhileParams;
 
 #ifdef __cplusplus
 }  // extern "C"

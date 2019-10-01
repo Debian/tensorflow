@@ -59,34 +59,35 @@ tensorflow::Env* env = tensorflow::Env::Default();
 // TODO(ahentz): make sure we clean this list up frequently.
 std::map<string, string> kBrokenTests = {
     // L2Norm only supports tensors with 4D or fewer.
-    {R"(^\/l2norm_dim=.*,epsilon=.*,input_shape=\[.,.,.,.,.*\])", "67963684"},
+    {R"(^\/l2norm.*_dim=.*,epsilon=.*,input_shape=\[.,.,.,.,.*\])", "67963684"},
 
     // SpaceToBatchND only supports 4D tensors.
     {R"(^\/space_to_batch_nd.*input_shape=\[1,4,4,4,1,1\])", "70848787"},
 
+    // BatchToSpaceND only supports 4D tensors.
+    {R"(^\/batch_to_space_nd.*input_shape=\[8,2,2,2,1,1\])", "70848787"},
+
     // L2Norm only works for dim=-1.
-    {R"(^\/l2norm_dim=-2,epsilon=.*,input_shape=\[.,.\])", "67963812"},
-    {R"(^\/l2norm_dim=0,epsilon=.*,input_shape=\[.,.\])", "67963812"},
-    {R"(^\/l2norm_dim=-2,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
-    {R"(^\/l2norm_dim=-2,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
-    {R"(^\/l2norm_dim=2,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
-    {R"(^\/l2norm_dim=2,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
-    {R"(^\/l2norm_dim=0,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
-    {R"(^\/l2norm_dim=0,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
-    {R"(^\/l2norm_dim=1,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
-    {R"(^\/l2norm_dim=1,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
-    {R"(^\/l2norm_dim=\[2,3\],epsilon=.*,input_shape=\[3,15,14,3\])",
+    {R"(^\/l2norm.*_dim=-2,epsilon=.*,input_shape=\[.,.\])", "67963812"},
+    {R"(^\/l2norm.*_dim=0,epsilon=.*,input_shape=\[.,.\])", "67963812"},
+    {R"(^\/l2norm.*_dim=-2,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=-2,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=2,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=2,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=0,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=0,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=1,epsilon=.*,input_shape=\[3,15,14,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=1,epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=\[2,3\],epsilon=.*,input_shape=\[3,15,14,3\])",
      "67963812"},
-    {R"(^\/l2norm_dim=\[2,3\],epsilon=.*,input_shape=\[1,3,4,3\])", "67963812"},
+    {R"(^\/l2norm.*_dim=\[2,3\],epsilon=.*,input_shape=\[1,3,4,3\])",
+     "67963812"},
 
     // ResizeBilinear looks completely incompatible with Tensorflow
     {R"(^\/resize_bilinear.*dtype=tf.int32)", "72401107"},
 
     // Transpose only supports 1D-4D input tensors.
     {R"(^\/transpose.*input_shape=\[.,.,.,.,.\])", "71545879"},
-
-    // No Support for float.
-    {R"(^\/floor_div.*dtype=tf\.float32)", "112859002"},
 
     // Relu does not support int32.
     // These test cases appends a Relu after the tested ops when
@@ -103,8 +104,33 @@ std::map<string, string> kBrokenTests = {
     {R"(^\/floor_div.*dtype=tf\.int64)", "119126484"},
     {R"(^\/squared_difference.*dtype=tf\.int64)", "119126484"},
 
-    // Strided Slice chooses the wrong dimension.
-    {R"(^\/strided_slice_buggy)", "119786029"},
+    // Select kernel doesn't support broadcasting yet.
+    {R"(^\/where.*1,2,3,1)", "134692786"},
+
+    // Strided slice doesn't support ellipsis.
+    {R"(strided_slice.*Ellipsis)", "138098220"},
+};
+
+// Additional list of tests that are expected to fail when
+//   --test_arg=--ignore_known_bugs=false
+// and
+//   --test_arg=--use_nnapi=true
+// Note that issues related to lack of NNAPI support for a particular op are
+// handled separately; this list is specifically for broken cases where
+// execution produces broken output.
+// Key is a substring of the test name and value is a bug number.
+std::map<string, string> kBrokenNnapiTests = {
+    // Certain NNAPI kernels silently fail with int32 types.
+    {R"(^\/add.*dtype=tf\.int32)", "122987564"},
+    {R"(^\/concat.*dtype=tf\.int32)", "122987564"},
+    {R"(^\/mul.*dtype=tf\.int32)", "122987564"},
+    {R"(^\/space_to_depth.*dtype=tf\.int32)", "122987564"},
+
+    // Certain NNAPI fully_connected shape permutations fail.
+    {R"(^\/fully_connected_constant_filter=True.*shape1=\[3,3\])", "122987564"},
+    {R"(^\/fully_connected_constant_filter=True.*shape1=\[4,4\])", "122987564"},
+    {R"(^\/fully_connected.*shape1=\[3,3\].*transpose_b=True)", "122987564"},
+    {R"(^\/fully_connected.*shape1=\[4,4\].*shape2=\[4,1\])", "122987564"},
 };
 
 // Allows test data to be unarchived into a temporary directory and makes
@@ -239,11 +265,24 @@ TEST_P(OpsTest, RunZipTests) {
 
   std::ifstream tflite_stream(tflite_test_case);
   ASSERT_TRUE(tflite_stream.is_open()) << tflite_test_case;
-  tflite::testing::TfLiteDriver test_driver(FLAGS_use_nnapi);
+  tflite::testing::TfLiteDriver test_driver(
+      FLAGS_use_nnapi ? TfLiteDriver::DelegateType::kNnapi
+                      : TfLiteDriver::DelegateType::kNone);
+
+  if (test_path.find("fully_quantize=True") != std::string::npos) {
+    // TODO(b/134594898): Tighten this constraint.
+    test_driver.SetThreshold(5e-1f, 4e-1f);
+  }
+
   test_driver.SetModelBaseDir(tflite_dir);
 
+  auto broken_tests = kBrokenTests;
+  if (FLAGS_use_nnapi) {
+    broken_tests.insert(kBrokenNnapiTests.begin(), kBrokenNnapiTests.end());
+  }
+
   string bug_number;
-  for (const auto& p : kBrokenTests) {
+  for (const auto& p : broken_tests) {
     if (RE2::PartialMatch(test_name, p.first)) {
       bug_number = p.second;
     }

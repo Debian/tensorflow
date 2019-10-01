@@ -1,23 +1,19 @@
 # Description:
 #   contains parts of TensorFlow that are experimental or unstable and which are not supported.
 
-package(default_visibility = [
-    "//learning/brain:__subpackages__",
-    "//tensorflow:__subpackages__",
-    "//tensorflow_model_optimization:__subpackages__",
-])
+load("//tensorflow:tensorflow.bzl", "py_test", "tf_custom_op_library", "tf_gen_op_libs", "tf_gen_op_wrapper_py", "tf_kernel_library")
+load("//tensorflow:tensorflow.bzl", "tf_custom_op_py_library")
 
-licenses(["notice"])  # Apache 2.0
+package(
+    default_visibility = [
+        "//learning/brain:__subpackages__",
+        "//tensorflow:__subpackages__",
+        "//tensorflow_model_optimization:__subpackages__",
+    ],
+    licenses = ["notice"],  # Apache 2.0
+)
 
 exports_files(["LICENSE"])
-
-load("//tensorflow:tensorflow.bzl", "py_test")
-load("//tensorflow:tensorflow.bzl", "tf_custom_op_library")
-load("//tensorflow:tensorflow.bzl", "tf_gen_op_wrapper_py")
-load("//tensorflow:tensorflow.bzl", "tf_gen_op_libs")
-load("//tensorflow:tensorflow.bzl", "tf_kernel_library")
-load("//tensorflow:tensorflow.bzl", "cuda_py_test")
-load("//tensorflow:tensorflow.bzl", "tf_custom_op_py_library")
 
 tf_custom_op_py_library(
     name = "framework_py",
@@ -32,7 +28,6 @@ tf_custom_op_py_library(
         "python/ops/arg_scope.py",
         "python/ops/audio_ops.py",
         "python/ops/checkpoint_ops.py",
-        "python/ops/critical_section_ops.py",
         "python/ops/ops.py",
         "python/ops/prettyprint_ops.py",
         "python/ops/script_ops.py",
@@ -50,6 +45,9 @@ tf_custom_op_py_library(
     visibility = [
         "//learning/brain:__subpackages__",
         "//tensorflow:__subpackages__",
+        "//tensorflow_estimator:__subpackages__",
+        "//tensorflow_model_optimization:__subpackages__",
+        "//third_party/py/tf_slim:__subpackages__",
         "//video/youtube/personalization:__subpackages__",
     ],
     deps = [
@@ -144,6 +142,7 @@ py_test(
     name = "arg_scope_test",
     size = "small",
     srcs = ["python/ops/arg_scope_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -155,6 +154,7 @@ py_test(
     name = "checkpoint_utils_test",
     size = "small",
     srcs = ["python/framework/checkpoint_utils_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     tags = ["manual"],  # http://b/30468735
     deps = [
@@ -170,30 +170,11 @@ py_test(
     ],
 )
 
-cuda_py_test(
-    name = "critical_section_test",
-    size = "medium",
-    srcs = ["python/ops/critical_section_test.py"],
-    additional_deps = [
-        "//tensorflow/python:client_testlib",
-        ":framework_py",
-        "//tensorflow/python:array_ops",
-        "//tensorflow/python:control_flow_ops",
-        "//tensorflow/python:framework_for_generated_wrappers",
-        "//tensorflow/python:framework_test_lib",
-        "//tensorflow/python:gradients",
-        "//tensorflow/python:platform_test",
-        "//tensorflow/python:resource_variable_ops",
-        "//tensorflow/python:tensor_array_ops",
-        "//tensorflow/python/data/ops:dataset_ops",
-        "//tensorflow/python/eager:context",
-    ],
-)
-
 py_test(
     name = "ops_test",
     size = "small",
     srcs = ["python/ops/ops_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -206,6 +187,7 @@ py_test(
     name = "prettyprint_ops_test",
     size = "small",
     srcs = ["python/ops/prettyprint_ops_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -222,6 +204,7 @@ py_test(
 py_test(
     name = "experimental_test",
     srcs = ["python/framework/experimental_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -233,6 +216,7 @@ py_test(
 py_test(
     name = "graph_util_test",
     srcs = ["python/framework/graph_util_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -244,6 +228,7 @@ py_test(
 py_test(
     name = "tensor_util_test",
     srcs = ["python/framework/tensor_util_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     deps = [
         ":framework_py",
@@ -261,6 +246,7 @@ py_test(
     name = "variables_test",
     size = "small",
     srcs = ["python/ops/variables_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     tags = ["manual"],
     deps = [
@@ -299,6 +285,7 @@ py_test(
     size = "medium",
     srcs = ["python/ops/checkpoint_ops_test.py"],
     data = [":checkpoint_ops_testdata"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     tags = ["no_pip"],
     deps = [

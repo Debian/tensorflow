@@ -64,7 +64,7 @@ class HloModule {
   // only be used for HloModules used outside of the XLA service (eg
   // tests). The versioned handle is used by the service in the compilation
   // cache. A default configuration is created for this module.
-  explicit HloModule(const string& name, const HloModuleConfig& config);
+  explicit HloModule(const string& name, HloModuleConfig config);
   virtual ~HloModule() {}
 
   // Adds an entry computation to the module. A module can only have one entry
@@ -72,12 +72,20 @@ class HloModule {
   HloComputation* AddEntryComputation(
       std::unique_ptr<HloComputation> computation);
 
+  // Replaces the current entry computation with another computation.
+  // The new entry computation must be a computation that is already in the
+  // module.
+  void ReplaceEntryComputation(HloComputation* entry_computation);
+
   // Adds an embedded computation to the module.
   HloComputation* AddEmbeddedComputation(
       std::unique_ptr<HloComputation> computation);
 
   // Removes an embedded computation.
   Status RemoveEmbeddedComputation(HloComputation* to_remove);
+
+  // Removes unused computations.
+  Status RemoveUnusedComputations();
 
   // Replaces all uses of computations that are keys of 'replacements' with
   // the corresponding values in 'replacements'. Replaces the entry computation,
@@ -108,6 +116,8 @@ class HloModule {
     CHECK_NE(nullptr, entry_computation_);
     return entry_computation_;
   }
+
+  bool has_entry_computation() const { return entry_computation_ != nullptr; }
 
   // Returns the root instruction shape of entry computation.
   //
@@ -167,6 +177,12 @@ class HloModule {
   // Gets the number of computations in this module.
   int64 computation_count() const { return computations_.size(); }
 
+  // Returns the mutable computation for the given index.
+  HloComputation* mutable_computation(int64 idx) {
+    CHECK(idx >= 0 && idx < computations_.size());
+    return computations_[idx].get();
+  }
+
   // Gets the number of instructions in this module.
   int64 instruction_count() const;
 
@@ -186,7 +202,11 @@ class HloModule {
   // MakeNonfusionComputations().
   std::vector<HloComputation*> MakeNonfusionComputations() const;
 
+  // Same as MakeNonfusionComputations() but sorting the computations by names.
+  std::vector<HloComputation*> MakeNonfusionComputationsSorted() const;
+
   const HloModuleConfig& config() const { return config_; }
+  void set_config(HloModuleConfig& config) { config_ = config; }
 
   // Return a string representation of the module.
   //
@@ -264,6 +284,22 @@ class HloModule {
   const HloSchedule& schedule() const { return *schedule_; }
   HloSchedule& schedule() { return *schedule_; }
 
+  HloComputation* AddComputationAndUnifyNamesAndIds(
+      std::unique_ptr<HloComputation> computation, bool is_entry) {
+    computation->ClearUniqueIdInternal();
+    for (auto* instruction : computation->instructions()) {
+      instruction->ClearUniqueIdInternal();
+    }
+    return AddComputationInternal(std::move(computation), is_entry,
+                                  /*uniquify_identifiers=*/true);
+  }
+
+  Status CheckUniqueNamesAndIdsForComputationsAndInstructions() const;
+
+  std::vector<std::vector<bool>>* mutable_fusion_config() {
+    return &fusion_config_;
+  }
+
  private:
   HloComputation* AddComputationInternal(
       std::unique_ptr<HloComputation> computation, bool is_entry,
@@ -303,6 +339,9 @@ class HloModule {
 
   // Bindings for dynamic parameter mapping.
   DynamicParameterBinding dynamic_parameter_binding_;
+
+  // Fusion configuration.
+  std::vector<std::vector<bool>> fusion_config_;
 };
 
 }  // namespace xla

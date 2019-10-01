@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 /**
  * An internal wrapper that wraps native interpreter and controls model execution.
@@ -69,11 +70,16 @@ final class NativeInterpreterWrapper implements AutoCloseable {
     this.interpreterHandle = createInterpreter(modelHandle, errorHandle, options.numThreads);
     this.inputTensors = new Tensor[getInputCount(interpreterHandle)];
     this.outputTensors = new Tensor[getOutputCount(interpreterHandle)];
-    if (options.useNNAPI) {
-      setUseNNAPI(options.useNNAPI);
+    if (options.allowFp16PrecisionForFp32 != null) {
+      allowFp16PrecisionForFp32(
+          interpreterHandle, options.allowFp16PrecisionForFp32.booleanValue());
     }
-    if (options.allowFp16PrecisionForFp32) {
-      setAllowFp16PrecisionForFp32(options.allowFp16PrecisionForFp32);
+    if (options.allowBufferHandleOutput != null) {
+      allowBufferHandleOutput(interpreterHandle, options.allowBufferHandleOutput.booleanValue());
+    }
+    if (options.useNNAPI != null && options.useNNAPI.booleanValue()) {
+      optionalNnApiDelegate = new NnApiDelegate();
+      applyDelegate(interpreterHandle, errorHandle, optionalNnApiDelegate.getNativeHandle());
     }
     for (Delegate delegate : options.delegates) {
       applyDelegate(interpreterHandle, errorHandle, delegate.getNativeHandle());
@@ -108,6 +114,10 @@ final class NativeInterpreterWrapper implements AutoCloseable {
     outputsIndexes = null;
     isMemoryAllocated = false;
     delegates.clear();
+    if (optionalNnApiDelegate != null) {
+      optionalNnApiDelegate.close();
+      optionalNnApiDelegate = null;
+    }
   }
 
   /** Sets inputs, runs model inference and returns outputs. */
@@ -161,7 +171,7 @@ final class NativeInterpreterWrapper implements AutoCloseable {
     this.inferenceDurationNanoseconds = inferenceDurationNanoseconds;
   }
 
-  private static native boolean run(long interpreterHandle, long errorHandle);
+  private static native void run(long interpreterHandle, long errorHandle);
 
   /** Resizes dimensions of a specific input. */
   void resizeInput(int idx, int[] dims) {
@@ -180,12 +190,17 @@ final class NativeInterpreterWrapper implements AutoCloseable {
     useNNAPI(interpreterHandle, useNNAPI);
   }
 
-  void setAllowFp16PrecisionForFp32(boolean allow) {
-    allowFp16PrecisionForFp32(interpreterHandle, allow);
-  }
-
   void setNumThreads(int numThreads) {
     numThreads(interpreterHandle, numThreads);
+  }
+
+  void modifyGraphWithDelegate(Delegate delegate) {
+    applyDelegate(interpreterHandle, errorHandle, delegate.getNativeHandle());
+    delegates.add(delegate);
+  }
+
+  void resetVariableTensors() {
+    resetVariableTensors(interpreterHandle, errorHandle);
   }
 
   /** Gets index of an input given its name. */
@@ -336,6 +351,10 @@ final class NativeInterpreterWrapper implements AutoCloseable {
   // delegates for safety.
   private final List<Delegate> delegates = new ArrayList<>();
 
+  // Prefer using the NnApiDelegate directly rather than the deprecated useNNNAPI() method when
+  // NNAPI is enabled via Interpreter.Options.
+  private NnApiDelegate optionalNnApiDelegate;
+
   private static native long allocateTensors(long interpreterHandle, long errorHandle);
 
   private static native int getInputTensorIndex(long interpreterHandle, int inputIdx);
@@ -356,6 +375,8 @@ final class NativeInterpreterWrapper implements AutoCloseable {
 
   private static native void allowFp16PrecisionForFp32(long interpreterHandle, boolean allow);
 
+  private static native void allowBufferHandleOutput(long interpreterHandle, boolean allow);
+
   private static native long createErrorReporter(int size);
 
   private static native long createModel(String modelPathOrBuffer, long errorHandle);
@@ -366,6 +387,8 @@ final class NativeInterpreterWrapper implements AutoCloseable {
 
   private static native void applyDelegate(
       long interpreterHandle, long errorHandle, long delegateHandle);
+
+  private static native void resetVariableTensors(long interpreterHandle, long errorHandle);
 
   private static native void delete(long errorHandle, long modelHandle, long interpreterHandle);
 

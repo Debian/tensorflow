@@ -26,7 +26,7 @@ from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
-from tensorflow.python.util.tf_export import tf_export
+from tensorflow.python.util.tf_export import keras_export
 
 
 class _Merge(Layer):
@@ -218,7 +218,7 @@ class _Merge(Layer):
     return K.all(K.concatenate(masks, axis=0), axis=0, keepdims=False)
 
 
-@tf_export('keras.layers.Add')
+@keras_export('keras.layers.Add')
 class Add(_Merge):
   """Layer that adds a list of inputs.
 
@@ -235,9 +235,8 @@ class Add(_Merge):
       x1 = keras.layers.Dense(8, activation='relu')(input1)
       input2 = keras.layers.Input(shape=(32,))
       x2 = keras.layers.Dense(8, activation='relu')(input2)
-      added = keras.layers.Add()([x1, x2])  # equivalent to added =
-      keras.layers.add([x1, x2])
-
+      # equivalent to `added = keras.layers.add([x1, x2])`
+      added = keras.layers.Add()([x1, x2])
       out = keras.layers.Dense(4)(added)
       model = keras.models.Model(inputs=[input1, input2], outputs=out)
   ```
@@ -250,7 +249,7 @@ class Add(_Merge):
     return output
 
 
-@tf_export('keras.layers.Subtract')
+@keras_export('keras.layers.Subtract')
 class Subtract(_Merge):
   """Layer that subtracts two inputs.
 
@@ -289,7 +288,7 @@ class Subtract(_Merge):
     return inputs[0] - inputs[1]
 
 
-@tf_export('keras.layers.Multiply')
+@keras_export('keras.layers.Multiply')
 class Multiply(_Merge):
   """Layer that multiplies (element-wise) a list of inputs.
 
@@ -305,7 +304,7 @@ class Multiply(_Merge):
     return output
 
 
-@tf_export('keras.layers.Average')
+@keras_export('keras.layers.Average')
 class Average(_Merge):
   """Layer that averages a list of inputs.
 
@@ -321,7 +320,7 @@ class Average(_Merge):
     return output / len(inputs)
 
 
-@tf_export('keras.layers.Maximum')
+@keras_export('keras.layers.Maximum')
 class Maximum(_Merge):
   """Layer that computes the maximum (element-wise) a list of inputs.
 
@@ -337,7 +336,7 @@ class Maximum(_Merge):
     return output
 
 
-@tf_export('keras.layers.Minimum')
+@keras_export('keras.layers.Minimum')
 class Minimum(_Merge):
   """Layer that computes the minimum (element-wise) a list of inputs.
 
@@ -353,7 +352,7 @@ class Minimum(_Merge):
     return output
 
 
-@tf_export('keras.layers.Concatenate')
+@keras_export('keras.layers.Concatenate')
 class Concatenate(_Merge):
   """Layer that concatenates a list of inputs.
 
@@ -444,7 +443,7 @@ class Concatenate(_Merge):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf_export('keras.layers.Dot')
+@keras_export('keras.layers.Dot')
 class Dot(_Merge):
   """Layer that computes a dot product between samples in two tensors.
 
@@ -559,7 +558,7 @@ class Dot(_Merge):
     return dict(list(base_config.items()) + list(config.items()))
 
 
-@tf_export('keras.layers.add')
+@keras_export('keras.layers.add')
 def add(inputs, **kwargs):
   """Functional interface to the `Add` layer.
 
@@ -588,7 +587,7 @@ def add(inputs, **kwargs):
   return Add(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.subtract')
+@keras_export('keras.layers.subtract')
 def subtract(inputs, **kwargs):
   """Functional interface to the `Subtract` layer.
 
@@ -617,7 +616,7 @@ def subtract(inputs, **kwargs):
   return Subtract(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.multiply')
+@keras_export('keras.layers.multiply')
 def multiply(inputs, **kwargs):
   """Functional interface to the `Multiply` layer.
 
@@ -631,7 +630,7 @@ def multiply(inputs, **kwargs):
   return Multiply(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.average')
+@keras_export('keras.layers.average')
 def average(inputs, **kwargs):
   """Functional interface to the `Average` layer.
 
@@ -645,21 +644,39 @@ def average(inputs, **kwargs):
   return Average(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.maximum')
+@keras_export('keras.layers.maximum')
 def maximum(inputs, **kwargs):
-  """Functional interface to the `Maximum` layer.
+  """Functional interface to the `Maximum` layer that computes
+
+     the maximum (element-wise) list of `inputs`.
+
+  For example:
+
+  ```python
+  input1 = tf.keras.layers.Input(shape=(16,))
+  x1 = tf.keras.layers.Dense(8, activation='relu')(input1) #shape=(None, 8)
+  input2 = tf.keras.layers.Input(shape=(32,))
+  x2 = tf.keras.layers.Dense(8, activation='relu')(input2) #shape=(None, 8)
+  max_inp=tf.keras.layers.maximum([x1,x2]) #shape=(None, 8)
+  out = tf.keras.layers.Dense(4)(max_inp)
+  model = tf.keras.models.Model(inputs=[input1, input2], outputs=out)
+  ```
 
   Arguments:
-      inputs: A list of input tensors (at least 2).
+      inputs: A list of input tensors (at least 2) of same shape.
       **kwargs: Standard layer keyword arguments.
 
   Returns:
-      A tensor, the element-wise maximum of the inputs.
+      A tensor (of same shape as input tensor) with the element-wise
+      maximum of the inputs.
+
+  Raises:
+      ValueError: If input tensors are of different shape.
   """
   return Maximum(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.minimum')
+@keras_export('keras.layers.minimum')
 def minimum(inputs, **kwargs):
   """Functional interface to the `Minimum` layer.
 
@@ -673,7 +690,7 @@ def minimum(inputs, **kwargs):
   return Minimum(**kwargs)(inputs)
 
 
-@tf_export('keras.layers.concatenate')
+@keras_export('keras.layers.concatenate')
 def concatenate(inputs, axis=-1, **kwargs):
   """Functional interface to the `Concatenate` layer.
 
@@ -688,7 +705,7 @@ def concatenate(inputs, axis=-1, **kwargs):
   return Concatenate(axis=axis, **kwargs)(inputs)
 
 
-@tf_export('keras.layers.dot')
+@keras_export('keras.layers.dot')
 def dot(inputs, axes, normalize=False, **kwargs):
   """Functional interface to the `Dot` layer.
 

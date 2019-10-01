@@ -24,10 +24,10 @@ limitations under the License.
 #include <vector>
 #include "mkldnn.hpp"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
+#include "tensorflow/core/framework/bounds_check.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/kernels/bounds_check.h"
 #include "tensorflow/core/kernels/ops_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/util/mkl_util.h"
@@ -671,17 +671,19 @@ class MklLRNGradOp : public OpKernel {
   float beta_;
 };
 
-#define REGISTER_MKL_LRN_CPU(T)                                     \
-  REGISTER_KERNEL_BUILDER(Name("_MklLRN")                           \
-                              .Device(DEVICE_CPU)                   \
-                              .TypeConstraint<T>("T")               \
-                              .Label(mkl_op_registry::kMklOpLabel), \
-                          MklLRNOp<T>);                             \
-  REGISTER_KERNEL_BUILDER(Name("_MklLRNGrad")                       \
-                              .Device(DEVICE_CPU)                   \
-                              .TypeConstraint<T>("T")               \
-                              .Label(mkl_op_registry::kMklOpLabel), \
-                          MklLRNGradOp<T>);
+#define REGISTER_MKL_LRN_CPU(T)                                \
+  REGISTER_KERNEL_BUILDER(                                     \
+      Name("_MklLRN")                                          \
+          .Device(DEVICE_CPU)                                  \
+          .TypeConstraint<T>("T")                              \
+          .Label(mkl_op_registry::kMklLayoutDependentOpLabel), \
+      MklLRNOp<T>);                                            \
+  REGISTER_KERNEL_BUILDER(                                     \
+      Name("_MklLRNGrad")                                      \
+          .Device(DEVICE_CPU)                                  \
+          .TypeConstraint<T>("T")                              \
+          .Label(mkl_op_registry::kMklLayoutDependentOpLabel), \
+      MklLRNGradOp<T>);
 
 TF_CALL_float(REGISTER_MKL_LRN_CPU);
 

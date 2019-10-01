@@ -207,6 +207,7 @@ class SingleThreadedExecutorImpl : public Executor {
     params.log_memory = false;              // TODO(mrry): Too severe?
     params.record_tensor_accesses = false;  // TODO(mrry): Too severe?
     params.rendezvous = args.rendezvous;
+    params.create_rendezvous = &(params_.rendezvous_factory);
     params.session_state = args.session_state;
     params.tensor_store = args.tensor_store;
     params.cancellation_manager = args.cancellation_manager;
@@ -376,8 +377,8 @@ static SingleThreadedExecutorRegistrar registrar;
 Status NewSingleThreadedExecutor(const LocalExecutorParams& params,
                                  std::unique_ptr<const Graph> graph,
                                  Executor** executor) {
-  std::unique_ptr<SingleThreadedExecutorImpl> impl(
-      new SingleThreadedExecutorImpl(params));
+  std::unique_ptr<SingleThreadedExecutorImpl> impl =
+      absl::make_unique<SingleThreadedExecutorImpl>(params);
   TF_RETURN_IF_ERROR(impl->Initialize(*graph));
   *executor = impl.release();
   return Status::OK();

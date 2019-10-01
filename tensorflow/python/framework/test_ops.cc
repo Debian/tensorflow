@@ -76,6 +76,12 @@ REGISTER_OP("TestStringOutput")
     .Output("output2: string")
     .SetShapeFn(shape_inference::UnknownShape);
 
+REGISTER_OP("Namespace>TestStringOutput")
+    .Input("input: float")
+    .Output("output1: float")
+    .Output("output2: string")
+    .SetShapeFn(shape_inference::UnknownShape);
+
 REGISTER_OP("TestAttr")
     .Output("out: T")
     .Attr("T: {float, double}")
@@ -157,7 +163,7 @@ REGISTER_KERNEL_BUILDER(Name("Old").Device(DEVICE_CPU), OldOp);
 // Stubbed-out resource to test resource handle ops.
 class StubResource : public ResourceBase {
  public:
-  string DebugString() override { return ""; }
+  string DebugString() const override { return ""; }
 };
 
 REGISTER_RESOURCE_HANDLE_KERNEL(StubResource);
@@ -404,6 +410,10 @@ REGISTER_OP("DefaultAttrs")
 
 REGISTER_OP("FuncAttr")
     .Attr("f: func")
+    .SetShapeFn(shape_inference::UnknownShape);
+
+REGISTER_OP("FuncListAttr")
+    .Attr("f: list(func)")
     .SetShapeFn(shape_inference::UnknownShape);
 
 REGISTER_OP("Simple")

@@ -32,22 +32,23 @@ from tensorflow.python.platform import test
 class OptimizationBenchmark(test.Benchmark):
   """Benchmarks for static optimizations."""
 
-  def benchmarkMapFusion(self):
+  def benchmark_map_fusion(self):
     """Evaluates performance map of fusion."""
 
     chain_lengths = [0, 1, 2, 5, 10, 20, 50]
     for chain_length in chain_lengths:
-      self._benchmarkMapFusion(chain_length, False)
-      self._benchmarkMapFusion(chain_length, True)
+      self._benchmark_map_fusion(chain_length, False)
+      self._benchmark_map_fusion(chain_length, True)
 
-  def _benchmarkMapFusion(self, chain_length, optimize_dataset):
+  def _benchmark_map_fusion(self, chain_length, optimize_dataset):
     with ops.Graph().as_default():
       dataset = dataset_ops.Dataset.from_tensors(0).repeat(None)
       for _ in range(chain_length):
         dataset = dataset.map(lambda x: x)
       if optimize_dataset:
         options = dataset_ops.Options()
-        options.experimental_map_fusion = True
+        options.experimental_optimization.apply_default_optimizations = False
+        options.experimental_optimization.map_fusion = True
         dataset = dataset.with_options(options)
 
       iterator = dataset_ops.make_one_shot_iterator(dataset)
@@ -66,23 +67,21 @@ class OptimizationBenchmark(test.Benchmark):
 
         median_wall_time = np.median(deltas) / 100
         opt_mark = "opt" if optimize_dataset else "noopt"
-        print("Map dataset {} chain length: {} Median wall time: {}".format(
-            opt_mark, chain_length, median_wall_time))
         self.report_benchmark(
             iters=100,
             wall_time=median_wall_time,
             name="map_fusion_{}_chain_length_{}".format(
                 opt_mark, chain_length))
 
-  def benchmarkMapAndFilterFusion(self):
+  def benchmark_map_and_filter_fusion(self):
     """Evaluates performance map of fusion."""
 
     chain_lengths = [0, 1, 2, 5, 10, 20, 50]
     for chain_length in chain_lengths:
-      self._benchmarkMapAndFilterFusion(chain_length, False)
-      self._benchmarkMapAndFilterFusion(chain_length, True)
+      self._benchmark_map_and_filter_fusion(chain_length, False)
+      self._benchmark_map_and_filter_fusion(chain_length, True)
 
-  def _benchmarkMapAndFilterFusion(self, chain_length, optimize_dataset):
+  def _benchmark_map_and_filter_fusion(self, chain_length, optimize_dataset):
     with ops.Graph().as_default():
       dataset = dataset_ops.Dataset.from_tensors(0).repeat(None)
       for _ in range(chain_length):
@@ -90,7 +89,8 @@ class OptimizationBenchmark(test.Benchmark):
             lambda x: math_ops.greater_equal(x - 5, 0))
       if optimize_dataset:
         options = dataset_ops.Options()
-        options.experimental_map_and_filter_fusion = True
+        options.experimental_optimization.apply_default_optimizations = False
+        options.experimental_optimization.map_and_filter_fusion = True
         dataset = dataset.with_options(options)
       iterator = dataset_ops.make_one_shot_iterator(dataset)
       next_element = iterator.get_next()
@@ -108,8 +108,6 @@ class OptimizationBenchmark(test.Benchmark):
 
         median_wall_time = np.median(deltas) / 100
         opt_mark = "opt" if optimize_dataset else "noopt"
-        print("Map and filter dataset {} chain length: {} Median wall time: {}"
-              .format(opt_mark, chain_length, median_wall_time))
         self.report_benchmark(
             iters=100,
             wall_time=median_wall_time,
@@ -118,20 +116,21 @@ class OptimizationBenchmark(test.Benchmark):
 
   # This benchmark compares the performance of pipeline with multiple chained
   # filter with and without filter fusion.
-  def benchmarkFilterFusion(self):
+  def benchmark_filter_fusion(self):
     chain_lengths = [0, 1, 2, 5, 10, 20, 50]
     for chain_length in chain_lengths:
-      self._benchmarkFilterFusion(chain_length, False)
-      self._benchmarkFilterFusion(chain_length, True)
+      self._benchmark_filter_fusion(chain_length, False)
+      self._benchmark_filter_fusion(chain_length, True)
 
-  def _benchmarkFilterFusion(self, chain_length, optimize_dataset):
+  def _benchmark_filter_fusion(self, chain_length, optimize_dataset):
     with ops.Graph().as_default():
       dataset = dataset_ops.Dataset.from_tensors(5).repeat(None)
       for _ in range(chain_length):
         dataset = dataset.filter(lambda x: math_ops.greater_equal(x - 5, 0))
       if optimize_dataset:
         options = dataset_ops.Options()
-        options.experimental_filter_fusion = True
+        options.experimental_optimization.apply_default_optimizations = False
+        options.experimental_optimization.filter_fusion = True
         dataset = dataset.with_options(options)
 
       iterator = dataset_ops.make_one_shot_iterator(dataset)
@@ -150,8 +149,6 @@ class OptimizationBenchmark(test.Benchmark):
 
         median_wall_time = np.median(deltas) / 100
         opt_mark = "opt" if optimize_dataset else "no-opt"
-        print("Filter dataset {} chain length: {} Median wall time: {}".format(
-            opt_mark, chain_length, median_wall_time))
         self.report_benchmark(
             iters=1000,
             wall_time=median_wall_time,

@@ -16,13 +16,14 @@
 # Description:
 # SavedModel contrib libraries.
 
-licenses(["notice"])  # Apache 2.0
+load("//tensorflow:tensorflow.bzl", "py_test")
+
+package(
+    default_visibility = ["//tensorflow:__subpackages__"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
 exports_files(["LICENSE"])
-
-package(default_visibility = ["//tensorflow:__subpackages__"])
-
-load("//tensorflow:tensorflow.bzl", "py_test")
 
 py_library(
     name = "saved_model_py",
@@ -69,6 +70,7 @@ py_test(
     name = "reader_test",
     size = "small",
     srcs = ["python/saved_model/reader_test.py"],
+    python_version = "PY2",
     srcs_version = "PY2AND3",
     tags = ["no_windows"],  # TODO: needs investigation on Windows
     visibility = ["//visibility:private"],
@@ -84,35 +86,6 @@ py_library(
     srcs_version = "PY2AND3",
     visibility = ["//visibility:public"],
     deps = [
-        "//tensorflow/python:array_ops",
-        "//tensorflow/python:framework_ops",
-        "//tensorflow/python:lib",
-        "//tensorflow/python:metrics",
-        "//tensorflow/python:platform",
-        "//tensorflow/python:saver",
-        "//tensorflow/python:util",
-        "//tensorflow/python/estimator:estimator_py",
-        "//tensorflow/python/keras:engine",
-        "//tensorflow/python/saved_model",
-    ],
-)
-
-py_test(
-    name = "keras_saved_model_test",
-    size = "medium",
-    srcs = ["python/saved_model/keras_saved_model_test.py"],
-    srcs_version = "PY2AND3",
-    tags = [
-        "no_oss",  # TODO(b/119349471): Re-enable
-        "no_windows",
-    ],
-    deps = [
-        ":keras_saved_model",
-        "//tensorflow/python:client_testlib",
-        "//tensorflow/python:training",
-        "//tensorflow/python/estimator:estimator_py",
         "//tensorflow/python/keras",
-        "//third_party/py/numpy",
-        "@absl_py//absl/testing:parameterized",
     ],
 )

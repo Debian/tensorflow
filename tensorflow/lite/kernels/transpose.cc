@@ -117,6 +117,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
         TF_LITE_TRANSPOSE(reference_ops, uint8_t);
       }
       break;
+    case kTfLiteInt8:
+      if (kernel_type == kReference) {
+        TF_LITE_TRANSPOSE(reference_ops, int8_t);
+      }
+      break;
     case kTfLiteInt32:
       if (kernel_type == kReference) {
         TF_LITE_TRANSPOSE(reference_ops, int32_t);
@@ -125,6 +130,11 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
     case kTfLiteInt64:
       if (kernel_type == kReference) {
         TF_LITE_TRANSPOSE(reference_ops, int64_t);
+      }
+      break;
+    case kTfLiteBool:
+      if (kernel_type == kReference) {
+        TF_LITE_TRANSPOSE(reference_ops, bool);
       }
       break;
     default:

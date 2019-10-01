@@ -75,7 +75,6 @@ from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import function
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import sparse_tensor
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import math_ops
@@ -261,8 +260,7 @@ class DenseSplitHandler(InequalitySplitHandler):
 
   def make_splits(self, stamp_token, next_stamp_token, class_id):
     """Create the best split using the accumulated stats and flush the state."""
-    if (self._gradient_shape == tensor_shape.scalar() and
-        self._hessian_shape == tensor_shape.scalar()):
+    if (self._gradient_shape.rank == 0 and self._hessian_shape.rank == 0):
       handler = make_dense_split_scalar
     else:
       handler = make_dense_split_tensor
@@ -312,9 +310,10 @@ def _make_dense_split(quantile_accumulator_handle, stats_accumulator_handle,
         gen_stats_accumulator_ops.stats_accumulator_scalar_flush(
             stats_accumulator_handle, stamp_token, next_stamp_token))
   # For sum_reduction, we don't need to divide by number of minibatches.
-  num_minibatches = control_flow_ops.cond(loss_uses_sum_reduction,
-                                          lambda: math_ops.to_int64(1),
-                                          lambda: num_minibatches)
+  num_minibatches = control_flow_ops.cond(
+      loss_uses_sum_reduction,
+      lambda: math_ops.cast(1, dtypes.int64),
+      lambda: num_minibatches)
   # Put quantile and stats accumulator flushing in the dependency path.
   with ops.control_dependencies([flush_quantiles, partition_ids]):
     are_splits_ready = array_ops.identity(are_splits_ready)
@@ -440,8 +439,7 @@ class SparseSplitHandler(InequalitySplitHandler):
 
   def make_splits(self, stamp_token, next_stamp_token, class_id):
     """Create the best split using the accumulated stats and flush the state."""
-    if (self._gradient_shape == tensor_shape.scalar() and
-        self._hessian_shape == tensor_shape.scalar()):
+    if self._gradient_shape.rank == 0 and self._hessian_shape.rank == 0:
       handler = make_sparse_split_scalar
     else:
       handler = make_sparse_split_tensor
@@ -488,9 +486,10 @@ def _make_sparse_split(
     num_minibatches, partition_ids, bucket_ids, gradients, hessians = (
         gen_stats_accumulator_ops.stats_accumulator_scalar_flush(
             stats_accumulator_handle, stamp_token, next_stamp_token))
-  num_minibatches = control_flow_ops.cond(loss_uses_sum_reduction,
-                                          lambda: math_ops.to_int64(1),
-                                          lambda: num_minibatches)
+  num_minibatches = control_flow_ops.cond(
+      loss_uses_sum_reduction,
+      lambda: math_ops.cast(1, dtypes.int64),
+      lambda: num_minibatches)
   # Put quantile and stats accumulator flushing in the dependency path.
   with ops.control_dependencies([flush_quantiles, partition_ids]):
     are_splits_ready = array_ops.identity(are_splits_ready)

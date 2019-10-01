@@ -16,8 +16,6 @@ limitations under the License.
 #define USE_EIGEN_TENSOR
 #define EIGEN_USE_THREADS
 
-#include "tensorflow/core/kernels/conv_3d.h"
-
 #include "tensorflow/core/framework/numeric_op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -25,6 +23,7 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/tensor_slice.h"
 #include "tensorflow/core/kernels/conv_2d.h"
+#include "tensorflow/core/kernels/conv_3d.h"
 #include "tensorflow/core/kernels/conv_grad_ops.h"
 #include "tensorflow/core/kernels/conv_ops_gpu.h"
 #include "tensorflow/core/kernels/ops_util.h"
@@ -39,7 +38,7 @@ limitations under the License.
 #include "tensorflow/core/kernels/eigen_contraction_kernel.h"
 #endif
 
-#if GOOGLE_CUDA
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 #include "tensorflow/core/platform/stream_executor.h"
 using stream_executor::dnn::DimIndex;
 #endif
@@ -1050,7 +1049,7 @@ TF_CALL_half(REGISTER_CPU_KERNEL);
 #undef REGISTER_CPU_KERNEL
 
 // GPU definitions of both ops.
-#if GOOGLE_CUDA
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 // Forward declarations of the functor specializations for GPU.
 // This ensures that the custom implementation is used instead of the default
 // Eigen one (which is used for CPU).
@@ -1063,7 +1062,8 @@ namespace functor {
       typename TTypes<T, 5, int>::Tensor out);                        \
   template <>                                                         \
   void ReverseTransformFilter<GPUDevice, T, 5>::operator()(           \
-      const GPUDevice& d, typename TTypes<T, 5>::ConstTensor in,      \
+      const GPUDevice& d, FilterTensorFormat src_filter_format,       \
+      typename TTypes<T, 5>::ConstTensor in,                          \
       typename TTypes<T, 5>::Tensor out);                             \
   template <>                                                         \
   void PadInput<GPUDevice, T, int, 5>::operator()(                    \
@@ -1145,18 +1145,17 @@ class Conv3DBackpropInputOp<GPUDevice, T> : public OpKernel {
     TensorShape input_shape;
     if (takes_shape_) {
       const Tensor& input_sizes = context->input(0);
-      OP_REQUIRES_OK(context, TensorShapeUtils::MakeShape(
-                                  input_sizes.vec<int32>(), &input_shape));
+      OP_REQUIRES_OK(context, MakeShape(input_sizes, &input_shape));
     } else {
       input_shape = context->input(0).shape();
     }
 
     ConvBackpropDimensions dims;
-    OP_REQUIRES_OK(context,
-                   ConvBackpropComputeDimensionsV2(
-                       "Conv3DBackpropInputOp", /*num_spatial_dims=*/3,
-                       input_shape, filter_shape, out_backprop_shape, dilation_,
-                       stride_, padding_, data_format_, &dims));
+    OP_REQUIRES_OK(context, ConvBackpropComputeDimensionsV2(
+                                "Conv3DBackpropInputOp", /*num_spatial_dims=*/3,
+                                input_shape, filter_shape, out_backprop_shape,
+                                dilation_, stride_, padding_,
+                                /*explicit_paddings=*/{}, data_format_, &dims));
 
     Tensor* in_backprop;
     OP_REQUIRES_OK(context,
@@ -1358,6 +1357,7 @@ class Conv3DBackpropInputOp<GPUDevice, T> : public OpKernel {
     AlgorithmConfig algorithm_config;
     if (cudnn_use_autotune_ && !AutoTuneConv3dBwdData::GetInstance()->Find(
                                    conv_parameters, &algorithm_config)) {
+#if GOOGLE_CUDA
       std::vector<AlgorithmDesc> algorithms;
       CHECK(stream->parent()->GetConvolveBackwardDataAlgorithms(
           conv_parameters.ShouldIncludeWinogradNonfusedAlgo<T>(
@@ -1402,6 +1402,22 @@ class Conv3DBackpropInputOp<GPUDevice, T> : public OpKernel {
         algorithm_config.set_algorithm_no_scratch(
             best_result_no_scratch.algorithm());
       }
+#elif TENSORFLOW_USE_ROCM
+      DnnScratchAllocator scratch_allocator(ConvolveBackwardDataScratchSize,
+                                            context);
+      ProfileResult best_result;
+      bool miopen_find_status =
+          stream
+              ->ThenConvolveBackwardDataWithAlgorithm(
+                  filter_desc, filter_ptr, output_desc, out_backprop_ptr,
+                  conv_desc, input_desc, &in_backprop_ptr, &scratch_allocator,
+                  AlgorithmConfig(), &best_result)
+              .ok();
+      OP_REQUIRES(context, miopen_find_status && best_result.is_valid(),
+                  errors::NotFound("Failed to find backward data algorithm!"));
+      algorithm_config.set_algorithm(best_result.algorithm());
+      algorithm_config.set_scratch_size(best_result.scratch_size());
+#endif
       AutoTuneConv3dBwdData::GetInstance()->Insert(conv_parameters,
                                                    algorithm_config);
     }
@@ -1530,18 +1546,18 @@ class Conv3DBackpropFilterOp<GPUDevice, T> : public OpKernel {
     TensorShape filter_shape;
     if (takes_shape_) {
       const Tensor& filter_sizes = context->input(1);
-      OP_REQUIRES_OK(context, TensorShapeUtils::MakeShape(
-                                  filter_sizes.vec<int32>(), &filter_shape));
+      OP_REQUIRES_OK(context, MakeShape(filter_sizes, &filter_shape));
     } else {
       filter_shape = context->input(1).shape();
     }
 
     ConvBackpropDimensions dims;
-    OP_REQUIRES_OK(context,
-                   ConvBackpropComputeDimensionsV2(
-                       "Conv3DBackpropFilterOp", /*num_spatial_dims=*/3,
-                       input_shape, filter_shape, out_backprop_shape, dilation_,
-                       stride_, padding_, data_format_, &dims));
+    OP_REQUIRES_OK(
+        context,
+        ConvBackpropComputeDimensionsV2(
+            "Conv3DBackpropFilterOp", /*num_spatial_dims=*/3, input_shape,
+            filter_shape, out_backprop_shape, dilation_, stride_, padding_,
+            /*explicit_paddings=*/{}, data_format_, &dims));
 
     Tensor* filter_backprop;
     OP_REQUIRES_OK(context,
@@ -1764,6 +1780,7 @@ class Conv3DBackpropFilterOp<GPUDevice, T> : public OpKernel {
     AlgorithmConfig algorithm_config;
     if (cudnn_use_autotune_ && !AutoTuneConv3dBwdFilter::GetInstance()->Find(
                                    conv_parameters, &algorithm_config)) {
+#if GOOGLE_CUDA
       std::vector<AlgorithmDesc> algorithms;
       CHECK(stream->parent()->GetConvolveBackwardFilterAlgorithms(
           conv_parameters.ShouldIncludeWinogradNonfusedAlgo<T>(
@@ -1809,6 +1826,23 @@ class Conv3DBackpropFilterOp<GPUDevice, T> : public OpKernel {
         algorithm_config.set_algorithm_no_scratch(
             best_result_no_scratch.algorithm());
       }
+#elif TENSORFLOW_USE_ROCM
+      DnnScratchAllocator scratch_allocator(ConvolveBackwardFilterScratchSize,
+                                            context);
+      ProfileResult best_result;
+      bool miopen_find_status =
+          stream
+              ->ThenConvolveBackwardFilterWithAlgorithm(
+                  input_desc, input_ptr, output_desc, out_backprop_ptr,
+                  conv_desc, filter_desc, &filter_backprop_ptr,
+                  &scratch_allocator, AlgorithmConfig(), &best_result)
+              .ok();
+      OP_REQUIRES(
+          context, miopen_find_status && best_result.is_valid(),
+          errors::NotFound("Failed to find backward filter algorithm!"));
+      algorithm_config.set_algorithm(best_result.algorithm());
+      algorithm_config.set_scratch_size(best_result.scratch_size());
+#endif
       AutoTuneConv3dBwdFilter::GetInstance()->Insert(conv_parameters,
                                                      algorithm_config);
     }
@@ -1831,7 +1865,7 @@ class Conv3DBackpropFilterOp<GPUDevice, T> : public OpKernel {
 
     auto toConstTensor = [](const Tensor& x) -> const Tensor { return x; };
     functor::ReverseTransformFilter<GPUDevice, T, 5>()(
-        context->eigen_device<GPUDevice>(),
+        context->eigen_device<GPUDevice>(), /*src_filter_format=*/FORMAT_OIHW,
         toConstTensor(pre_transformed_filter_backprop).template tensor<T, 5>(),
         filter_backprop->tensor<T, 5>());
   }
@@ -1867,6 +1901,6 @@ TF_CALL_float(REGISTER_GPU_KERNEL);
 TF_CALL_double(REGISTER_GPU_KERNEL);
 #undef REGISTER_GPU_KERNEL
 
-#endif  // GOOGLE_CUDA
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 }  // namespace tensorflow

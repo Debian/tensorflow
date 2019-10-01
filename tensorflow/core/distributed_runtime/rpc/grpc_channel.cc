@@ -44,6 +44,10 @@ string MakeAddress(const string& job, int task) {
 
 // Allows the host to be a raw IP (either v4 or v6).
 Status ValidateHostPortPair(const string& host_port) {
+  string bns_prefix = "/bns/";
+  if (host_port.substr(0, bns_prefix.length()) == bns_prefix) {
+    return Status::OK();
+  }
   uint32 port;
   auto colon_index = host_port.find_last_of(':');
   if (!strings::safe_strtou32(host_port.substr(colon_index + 1), &port) ||
@@ -60,11 +64,9 @@ Status ValidateHostPortPair(const string& host_port) {
   // TODO(mrry): Implement secure channels.
   ::grpc::ChannelArguments args;
   args.SetInt(GRPC_ARG_MAX_MESSAGE_LENGTH, std::numeric_limits<int32>::max());
-  args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, std::numeric_limits<int>::max());
-  args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, std::numeric_limits<int>::max());
   // NOTE(mrry): Some versions of gRPC use a 20-second minimum backoff
   // on connection failure, which makes our tests time out.
-  args.SetInt("grpc.testing.fixed_reconnect_backoff_ms", 1000);
+  args.SetInt(GRPC_ARG_MAX_RECONNECT_BACKOFF_MS, 1000);
   if (rpc_options != nullptr) {
     if (rpc_options->compression_algorithm() == "deflate") {
       args.SetCompressionAlgorithm(GRPC_COMPRESS_DEFLATE);
@@ -83,6 +85,10 @@ Status ValidateHostPortPair(const string& host_port) {
     } else if (!rpc_options->compression_algorithm().empty()) {
       LOG(ERROR) << "Invalid compression algorithm: "
                  << rpc_options->compression_algorithm();
+    }
+    if (rpc_options->disable_session_connection_sharing()) {
+      VLOG(5) << "Disabling TCP connection sharing";
+      args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, true);
     }
   }
   return args;
@@ -308,7 +314,7 @@ class SparseGrpcChannelCache : public CachingGrpcChannelCache {
       task_strings.emplace_back(
           strings::StrCat(id_host_port.first, " -> ", id_host_port.second));
     }
-    return strings::StrCat(job_id_, " -> {", str_util::Join(task_strings, ", "),
+    return strings::StrCat(job_id_, " -> {", absl::StrJoin(task_strings, ", "),
                            "}");
   }
 

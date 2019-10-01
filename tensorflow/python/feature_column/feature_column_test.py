@@ -1832,7 +1832,7 @@ class LinearModelTest(test.TestCase):
       }
     with self.assertRaisesRegexp(
         ValueError,
-        'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+        r'Batch size \(first dimension\) of each feature must be same.'):
       fc.linear_model(features, [price1, price2])
 
   def test_subset_of_static_batch_size_mismatch(self):
@@ -1847,7 +1847,7 @@ class LinearModelTest(test.TestCase):
       }
       with self.assertRaisesRegexp(
           ValueError,
-          'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+          r'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
         fc.linear_model(features, [price1, price2, price3])
 
   def test_runtime_batch_size_mismatch(self):
@@ -2467,7 +2467,7 @@ class _LinearModelTest(test.TestCase):
       }
     with self.assertRaisesRegexp(
         ValueError,
-        'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+        r'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
       get_keras_linear_model_predictions(features, [price1, price2])
 
   def test_subset_of_static_batch_size_mismatch(self):
@@ -2482,7 +2482,7 @@ class _LinearModelTest(test.TestCase):
       }
       with self.assertRaisesRegexp(
           ValueError,
-          'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+          r'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
         get_keras_linear_model_predictions(features, [price1, price2, price3])
 
   def test_runtime_batch_size_mismatch(self):
@@ -2682,7 +2682,7 @@ class InputLayerTest(test.TestCase):
       # additional variables
       _ = input_layer(features)
       self.assertEqual(1, len(variables))
-      self.assertEqual(variables[0], input_layer.variables[0])
+      self.assertIs(variables[0], input_layer.variables[0])
 
   def test_feature_column_input_layer_gradient(self):
     with context.eager_mode():
@@ -2974,7 +2974,7 @@ class FunctionalInputLayerTest(test.TestCase):
       }
       with self.assertRaisesRegexp(
           ValueError,
-          'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+          r'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
         fc.input_layer(features, [price1, price2])
 
   def test_subset_of_static_batch_size_mismatch(self):
@@ -2989,7 +2989,7 @@ class FunctionalInputLayerTest(test.TestCase):
       }
       with self.assertRaisesRegexp(
           ValueError,
-          'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
+          r'Batch size \(first dimension\) of each feature must be same.'):  # pylint: disable=anomalous-backslash-in-string
         fc.input_layer(features, [price1, price2, price3])
 
   def test_runtime_batch_size_mismatch(self):
@@ -4394,8 +4394,7 @@ class IdentityCategoricalColumnTest(test.TestCase):
     id_weight_pair = column._get_sparse_tensors(_LazyBuilder({'aaa': inputs}))
     self.assertIsNone(id_weight_pair.weight_tensor)
     with _initialized_session():
-      with self.assertRaisesRegexp(
-          errors.OpError, 'assert_greater_or_equal_0'):
+      with self.assertRaisesRegexp(errors.OpError, 'assert'):
         id_weight_pair.id_tensor.eval()
 
   @test_util.run_deprecated_v1
@@ -4408,8 +4407,7 @@ class IdentityCategoricalColumnTest(test.TestCase):
     id_weight_pair = column._get_sparse_tensors(_LazyBuilder({'aaa': inputs}))
     self.assertIsNone(id_weight_pair.weight_tensor)
     with _initialized_session():
-      with self.assertRaisesRegexp(
-          errors.OpError, 'assert_less_than_num_buckets'):
+      with self.assertRaisesRegexp(errors.OpError, 'assert'):
         id_weight_pair.id_tensor.eval()
 
   @test_util.run_deprecated_v1

@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow.python.eager import context
+from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import confusion_matrix
@@ -33,31 +34,6 @@ from tensorflow.python.util.deprecation import deprecated_argument_lookup
 from tensorflow.python.util.tf_export import tf_export
 
 
-@tf_export("losses.Reduction", "keras.losses.Reduction", v1=[])
-class ReductionV2(object):
-  """Types of loss reduction.
-
-  Contains the following values:
-
-  * `NONE`: Un-reduced weighted losses with the same shape as input.
-  * `SUM`: Scalar sum of weighted losses.
-  * `SUM_OVER_BATCH_SIZE`: Scalar `SUM` divided by number of elements in losses.
-  """
-
-  NONE = "none"
-  SUM = "sum"
-  SUM_OVER_BATCH_SIZE = "sum_over_batch_size"
-
-  @classmethod
-  def all(cls):
-    return (cls.NONE, cls.SUM, cls.SUM_OVER_BATCH_SIZE)
-
-  @classmethod
-  def validate(cls, key):
-    if key not in cls.all():
-      raise ValueError("Invalid Reduction Key %s." % key)
-
-
 @tf_export(v1=["losses.Reduction"])
 class Reduction(object):
   """Types of loss reduction.
@@ -70,7 +46,7 @@ class Reduction(object):
   * `SUM_OVER_BATCH_SIZE`: Scalar `SUM` divided by number of elements in losses.
   * `SUM_OVER_NONZERO_WEIGHTS`: Scalar `SUM` divided by number of non-zero
      weights. DEPRECATED.
-  * `SUM_BY_NONZERO_WEIGHTS`: Same as `SUM_OVER_NONZERO_WEIGHTS`.
+  * `SUM_BY_NONZERO_WEIGHTS`: Same as `SUM_OVER_NONZERO_WEIGHTS`. DEPRECATED.
   """
 
   NONE = "none"
@@ -138,7 +114,7 @@ def _num_present(losses, weights, per_batch=False):
        and not math_ops.equal(weights, 0.0))):
     return _num_elements(losses)
   with ops.name_scope(None, "num_present", (losses, weights)) as scope:
-    weights = math_ops.to_float(weights)
+    weights = math_ops.cast(weights, dtype=dtypes.float32)
     present = array_ops.where(
         math_ops.equal(weights, 0.0),
         array_ops.zeros_like(weights),
@@ -198,16 +174,15 @@ def compute_weighted_loss(
   Reduction.validate(reduction)
   with ops.name_scope(scope, "weighted_loss", (losses, weights)):
     # Save the `reduction` argument for loss normalization when distributing
-    # to multiple replicas.
-    # TODO(josh11b): Associate it with the returned op for more precision.
+    # to multiple replicas. Used only for estimator + v1 optimizer flow.
     ops.get_default_graph()._last_loss_reduction = reduction  # pylint: disable=protected-access
 
     with ops.control_dependencies((
         weights_broadcast_ops.assert_broadcastable(weights, losses),)):
       losses = ops.convert_to_tensor(losses)
       input_dtype = losses.dtype
-      losses = math_ops.to_float(losses)
-      weights = math_ops.to_float(weights)
+      losses = math_ops.cast(losses, dtype=dtypes.float32)
+      weights = math_ops.cast(weights, dtype=dtypes.float32)
       weighted_losses = math_ops.multiply(losses, weights)
       if reduction == Reduction.NONE:
         loss = weighted_losses
@@ -215,8 +190,7 @@ def compute_weighted_loss(
         loss = math_ops.reduce_sum(weighted_losses)
         if reduction == Reduction.MEAN:
           loss = _safe_mean(
-              loss,
-              math_ops.reduce_sum(array_ops.ones_like(losses) * weights))
+              loss, math_ops.reduce_sum(array_ops.ones_like(losses) * weights))
         elif (reduction == Reduction.SUM_BY_NONZERO_WEIGHTS or
               reduction == Reduction.SUM_OVER_NONZERO_WEIGHTS):
           loss = _safe_mean(loss, _num_present(losses, weights))
@@ -274,8 +248,8 @@ def absolute_difference(
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "absolute_difference",
                       (predictions, labels, weights)) as scope:
-    predictions = math_ops.to_float(predictions)
-    labels = math_ops.to_float(labels)
+    predictions = math_ops.cast(predictions, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     predictions.get_shape().assert_is_compatible_with(labels.get_shape())
     losses = math_ops.abs(math_ops.subtract(predictions, labels))
     return compute_weighted_loss(
@@ -328,8 +302,8 @@ def cosine_distance(
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "cosine_distance_loss",
                       (predictions, labels, weights)) as scope:
-    predictions = math_ops.to_float(predictions)
-    labels = math_ops.to_float(labels)
+    predictions = math_ops.cast(predictions, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     predictions.get_shape().assert_is_compatible_with(labels.get_shape())
 
     radial_diffs = math_ops.multiply(predictions, labels)
@@ -376,8 +350,8 @@ def hinge_loss(labels, logits, weights=1.0, scope=None,
   if logits is None:
     raise ValueError("logits must not be None.")
   with ops.name_scope(scope, "hinge_loss", (logits, labels, weights)) as scope:
-    logits = math_ops.to_float(logits)
-    labels = math_ops.to_float(labels)
+    logits = math_ops.cast(logits, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     logits.get_shape().assert_is_compatible_with(labels.get_shape())
     # We first need to convert binary labels to -1/1 labels (as floats).
     all_ones = array_ops.ones_like(labels)
@@ -445,8 +419,8 @@ def huber_loss(labels, predictions, weights=1.0, delta=1.0, scope=None,
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "huber_loss",
                       (predictions, labels, weights)) as scope:
-    predictions = math_ops.to_float(predictions)
-    labels = math_ops.to_float(labels)
+    predictions = math_ops.cast(predictions, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     predictions.get_shape().assert_is_compatible_with(labels.get_shape())
     error = math_ops.subtract(predictions, labels)
     abs_error = math_ops.abs(error)
@@ -511,8 +485,8 @@ def log_loss(labels, predictions, weights=1.0, epsilon=1e-7, scope=None,
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "log_loss",
                       (predictions, labels, weights)) as scope:
-    predictions = math_ops.to_float(predictions)
-    labels = math_ops.to_float(labels)
+    predictions = math_ops.cast(predictions, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     predictions.get_shape().assert_is_compatible_with(labels.get_shape())
     losses = -math_ops.multiply(
         labels,
@@ -579,11 +553,11 @@ def mean_pairwise_squared_error(
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "mean_pairwise_squared_error",
                       (predictions, labels, weights)) as scope:
-    weights = math_ops.to_float(weights)
-    labels = math_ops.to_float(labels)
+    weights = math_ops.cast(weights, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     with ops.control_dependencies((
         weights_broadcast_ops.assert_broadcastable(weights, labels),)):
-      predictions = math_ops.to_float(predictions)
+      predictions = math_ops.cast(predictions, dtype=dtypes.float32)
       predictions.get_shape().assert_is_compatible_with(labels.get_shape())
 
       diffs = math_ops.subtract(predictions, labels)
@@ -664,8 +638,8 @@ def mean_squared_error(
     raise ValueError("predictions must not be None.")
   with ops.name_scope(scope, "mean_squared_error",
                       (predictions, labels, weights)) as scope:
-    predictions = math_ops.to_float(predictions)
-    labels = math_ops.to_float(labels)
+    predictions = math_ops.cast(predictions, dtype=dtypes.float32)
+    labels = math_ops.cast(labels, dtype=dtypes.float32)
     predictions.get_shape().assert_is_compatible_with(labels.get_shape())
     losses = math_ops.squared_difference(predictions, labels)
     return compute_weighted_loss(
@@ -793,7 +767,7 @@ def softmax_cross_entropy(
 
     if label_smoothing > 0:
       num_classes = math_ops.cast(
-          array_ops.shape(onehot_labels)[1], logits.dtype)
+          array_ops.shape(onehot_labels)[-1], logits.dtype)
       smooth_positives = 1.0 - label_smoothing
       smooth_negatives = label_smoothing / num_classes
       onehot_labels = onehot_labels * smooth_positives + smooth_negatives

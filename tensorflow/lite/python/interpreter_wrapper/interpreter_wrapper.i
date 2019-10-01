@@ -21,7 +21,17 @@ limitations under the License.
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/model.h"
 #include "tensorflow/lite/python/interpreter_wrapper/interpreter_wrapper.h"
+#include "tensorflow/lite/python/interpreter_wrapper/python_error_reporter.h"
 %}
+
+
+%typemap(in) TfLiteDelegate* {
+  $1 = reinterpret_cast<TfLiteDelegate*>(PyLong_AsVoidPtr($input));
+}
+
+%typemap(out) TfLiteDelegate* {
+  $result = PyLong_FromVoidPtr($1)
+}
 
 
 %include "tensorflow/lite/python/interpreter_wrapper/interpreter_wrapper.h"

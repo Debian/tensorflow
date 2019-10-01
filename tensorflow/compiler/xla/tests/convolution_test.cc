@@ -98,7 +98,7 @@ class ForwardPassConvolution_3x3x256_256_OutputZ_Iota : public ConvolutionTest {
     precision.add_operand_precision(PrecisionConfig::HIGHEST);
     precision.add_operand_precision(PrecisionConfig::DEFAULT);
     Conv(lhs, rhs, {1, 1}, Padding::kValid, /*feature_group_count=*/1,
-         &precision);
+         /*batch_group_count=*/1, &precision);
 
     ComputeAndCompare(&builder, {}, error_spec_);
   }
@@ -467,8 +467,8 @@ XLA_TEST_F(ConvolutionTest, Convolve3D_1x4x2x3x3_2x2x2x3x3_Valid) {
 // servers. The error message is missing the operator ++.
 template <typename T>
 void iota_int_init_value(std::vector<T>& values, int init_value) {
-  std::for_each(values.begin(), values.end(),
-                [&](T& value) { value = static_cast<T>(init_value++); });
+  absl::c_for_each(values,
+                   [&](T& value) { value = static_cast<T>(init_value++); });
 }
 
 template <typename T>
@@ -1801,7 +1801,8 @@ INSTANTIATE_TEST_CASE_P(
                       Convolve1DTestParam{24, 1, 1, 10, 5},
                       Convolve1DTestParam{160, 1, 1, 10, 1},
                       Convolve1DTestParam{255, 1, 1, 3, 1},
-                      Convolve1DTestParam{130, 1, 1, 1, 3},
+                      Convolve1DTestParam{130, 1, 1, 1, 2},
+                      Convolve1DTestParam{136, 1, 1, 1, 2},
                       Convolve1DTestParam{64, 1, 1, 1, 1},
                       Convolve1DTestParam{128, 1, 1, 1, 1},
                       Convolve1DTestParam{139, 1, 1, 128, 1},
@@ -1841,15 +1842,11 @@ INSTANTIATE_TEST_CASE_P(
                       Convolve1DTestParam{130, 1, 1, 1, 3},
                       Convolve1DTestParam{64, 1, 1, 1, 1},
                       Convolve1DTestParam{128, 1, 1, 1, 1},
-// TODO(b/72566306): The following five tests failed on CPU with unreasonable
-// relative errors.  Last ran on 2018-02-22.
-#if XLA_TEST_BACKEND_GPU
                       Convolve1DTestParam{139, 1, 1, 128, 1},
                       Convolve1DTestParam{640, 3, 3, 128, 1},
                       Convolve1DTestParam{900, 1, 1, 10, 1},
                       Convolve1DTestParam{1, 10, 10, 1, 10},
                       Convolve1DTestParam{1, 10, 130, 1, 1},
-#endif
                       Convolve1DTestParam{1, 10, 130, 1, 2},
                       Convolve1DTestParam{1, 64, 64, 1, 10},
                       Convolve1DTestParam{1, 65, 65, 1, 1},
@@ -1945,7 +1942,8 @@ XLA_TEST_F(ConvolutionTest, ConvolveF32BackwardInputGroupedConvolution) {
 
 class ConvolutionHloTest : public HloTestBase {};
 
-XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_CPU(ConvolveF64Forward)) {
+// double datatype is not yet supported in ROCm
+XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_GPU_ROCM(ConvolveF64Forward)) {
   constexpr char kHlo[] = R"(
 HloModule TestModule
 
@@ -1957,7 +1955,7 @@ ENTRY Test {
   EXPECT_TRUE(RunAndCompare(kHlo, ErrorSpec{0.001}));
 }
 
-XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_CPU(ConvolveF32ForwardReversed)) {
+XLA_TEST_F(ConvolutionHloTest, ConvolveF32ForwardReversed) {
   constexpr char kHlo[] = R"(
 HloModule TestModule
 
@@ -1969,7 +1967,9 @@ ENTRY Test {
   EXPECT_TRUE(RunAndCompare(kHlo, ErrorSpec{0.001}));
 }
 
-XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_CPU(ConvolveF64BackwardFilter)) {
+// double datatype is not yet supported in ROCm
+XLA_TEST_F(ConvolutionHloTest,
+           DISABLED_ON_GPU_ROCM(ConvolveF64BackwardFilter)) {
   constexpr char kHlo[] = R"(
 HloModule TestModule
 
@@ -1981,7 +1981,8 @@ ENTRY Test {
   EXPECT_TRUE(RunAndCompare(kHlo, ErrorSpec{0.001}));
 }
 
-XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_CPU(ConvolveF64BackwardInput)) {
+// double datatype is not yet supported in ROCm
+XLA_TEST_F(ConvolutionHloTest, DISABLED_ON_GPU_ROCM(ConvolveF64BackwardInput)) {
   constexpr char kHlo[] = R"(
 HloModule TestModule
 

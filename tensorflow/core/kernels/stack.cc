@@ -96,7 +96,7 @@ class Stack : public ResourceBase {
 
   DataType ElemType() { return elem_type_; }
 
-  string DebugString() override {
+  string DebugString() const override {
     mutex_lock l(mu_);
     return strings::StrCat("Stack[", stack_name_, "]");
   }
@@ -184,10 +184,10 @@ void StackOp::Compute(OpKernelContext* ctx) {
   ResourceMgr* rm = ctx->resource_manager();
   OP_REQUIRES(ctx, rm != nullptr, errors::Internal("No resource manager."));
   string key = strings::StrCat(kContainer, stack_name);
-  Stack* stack = new Stack(elem_type_, stack_name, size);
   auto* step_container = ctx->step_container();
   OP_REQUIRES(ctx, step_container != nullptr,
               errors::Internal("No step container."));
+  Stack* stack = new Stack(elem_type_, stack_name, size);
   OP_REQUIRES_OK(ctx, rm->Create(step_container->name(), key, stack));
   if (IsRefType(ctx->expected_output_dtype(0))) {
     // Create the stack handle.
@@ -244,9 +244,9 @@ void StackPushOp::ComputeAsync(OpKernelContext* ctx, DoneCallback done) {
     DeviceContext* device_ctxt = ctx->op_device_context();
     auto device = static_cast<tensorflow::Device*>(ctx->device());
     Allocator* allocator = device->GetAllocator(alloc_attrs);
-    AllocatorStats stats;
-    allocator->GetStats(&stats);
-    if (stats.bytes_in_use > (stats.bytes_limit * kOccupancy)) {
+    absl::optional<AllocatorStats> stats = allocator->GetStats();
+    if (stats && *stats->bytes_limit &&
+        stats->bytes_in_use > (*stats->bytes_limit * kOccupancy)) {
       // Asynchronously copy the tensor from GPU to CPU memory.
       // TODO(yuanbyu): Swap the oldest tensor first.
       AllocatorAttributes host_alloc_attrs;

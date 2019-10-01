@@ -13,11 +13,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow/cc/framework/cc_op_gen.h"
+
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-#include "tensorflow/cc/framework/cc_op_gen.h"
+#include "absl/strings/escaping.h"
 #include "tensorflow/core/framework/api_def.pb.h"
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/attr_value_util.h"
@@ -42,14 +44,19 @@ namespace {
 const int kRightMargin = 79;
 
 // Converts:
-//   bazel-out/.../genfiles/(external/YYY/)?XX
+//   bazel-out/.../(bin|genfiles)/(external/YYY/)?XX
 // to: XX.
 string GetPath(const string& dot_h_fname) {
-  auto pos = dot_h_fname.find("/genfiles/");
+  auto pos = dot_h_fname.find("/bin/");
   string result = dot_h_fname;
   if (pos != string::npos) {
     // - 1 account for the terminating null character (\0) in "/genfiles/".
-    result = dot_h_fname.substr(pos + sizeof("/genfiles/") - 1);
+    result = dot_h_fname.substr(pos + sizeof("/bin/") - 1);
+  } else {
+    pos = dot_h_fname.find("/genfiles/");
+    if (pos != string::npos) {
+      result = dot_h_fname.substr(pos + sizeof("/genfiles/") - 1);
+    }
   }
   if (result.size() > sizeof("external/") &&
       result.compare(0, sizeof("external/") - 1, "external/") == 0) {
@@ -128,7 +135,7 @@ string MakeComment(StringPiece text, StringPiece indent) {
 }
 
 string PrintString(const string& str) {
-  return strings::StrCat("\"", str_util::CEscape(str), "\"");
+  return strings::StrCat("\"", absl::CEscape(str), "\"");
 }
 
 string PrintTensorShape(const TensorShapeProto& shape_proto) {
@@ -186,7 +193,7 @@ string PrintTensor(const TensorProto& tensor_proto) {
       string ret;
       for (int64 i = 0; i < num_elts; ++i) {
         if (i > 0) strings::StrAppend(&ret, " ");
-        strings::StrAppend(&ret, str_util::CEscape(t.flat<string>()(i)));
+        strings::StrAppend(&ret, absl::CEscape(t.flat<string>()(i)));
       }
       return ret;
     }
@@ -286,11 +293,28 @@ string ToCamelCase(const string& str) {
   bool cap = true;
   while (i < str.size()) {
     const char c = str[i++];
-    if (c == joiner) {
+    if (c == '>') {
+      cap = true;
+    } else if (c == joiner) {
       cap = true;
     } else if (cap) {
       result += toupper(c);
       cap = false;
+    } else {
+      result += c;
+    }
+  }
+  return result;
+}
+
+string SeparateNamespaces(const string& str) {
+  string result;
+  const char joiner = '_';
+  size_t i = 0;
+  while (i < str.size()) {
+    const char c = str[i++];
+    if (c == '>') {
+      result += joiner;
     } else {
       result += c;
     }
@@ -321,6 +345,7 @@ std::pair<const char*, bool> AttrTypeName(StringPiece attr_type) {
           {"tensor", {"TensorProto", true}},
           {"list(tensor)", {"gtl::ArraySlice<TensorProto>", true}},
           {"func", {"NameAttrList", true}},
+          {"list(func)", {"gtl::ArraySlice<NameAttrList>", true}},
       };
 
   auto entry = attr_type_map->find(attr_type);
@@ -542,7 +567,7 @@ struct OpInfo {
 OpInfo::OpInfo(const OpDef& graph_op_def, const ApiDef& api_def,
                const std::vector<string>& aliases)
     : graph_op_def(graph_op_def), api_def(api_def), aliases(aliases) {
-  op_name = api_def.endpoint(0).name();
+  op_name = SeparateNamespaces(api_def.endpoint(0).name());
   InferOpAttributes(graph_op_def, &inferred_input_attrs);
   has_optional_attrs = HasOptionalAttrs(api_def, inferred_input_attrs);
   arg_types.push_back("const ::tensorflow::Scope&");

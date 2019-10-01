@@ -1,9 +1,5 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])  # Apache 2.0
-
 load(
-    "//tensorflow/core:platform/default/build_config.bzl",
+    "//tensorflow/core/platform:default/build_config.bzl",
     "tf_proto_library_cc",
     "tf_proto_library_py",
 )
@@ -12,6 +8,11 @@ load(
     "tf_cc_binary",
     "tf_cc_test",
     "tf_copts",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
 tf_proto_library_cc(
@@ -74,6 +75,8 @@ cc_library(
     linkstatic = 1,
     visibility = ["//visibility:public"],
     deps = [
+        "//tensorflow/lite/kernels/internal:common",
+        "//tensorflow/lite/kernels/internal:compatibility",
         "//tensorflow/lite/kernels/internal:reference_base",
         "//tensorflow/lite/kernels/internal:types",
     ],
@@ -133,6 +136,7 @@ cc_library(
 cc_library(
     name = "model_cmdline_flags",
     srcs = [
+        "args.cc",
         "model_cmdline_flags.cc",
     ],
     hdrs = [
@@ -163,7 +167,7 @@ cc_library(
     ],
     deps = [
         # Placeholder for internal file dependency.
-        "@protobuf_archive//:protobuf_headers",
+        "@com_google_protobuf//:protobuf_headers",
         "//tensorflow/core:framework_lite",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
@@ -174,6 +178,8 @@ cc_library(
     name = "graph_transformations",
     srcs = [
         "graph_transformations/convert_expanddims_to_reshape.cc",
+        "graph_transformations/convert_matrix_diag_v2_to_v1.cc",
+        "graph_transformations/convert_matrix_set_diag_v2_to_v1.cc",
         "graph_transformations/convert_pure_conv_to_depthwise.cc",
         "graph_transformations/convert_reorder_axes.cc",
         "graph_transformations/convert_squeeze_to_reshape.cc",
@@ -192,6 +198,7 @@ cc_library(
         "graph_transformations/fuse_binary_into_preceding_affine.cc",
         "graph_transformations/fuse_broadcast_into_following_binary.cc",
         "graph_transformations/graph_transformations.cc",
+        "graph_transformations/group_bidirectional_sequence_ops.cc",
         "graph_transformations/hardcode_min_max.cc",
         "graph_transformations/identify_dilated_conv.cc",
         "graph_transformations/identify_l2_normalization.cc",
@@ -281,9 +288,11 @@ cc_library(
         ":runtime",
         ":toco_port",
         ":tooling_util",
+        "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/lite/kernels/internal:quantization_util",
         "//tensorflow/lite/kernels/internal:strided_slice_logic",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -308,7 +317,7 @@ cc_library(
         "toco_tooling.h",
     ],
     copts = tf_copts() + select({
-        "//tensorflow:darwin": ["-DTOCO_SUPPORT_PORTABLE_PROTOS=0"],
+        "//tensorflow:macos": ["-DTOCO_SUPPORT_PORTABLE_PROTOS=0"],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
@@ -322,7 +331,7 @@ cc_library(
         ":toco_flags_proto_cc",
         ":toco_port",
         ":tooling_util",
-        "@protobuf_archive//:protobuf_headers",
+        "@com_google_protobuf//:protobuf_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "//tensorflow/core:core_cpu_lib",
@@ -333,7 +342,7 @@ cc_library(
         "//tensorflow/lite/toco/tflite:export",
         "//tensorflow/lite/toco/tflite:import",
     ] + select({
-        # Placeholder for internal darwin rule.
+        # Placeholder for internal macOS rule.
         "//conditions:default": [],
     }),
 )
@@ -376,9 +385,10 @@ cc_library(
         ":types_proto_cc",
         "//tensorflow/core:lib",
         "//tensorflow/lite/kernels/internal:types",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
+        "@com_google_protobuf//:protobuf_headers",
         "@com_googlesource_code_re2//:re2",
-        "@protobuf_archive//:protobuf_headers",
     ],
 )
 
@@ -473,6 +483,32 @@ tf_cc_test(
     ],
     deps = [
         ":toco_port",
+        "//tensorflow/lite/testing:util",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+tf_cc_test(
+    name = "model_cmdline_flags_test",
+    srcs = [
+        "model_cmdline_flags_test.cc",
+    ],
+    deps = [
+        ":model_cmdline_flags",
+        ":model_flags_proto_cc",
+        "//tensorflow/lite/testing:util",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+tf_cc_test(
+    name = "toco_cmdline_flags_test",
+    srcs = [
+        "toco_cmdline_flags_test.cc",
+    ],
+    deps = [
+        ":toco_cmdline_flags",
+        ":toco_flags_proto_cc",
         "//tensorflow/lite/testing:util",
         "@com_google_googletest//:gtest",
     ],

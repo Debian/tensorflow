@@ -12,12 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
-#include <stdlib.h>
-#include <string.h>
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/kernels/activation_functor.h"
+#include "tensorflow/lite/kernels/internal/compatibility.h"
+#include "tensorflow/lite/kernels/internal/reference/portable_tensor_utils_impl.h"
 #include "tensorflow/lite/kernels/internal/round.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 
@@ -88,12 +91,11 @@ void PortableMatrixBatchVectorMultiplyAccumulate(
     const int8_t* __restrict__ matrix, const int m_rows, const int m_cols,
     const int8_t* __restrict__ vectors, const float* scaling_factors,
     int n_batch, float* __restrict__ result, int result_stride) {
-  int batch, row, col;
-  for (batch = 0; batch < n_batch; ++batch, vectors += m_cols) {
+  for (int batch = 0; batch < n_batch; ++batch, vectors += m_cols) {
     const float batch_scaling_factor = scaling_factors[batch];
     // Get the address of the first row.
     const int8_t* row_ptr = matrix;
-    for (row = 0; row < m_rows; ++row, result += result_stride) {
+    for (int row = 0; row < m_rows; ++row, result += result_stride) {
       // Initialize the dot product sum for the row to 0.
       int32_t dotprod = 0;
 #if defined(__GNUC__)
@@ -101,11 +103,75 @@ void PortableMatrixBatchVectorMultiplyAccumulate(
       __builtin_prefetch(row_ptr, 0 /* prefetch for read */,
                          3 /* temporal locality */);
 #endif
-      // For every block of 16 8-bit elements (128-bit register) from each row.
-      for (col = 0; col < m_cols; ++col, ++row_ptr) {
+      for (int col = 0; col < m_cols; ++col, ++row_ptr) {
         dotprod += (*row_ptr) * (vectors[col]);
       }  // for col
-      *result += (dotprod * batch_scaling_factor);
+      *result += dotprod * batch_scaling_factor;
+    }  // for row
+  }    // for batch
+}
+
+void PortableSparseMatrixBatchVectorMultiplyAccumulate(
+    const float* __restrict__ matrix, const uint8_t* __restrict__ ledger,
+    int m_rows, int m_cols, const float* __restrict__ vector, int n_batch,
+    float* __restrict__ result, int result_stride) {
+  const int kBlockSize = 16;
+  TFLITE_DCHECK_EQ(  // NOLINT
+      m_cols % kBlockSize, 0);
+  float* result_in_batch = result;
+  for (int b = 0; b < n_batch; b++) {
+    const float* matrix_ptr = matrix;
+    const uint8_t* ledger_ptr = ledger;
+    for (int r = 0; r < m_rows; r++) {
+      float dot_prod = 0.0f;
+      int num_nonzero_blocks = *ledger_ptr++;
+      if (num_nonzero_blocks > 0) {
+        const float* vector_in_batch = vector + b * m_cols;
+        for (int i = 0; i < num_nonzero_blocks; i++) {
+          const int block_start_index = *ledger_ptr++ * kBlockSize;
+          const float* vector_block_in_batch_ptr =
+              vector_in_batch + block_start_index;
+          for (int c = 0; c < kBlockSize; c++) {
+            dot_prod += *matrix_ptr++ * *vector_block_in_batch_ptr++;
+          }
+        }
+      }
+      *result_in_batch += dot_prod;
+      result_in_batch += result_stride;
+    }
+  }
+}
+
+void PortableSparseMatrixBatchVectorMultiplyAccumulate(
+    const int8_t* __restrict__ matrix, const uint8_t* ledger, const int m_rows,
+    const int m_cols, const int8_t* __restrict__ vectors,
+    const float* scaling_factors, int n_batch, float* __restrict__ result,
+    int result_stride) {
+  static const int kBlockSize = 16;
+  TFLITE_DCHECK_EQ(  // NOLINT
+      m_cols % kBlockSize, 0);
+  for (int batch = 0; batch < n_batch; ++batch, vectors += m_cols) {
+    const float batch_scaling_factor = scaling_factors[batch];
+    const uint8_t* ledger_ptr = ledger;
+    // Get the address of the first row.
+    const int8_t* row_ptr = matrix;
+    for (int row = 0; row < m_rows; ++row, result += result_stride) {
+      // Initialize the dot product sum for the row to 0.
+      int32_t dotprod = 0;
+#if defined(__GNUC__)
+      // Prefetch the row to cache.
+      __builtin_prefetch(row_ptr, 0 /* prefetch for read */,
+                         3 /* temporal locality */);
+#endif
+      int num_nonzero_blocks = *ledger_ptr++;
+      for (int i = 0; i < num_nonzero_blocks; i++) {
+        const int block_start_index = *ledger_ptr++ * kBlockSize;
+        const int8_t* vector_block_ptr = vectors + block_start_index;
+        for (int c = 0; c < kBlockSize; c++) {
+          dotprod += (*row_ptr++) * (*vector_block_ptr++);
+        }  // for block
+      }    // for num_nonzero_blocks
+      *result += dotprod * batch_scaling_factor;
     }  // for row
   }    // for batch
 }
@@ -267,9 +333,9 @@ void PortableMeanStddevNormalization(const float* input_vector,
     float stddev_inv = 0.0f;
     const float variance = sum_sq / v_size - mean * mean;
     if (variance == 0) {
-      stddev_inv = 1.0f / sqrt(normalization_epsilon);
+      stddev_inv = 1.0f / std::sqrt(normalization_epsilon);
     } else {
-      stddev_inv = 1.0f / sqrt(variance);
+      stddev_inv = 1.0f / std::sqrt(variance);
     }
     for (int i = 0; i < v_size; ++i) {
       output_vector[i] = (input_vector[i] - mean) * stddev_inv;

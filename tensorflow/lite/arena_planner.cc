@@ -55,12 +55,17 @@ TfLiteStatus ArenaPlanner::ResetAllocations() {
   TF_LITE_ENSURE_STATUS(persistent_arena_.Clear());
   allocs_.clear();
   allocs_.resize(graph_info_->num_tensors());
+  // Note that we only clear the alloc_queue_ when re-planning allocations, as
+  // it should only change when the graph topology itself changes.
   return kTfLiteOk;
 }
 
 TfLiteStatus ArenaPlanner::PlanAllocations() {
   // Invalidate any existing data.
   TF_LITE_ENSURE_STATUS(ResetAllocations());
+  // The alloc_queue_ is specific to the graph topology, and will be
+  // completely reconstructed from graph data here.
+  alloc_queue_.clear();
 
   // Keeps track of references to each tensor.
   std::vector<int> refcounts(graph_info_->num_tensors(), 0);
@@ -103,8 +108,8 @@ TfLiteStatus ArenaPlanner::PlanAllocations() {
     refcounts[tensor_index]++;
   }
 
-  // Variable tensors should are also never overwritten and need to be alive all
-  // the time.
+  // Variable tensors also should be ensured to be never overwritten and need to
+  // be alive all the time.
   for (int tensor_index : graph_info_->variables()) {
     refcounts[tensor_index]++;
   }
@@ -130,7 +135,7 @@ TfLiteStatus ArenaPlanner::PlanAllocations() {
   }
 
   // Count references to node input tensors.
-  for (int i = 0; i < graph_info_->num_nodes(); ++i) {
+  for (size_t i = 0; i < graph_info_->num_nodes(); ++i) {
     const TfLiteNode& node = graph_info_->node(i);
     TfLiteIntArray* node_inputs = node.inputs;
     for (int j = 0; j < node_inputs->size; ++j) {
@@ -148,7 +153,7 @@ TfLiteStatus ArenaPlanner::PlanAllocations() {
     }
   }
   // Go through the graph in execution order.
-  for (int i = 0; i < graph_info_->num_nodes(); ++i) {
+  for (size_t i = 0; i < graph_info_->num_nodes(); ++i) {
     const TfLiteNode& node = graph_info_->node(i);
 
     // First queue output tensors for allocation.
@@ -188,7 +193,7 @@ TfLiteStatus ArenaPlanner::ExecuteAllocations(int first_node, int last_node) {
   TF_LITE_ENSURE_STATUS(CalculateAllocations(first_node, last_node));
   TF_LITE_ENSURE_STATUS(Commit());
 
-  for (int i = 0; i < graph_info_->num_tensors(); ++i) {
+  for (int i = 0; i < static_cast<int>(graph_info_->num_tensors()); ++i) {
     // TODO(ahentz): we could do this only for the tensors that were modified
     // in CalculateAllocations(), instead of redoing it for tensors that
     // already had proper pointers. However we must be very careful, because
@@ -232,9 +237,14 @@ TfLiteStatus ArenaPlanner::CalculateAllocations(int first_node, int last_node) {
     }
   }
 
-  // Don't forget to deallocate temporaries of last node.
-  TF_LITE_ENSURE_STATUS(
-      CalculateDeallocationOfInternalTensors(active_node - 1));
+  // For the case if the graph is empty the node index can be negative since we
+  // substract from the active node, so the node_index can be zero for those
+  // cases
+  if (active_node > 0) {
+    // Don't forget to deallocate temporaries of last node.
+    TF_LITE_ENSURE_STATUS(
+        CalculateDeallocationOfInternalTensors(active_node - 1));
+  }
 
   return kTfLiteOk;
 }
@@ -279,8 +289,8 @@ TfLiteStatus ArenaPlanner::CalculateTensorDeallocation(int tensor_index) {
 
 TfLiteStatus ArenaPlanner::CalculateAllocationOfInternalTensors(
     int node_index) {
-  if (node_index < graph_info_->num_nodes()) {
-    const TfLiteNode& node = graph_info_->node(node_index);
+  if (node_index < static_cast<int>(graph_info_->num_nodes())) {
+    const TfLiteNode& node = graph_info_->node(static_cast<size_t>(node_index));
     TfLiteIntArray* node_temporaries = node.temporaries;
     for (int i = 0; i < node_temporaries->size; ++i) {
       int tensor_index = node_temporaries->data[i];
@@ -292,8 +302,8 @@ TfLiteStatus ArenaPlanner::CalculateAllocationOfInternalTensors(
 
 TfLiteStatus ArenaPlanner::CalculateDeallocationOfInternalTensors(
     int node_index) {
-  if (node_index < graph_info_->num_nodes()) {
-    const TfLiteNode& node = graph_info_->node(node_index);
+  if (node_index < static_cast<int>(graph_info_->num_nodes())) {
+    const TfLiteNode& node = graph_info_->node(static_cast<size_t>(node_index));
     TfLiteIntArray* node_temporaries = node.temporaries;
     for (int i = 0; i < node_temporaries->size; ++i) {
       int tensor_index = node_temporaries->data[i];
