@@ -462,6 +462,7 @@ class PrintModelAnalysisTest(test.TestCase):
       self.assertTrue(has_rnn)
       self.assertTrue(has_loop)
 
+  @test_util.run_v1_only('b/139088991')
   def testPprof(self):
     for attr in ['micros', 'bytes', 'accelerator_micros', 'cpu_micros',
                  'params', 'float_ops']:
@@ -652,6 +653,7 @@ class PrintModelAnalysisTest(test.TestCase):
       self._trainLoop(x, 10, time_dir, time_steps,
                       memory_dir, memory_steps, profile_dir, dump_steps)
 
+  @test_util.run_v1_only('b/120545219')
   def testOOM(self):
     if not test.is_gpu_available():
       return
@@ -678,6 +680,7 @@ class PrintModelAnalysisTest(test.TestCase):
                       exception_str)
       self.assertGreater(float(mat.group(1)), 0.0)
 
+  @test_util.run_v1_only('b/120545219')
   def testDistributedOOM(self):
     if not test.is_gpu_available():
       return
@@ -745,6 +748,7 @@ class PrintModelAnalysisTest(test.TestCase):
       self.assertEqual(n.output_bytes, n2.output_bytes)
       self.assertEqual(n.residual_bytes, n2.residual_bytes)
 
+  @test_util.run_v1_only('b/120545219')
   def testTraceLoopBytes(self):
     if not test.is_gpu_available(): return
     ops.reset_default_graph()

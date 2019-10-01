@@ -55,7 +55,6 @@ void SetDataTypeForAllOutputs(Model* model, Operator* op,
   // Do the actual output data types propagation.
   switch (op->type) {
     case OperatorType::kDequantize:
-    case OperatorType::kResizeBilinear:
       // These operators unconditionally produce float outputs
       SetDataTypeForAllOutputs(model, op, ArrayDataType::kFloat);
       break;
@@ -249,6 +248,54 @@ void SetDataTypeForAllOutputs(Model* model, Operator* op,
     case OperatorType::kUnidirectionalSequenceLstm: {
       const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
       if (data_type != ArrayDataType::kFloat) return ::tensorflow::Status::OK();
+      SetDataTypeForAllOutputs(model, op, data_type);
+      break;
+    }
+    case OperatorType::kUnidirectionalSequenceRnn: {
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
+      if (data_type != ArrayDataType::kFloat) return ::tensorflow::Status::OK();
+      SetDataTypeForAllOutputs(model, op, data_type);
+      break;
+    }
+    case OperatorType::kUnique: {
+      CHECK_EQ(op->outputs.size(), 2);
+      const UniqueOperator* unique_op = static_cast<UniqueOperator*>(op);
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
+      model->GetArray(op->outputs[0]).data_type = data_type;
+      model->GetArray(op->outputs[1]).data_type = unique_op->idx_out_type;
+      break;
+    }
+    case OperatorType::kBidirectionalSequenceLstm: {
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
+      if (data_type != ArrayDataType::kFloat) return ::tensorflow::Status::OK();
+      SetDataTypeForAllOutputs(model, op, data_type);
+      break;
+    }
+    case OperatorType::kBidirectionalSequenceRnn: {
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
+      if (data_type != ArrayDataType::kFloat) return ::tensorflow::Status::OK();
+      SetDataTypeForAllOutputs(model, op, data_type);
+      break;
+    }
+    case OperatorType::kLstmCell: {
+      // It's tricky to propagate data types through a LstmCell, as that has
+      // multiple inputs and outputs, and there are quantized cases with
+      // mixed (8bit vs 16bit) cases. Fortunately, that should never be needed,
+      // as the data formats, such as TFLITE, that have LstmCell nodes, also
+      // have data type fields for all their arrays.
+      break;
+    }
+    case OperatorType::kMatrixDiag: {
+      CHECK_EQ(op->inputs.size(), 1);
+      CHECK_EQ(op->outputs.size(), 1);
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
+      SetDataTypeForAllOutputs(model, op, data_type);
+      break;
+    }
+    case OperatorType::kMatrixSetDiag: {
+      CHECK_EQ(op->inputs.size(), 2);
+      CHECK_EQ(op->outputs.size(), 1);
+      const ArrayDataType data_type = model->GetArray(op->inputs[0]).data_type;
       SetDataTypeForAllOutputs(model, op, data_type);
       break;
     }

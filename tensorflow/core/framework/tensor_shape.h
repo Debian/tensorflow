@@ -47,7 +47,7 @@ class TensorShapeRep {
   TensorShapeRep(const TensorShapeRep& b);
   void operator=(const TensorShapeRep& b);
 
-  /// Move the specified shape.  After moving, <b> is safe for destruction and
+  /// Move the specified shape.  After moving, `b` is safe for destruction and
   // can be reassigned into, but its dimensions and number of elements can be
   // nonsensical (e.g., negative dimension sizes, or number of elements not
   // properly recomputed).
@@ -256,6 +256,7 @@ class TensorShapeBase : public TensorShapeRep {
 
  private:
   void RecomputeNumElements();
+  void InitDims(gtl::ArraySlice<int64> dim_sizes);
 
   // True for PartialTensorShape, false for TensorShape
   static constexpr bool kIsPartial =
@@ -547,6 +548,13 @@ inline TensorShape::operator const PartialTensorShape&() const {
 // Declare explicit instantiations in .cc file
 extern template class TensorShapeBase<TensorShape>;
 extern template class TensorShapeBase<PartialTensorShape>;
+
+// A convenient struct to represent a (DataType, PartialTensorShape) pair. It's
+// often used in shape inference.
+struct DtypeAndPartialTensorShape {
+  DataType dtype;
+  PartialTensorShape shape;
+};
 
 }  // namespace tensorflow
 

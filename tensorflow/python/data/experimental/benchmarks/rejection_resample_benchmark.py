@@ -39,6 +39,9 @@ def _time_resampling(data_np, target_dist, init_dist, num_to_sample):  # pylint:
           initial_dist=init_dist,
           seed=142))
 
+  options = dataset_ops.Options()
+  options.experimental_optimization.apply_default_optimizations = False
+  dataset = dataset.with_options(options)
   get_next = dataset_ops.make_one_shot_iterator(dataset).get_next()
 
   with session.Session() as sess:
@@ -53,7 +56,7 @@ def _time_resampling(data_np, target_dist, init_dist, num_to_sample):  # pylint:
 class RejectionResampleBenchmark(test.Benchmark):
   """Benchmarks for `tf.data.experimental.rejection_resample()`."""
 
-  def benchmarkResamplePerformance(self):
+  def benchmark_resample_performance(self):
     init_dist = [0.25, 0.25, 0.25, 0.25]
     target_dist = [0.0, 0.0, 0.0, 1.0]
     num_classes = len(init_dist)

@@ -506,7 +506,7 @@ def connected_components(images):
     # constructing multiple additional large tensors.
     components_flat = array_ops.reshape(components, [-1])
     unique_ids, id_index = array_ops.unique(components_flat)
-    id_is_zero = array_ops.where(math_ops.equal(unique_ids, 0))[:, 0]
+    id_is_zero = array_ops.where_v2(math_ops.equal(unique_ids, 0))[:, 0]
     # Map each nonzero id to consecutive values.
     nonzero_consecutive_ids = math_ops.range(
         array_ops.shape(unique_ids)[0] - array_ops.shape(id_is_zero)[0]) + 1
@@ -518,7 +518,7 @@ def connected_components(images):
     def has_zero():
       # Insert a zero in the consecutive ids where zero appears in unique_ids.
       # id_is_zero has length 1.
-      zero_id_ind = math_ops.to_int32(id_is_zero[0])
+      zero_id_ind = math_ops.cast(id_is_zero[0], dtypes.int32)
       ids_before = nonzero_consecutive_ids[:zero_id_ind]
       ids_after = nonzero_consecutive_ids[zero_id_ind:]
       return array_ops.concat([ids_before, [0], ids_after], axis=0)

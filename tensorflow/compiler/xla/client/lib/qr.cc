@@ -101,7 +101,7 @@ Status House(XlaOp x, XlaOp k, absl::Span<const int64> batch_dims,
 
   auto sigma_is_zero = Eq(sigma, zero);
 
-  *beta = Select(sigma_is_zero, alpha, -Sign(alpha) * mu);
+  *beta = Select(sigma_is_zero, alpha, Select(Lt(alpha, zero), one, -one) * mu);
   *tau = Select(sigma_is_zero, Broadcast(zero, batch_dims),
                 (*beta - alpha) / *beta);
   auto divisor =
@@ -154,7 +154,7 @@ struct QRBlockResult {
 StatusOr<QRBlockResult> QRBlock(XlaOp a, PrecisionConfig::Precision precision) {
   XlaBuilder* builder = a.builder();
   TF_ASSIGN_OR_RETURN(Shape a_shape, builder->GetShape(a));
-  const int num_dims = ShapeUtil::Rank(a_shape);
+  const int num_dims = a_shape.rank();
   if (num_dims < 2) {
     return InvalidArgument("Argument to QR must have rank >= 2; got shape %s",
                            a_shape.ToString());
@@ -192,7 +192,7 @@ StatusOr<QRBlockResult> QRBlock(XlaOp a, PrecisionConfig::Precision precision) {
     // a[:, :] -= tau * np.dot(v[:, np.newaxis],
     //                          np.dot(v[np.newaxis, :], a[:, :]))
     auto vva = BatchDot(v_broadcast, a, precision);
-    vva = BatchDot(TransposeInMinorDims(v_broadcast), vva, precision);
+    vva = BatchDot(v_broadcast, true, vva, false, precision);
     a = a - Mul(tau, vva,
                 /*broadcast_dimensions=*/batch_dim_indices);
 
@@ -271,7 +271,7 @@ StatusOr<XlaOp> ComputeWYRepresentation(PrimitiveType type,
     auto beta = DynamicSliceInMinorDims(taus, {j}, {1});
 
     // yv has shape [..., n, 1]
-    auto yv = BatchDot(TransposeInMinorDims(y), v, precision);
+    auto yv = BatchDot(y, true, v, false, precision);
     // wyv has shape [..., m, 1]
     auto wyv = BatchDot(w, yv, precision);
 
@@ -325,7 +325,7 @@ StatusOr<QRDecompositionResult> QRDecomposition(
     PrecisionConfig::Precision precision) {
   XlaBuilder* builder = a.builder();
   TF_ASSIGN_OR_RETURN(Shape a_shape, builder->GetShape(a));
-  const int num_dims = ShapeUtil::Rank(a_shape);
+  const int num_dims = a_shape.rank();
   if (num_dims < 2) {
     return InvalidArgument("Arguments to QR must have rank >= 2: got shape %s",
                            a_shape.ToString());
@@ -365,7 +365,7 @@ StatusOr<QRDecompositionResult> QRDecomposition(
 
     // a[i:, i+k:] += np.dot(Y, np.dot(W.T, a[i:, i+k:]))
     auto a_panel = SliceInMinorDims(a, {i, i + k}, {m, n});
-    auto a_update = BatchDot(TransposeInMinorDims(w), a_panel, precision);
+    auto a_update = BatchDot(w, true, a_panel, false, precision);
     a_update = BatchDot(y, a_update, precision);
     a_panel = a_panel + a_update;
     a = UpdateSliceInMinorDims(a, a_panel, {i, i + k});
@@ -373,7 +373,7 @@ StatusOr<QRDecompositionResult> QRDecomposition(
     // q[:, i:] += np.dot(np.dot(q[:, i:], W), Y.T))
     auto q_panel = SliceInMinorDims(q, {0, i}, {m, m});
     auto q_update = BatchDot(q_panel, w, precision);
-    q_update = BatchDot(q_update, TransposeInMinorDims(y), precision);
+    q_update = BatchDot(q_update, false, y, true, precision);
     q_panel = q_panel + q_update;
     q = UpdateSliceInMinorDims(q, q_panel, {0, i});
   }

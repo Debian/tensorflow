@@ -23,10 +23,9 @@ from tensorflow.contrib.boosted_trees.python.ops import boosted_trees_ops_loader
 # pylint: enable=unused-import
 from tensorflow.contrib.boosted_trees.python.ops import gen_stats_accumulator_ops
 from tensorflow.python.framework import ops
-from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import resources
 from tensorflow.python.training import saver
-from tensorflow.python.training.checkpointable import tracking
+from tensorflow.python.training.tracking import tracking
 
 # Pattern to remove all non alpha numeric from a string.
 _PATTERN = re.compile(r"[\W_]+")
@@ -134,8 +133,7 @@ class StatsAccumulator(tracking.TrackableResource):
     self._hessian_shape = hessian_shape
     self._container = container
 
-    if (gradient_shape == tensor_shape.scalar() and
-        hessian_shape == tensor_shape.scalar()):
+    if (gradient_shape.rank == 0 and hessian_shape.rank == 0):
       self._is_scalar = True
     else:
       self._is_scalar = False
@@ -144,8 +142,8 @@ class StatsAccumulator(tracking.TrackableResource):
       name = _PATTERN.sub("", name)
     with ops.name_scope(name, "StatsAccumulator") as name:
       self._name = name
-      self._resource_handle = self.create_resource()
-      self._init_op = self.initialize()
+      self._resource_handle = self._create_resource()
+      self._init_op = self._initialize()
       is_initialized_op = self.is_initialized()
     resources.register_resource(self.resource_handle, self.initializer,
                                 is_initialized_op)
@@ -153,7 +151,7 @@ class StatsAccumulator(tracking.TrackableResource):
         self.resource_handle, self.initializer, self._is_scalar, name)
     ops.add_to_collection(ops.GraphKeys.SAVEABLE_OBJECTS, self._saveable)
 
-  def create_resource(self):
+  def _create_resource(self):
     if self._is_scalar:
       return (
           gen_stats_accumulator_ops.stats_accumulator_scalar_resource_handle_op(
@@ -163,7 +161,7 @@ class StatsAccumulator(tracking.TrackableResource):
           gen_stats_accumulator_ops.stats_accumulator_tensor_resource_handle_op(
               self._container, self._name, name=self._name))
 
-  def initialize(self):
+  def _initialize(self):
     if self._is_scalar:
       return gen_stats_accumulator_ops.create_stats_accumulator_scalar(
           self.resource_handle, self._stamp_token)
@@ -175,7 +173,7 @@ class StatsAccumulator(tracking.TrackableResource):
   @property
   def initializer(self):
     if self._init_op is None:
-      self._init_op = self.initialize()
+      self._init_op = self._initialize()
     return self._init_op
 
   def is_initialized(self):

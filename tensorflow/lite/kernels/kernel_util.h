@@ -44,15 +44,26 @@ inline TfLiteTensor* GetTemporary(TfLiteContext* context, TfLiteNode* node,
                                   int index) {
   return &context->tensors[node->temporaries->data[index]];
 }
+inline const TfLiteTensor* GetIntermediates(TfLiteContext* context,
+                                            TfLiteNode* node, int index) {
+  return &context->tensors[node->intermediates->data[index]];
+}
 inline int NumInputs(const TfLiteNode* node) { return node->inputs->size; }
 inline int NumOutputs(const TfLiteNode* node) { return node->outputs->size; }
+inline int NumIntermediates(const TfLiteNode* node) {
+  return node->intermediates->size;
+}
 
-inline int64_t NumElements(const TfLiteTensor* t) {
+inline int64_t NumElements(const TfLiteIntArray* dims) {
   int64_t count = 1;
-  for (int i = 0; i < NumDimensions(t); ++i) {
-    count *= SizeOfDimension(t, i);
+  for (int i = 0; i < dims->size; ++i) {
+    count *= dims->data[i];
   }
   return count;
+}
+
+inline int64_t NumElements(const TfLiteTensor* t) {
+  return NumElements(t->dims);
 }
 
 inline const TfLiteTensor* GetOptionalInputTensor(TfLiteContext* context,
@@ -63,6 +74,14 @@ inline const TfLiteTensor* GetOptionalInputTensor(TfLiteContext* context,
     return &context->tensors[node->inputs->data[index]];
   }
   return nullptr;
+}
+
+inline int8_t* GetInt8DataPtr(const TfLiteTensor* tensor, const bool is_uint8) {
+  if (is_uint8) {
+    return reinterpret_cast<int8_t*>(tensor->data.uint8);
+  } else {
+    return tensor->data.int8;
+  }
 }
 
 // Determines whether tensor is constant.
@@ -84,6 +103,25 @@ inline void SetTensorToDynamic(TfLiteTensor* tensor) {
   }
 }
 
+// Determines whether it is a hybrid op - one that has float inputs and
+// quantized weights.
+inline bool IsHybridOp(const TfLiteTensor* input, const TfLiteTensor* weight) {
+  return ((weight->type == kTfLiteUInt8 || weight->type == kTfLiteInt8) &&
+          input->type == kTfLiteFloat32);
+}
+
+// Check dimensionality match and populate OpData for Conv and DepthwiseConv.
+TfLiteStatus PopulateConvolutionQuantizationParams(
+    TfLiteContext* context, const TfLiteTensor* input,
+    const TfLiteTensor* filter, const TfLiteTensor* bias, TfLiteTensor* output,
+    const TfLiteFusedActivation& activation, int32_t* multiplier, int* shift,
+    int32_t* output_activation_min, int32_t* output_activation_max,
+    int32_t* per_channel_multiplier, int* per_channel_shift);
+
+// QuantizedMultiplier with the guard that shift will not be smaller than -31.
+void GuardedQuantizeMultiplier(double effective_output_scale,
+                               int32_t* significand, int* shift);
+
 // Calculates the multiplication factor for a quantized convolution (or
 // quantized depthwise convolution) involving the given tensors. Returns an
 // error if the scales of the tensors are not compatible.
@@ -91,6 +129,12 @@ TfLiteStatus GetQuantizedConvolutionMultipler(TfLiteContext* context,
                                               const TfLiteTensor* input,
                                               const TfLiteTensor* filter,
                                               const TfLiteTensor* bias,
+                                              TfLiteTensor* output,
+                                              double* multiplier);
+
+TfLiteStatus GetQuantizedConvolutionMultipler(TfLiteContext* context,
+                                              const TfLiteTensor* input,
+                                              const TfLiteTensor* filter,
                                               TfLiteTensor* output,
                                               double* multiplier);
 
@@ -104,6 +148,9 @@ TfLiteStatus CalculateActivationRangeQuantized(TfLiteContext* context,
 void CalculateActivationRangeUint8(TfLiteFusedActivation activation,
                                    TfLiteTensor* output, int32_t* act_min,
                                    int32_t* act_max);
+void CalculateActivationRangeInt8(TfLiteFusedActivation activation,
+                                  TfLiteTensor* output, int32_t* act_min,
+                                  int32_t* act_max);
 // Calculates the useful range of an activation layer given its activation
 // tensor.a
 template <typename T>

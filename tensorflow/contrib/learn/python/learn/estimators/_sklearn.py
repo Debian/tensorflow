@@ -19,11 +19,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
 import os
 
 import numpy as np
 import six
+
+from tensorflow.python.util.compat import collections_abc
 
 
 def _pprint(d):
@@ -50,12 +51,12 @@ class _BaseEstimator(object):
       params : mapping of string to any
       Parameter names mapped to their values.
     """
-    out = dict()
+    out = {}
     param_names = [name for name in self.__dict__ if not name.startswith('_')]
     for key in param_names:
       value = getattr(self, key, None)
 
-      if isinstance(value, collections.Callable):
+      if isinstance(value, collections_abc.Callable):
         continue
 
       # XXX: should we rather test if instance of estimator?

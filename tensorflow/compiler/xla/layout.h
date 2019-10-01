@@ -55,6 +55,25 @@ class Tile {
   // Returns the dimensions of the tile.
   const std::vector<int64>& dimensions() const { return dimensions_; }
 
+  Tile& add_dimensions(int64 value) {
+    dimensions_.push_back(value);
+    return *this;
+  }
+
+  Tile& clear_dimensions() {
+    dimensions_.clear();
+    return *this;
+  }
+
+  // This dimension size means the corresponding dimension in the shape is
+  // combined with the next minor dimension before tiling is applied.
+  static constexpr int64 kCombineDimension = std::numeric_limits<int64>::min();
+
+  template <typename H>
+  friend H AbslHashValue(H h, const Tile& t) {
+    return H::combine(std::move(h), t.dimensions_);
+  }
+
  private:
   // The bounds of the tile.
   std::vector<int64> dimensions_;
@@ -71,10 +90,13 @@ class Layout {
 
   // Constructs a dense tiled layout with the given minor-to-major order and
   // tiles.
-  Layout(absl::Span<const int64> minor_to_major, absl::Span<const Tile> tiles)
+  Layout(absl::Span<const int64> minor_to_major, absl::Span<const Tile> tiles,
+         int64 element_size_in_bits = 0, int64 memory_space = 0)
       : format_(DENSE),
         minor_to_major_(minor_to_major.begin(), minor_to_major.end()),
-        tiles_(tiles.begin(), tiles.end()) {}
+        tiles_(tiles.begin(), tiles.end()),
+        element_size_in_bits_(element_size_in_bits),
+        memory_space_(memory_space) {}
 
   // Construct a shape from a LayoutProto.
   static Layout CreateFromProto(const LayoutProto& proto);
@@ -84,6 +106,50 @@ class Layout {
 
   // Returns a human-readable string that represents this layout.
   string ToString() const;
+
+  // Equal is a configurable functor to check the equality of two layouts.
+  //
+  // Examples:
+  //
+  // - Comparing two layouts ignoring their difference in tiles:
+  //   Equal().IgnoreTiles()(layout1, layout2);
+  //
+  // - Comparing two layouts ignoring their difference in tiles and element
+  //   size:
+  //   Equal().IgnoreTiles().IgnoreElementSize()(layout1, layout2);
+  class Equal {
+   public:
+    Equal() = default;
+
+    bool operator()(const Layout& lhs, const Layout& rhs);
+
+    Equal& IgnoreTiles() {
+      ignore_tiles_ = true;
+      return *this;
+    }
+
+    Equal& IgnoreElementSize() {
+      ignore_element_size_ = true;
+      return *this;
+    }
+
+    Equal& MinorToMajorOnly() {
+      ignore_tiles_ = true;
+      ignore_element_size_ = true;
+      ignore_memory_space_ = true;
+      return *this;
+    }
+
+    Equal& IgnoreMemorySpace() {
+      ignore_memory_space_ = true;
+      return *this;
+    }
+
+   private:
+    bool ignore_tiles_ = false;
+    bool ignore_element_size_ = false;
+    bool ignore_memory_space_ = false;
+  };
 
   bool operator==(const Layout& other) const;
   bool operator!=(const Layout& other) const { return !(*this == other); }
@@ -146,6 +212,11 @@ class Layout {
     element_size_in_bits_ = value;
     return *this;
   }
+  int64 memory_space() const { return memory_space_; }
+  Layout& set_memory_space(int64 value) {
+    memory_space_ = value;
+    return *this;
+  }
 
   void Swap(Layout* other) {
     using std::swap;
@@ -153,18 +224,32 @@ class Layout {
   }
 
   void Clear() {
+    *this = Layout();
     format_ = INVALID_FORMAT;
-    minor_to_major_.clear();
-    max_sparse_elements_ = 0;
-    element_size_in_bits_ = 0;
   }
 
- public:
+  template <typename H>
+  friend H AbslHashValue(H h, const Layout& l) {
+    return H::combine(std::move(h), l.format_, l.minor_to_major_,
+                      l.max_sparse_elements_, l.tiles_,
+                      l.element_size_in_bits_);
+  }
+
+ private:
   // The format of this layout.
   Format format_ = INVALID_FORMAT;
 
-  // Sequence of dimension numbers, from minor (fastest varying index) to major
-  // (slowest varying index).
+  // A map from physical dimension numbers to logical dimension numbers.
+  // The first element is the most minor physical dimension (fastest varying
+  // index) and the last the most major (slowest varying index). The contents of
+  // the vector are the indices of the *logical* dimensions in the shape.
+  //
+  // For example, in shape f32[8,100,100,3]{3,0,2,1}, the logical dimensions
+  // are [8,100,100,3] and minor_to_major_ is {3,0,2,1}.
+  // So, the most minor physical dimension is [8,100,100,3][3], which is size 3.
+  // The second most minor is [8,100,100,3][0], which is size 8.
+  // The third most minor is [8,100,100,3][2], which is size 100.
+  // And the major dim is [8,100,100,3][1], which is size 100.
   std::vector<int64> minor_to_major_;
 
   // The maximum number of elements that can be stored for SPARSE formats.  This
@@ -172,11 +257,14 @@ class Layout {
   // memory.  This field must be zero unless the format is SPARSE.
   int64 max_sparse_elements_ = 0;
 
+  // The tiles used in tiling-based layout.
+  std::vector<Tile> tiles_;
+
   // The number of bits used to store an individual array element.
   int64 element_size_in_bits_ = 0;
 
-  // The tiles used in tiling-based layout.
-  std::vector<Tile> tiles_;
+  // The assigned memory space.
+  int64 memory_space_ = 0;
 };
 
 std::ostream& operator<<(std::ostream& out, const Tile& Tile);

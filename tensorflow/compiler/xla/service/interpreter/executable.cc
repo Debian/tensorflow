@@ -68,6 +68,19 @@ StatusOr<ScopedShapedBuffer> InterpreterExecutable::ExecuteOnStream(
         "Mismatch between argument count and graph parameter count.");
   }
 
+  // Check that the args have the right shape.
+  for (int64 i = 0; i < computation->num_parameters(); ++i) {
+    const auto& expected_shape = computation->parameter_instruction(i)->shape();
+    const auto& actual_shape = arguments[i]->on_device_shape();
+    if (!Shape::Equal().MinorToMajorOnlyInLayout()(expected_shape,
+                                                   actual_shape)) {
+      return InvalidArgument(
+          "Shape mismatch on parameter %d.  Expected %s, but was %s.", i,
+          ShapeUtil::HumanStringWithLayout(expected_shape),
+          ShapeUtil::HumanStringWithLayout(actual_shape));
+    }
+  }
+
   TF_ASSIGN_OR_RETURN(TransferManager * transfer_manager,
                       TransferManager::GetForPlatform(platform));
 
@@ -86,8 +99,8 @@ StatusOr<ScopedShapedBuffer> InterpreterExecutable::ExecuteOnStream(
   {
     tensorflow::mutex_lock lock(evaluator_lock_);
     evaluator_->ResetVisitStates();
-    TF_ASSIGN_OR_RETURN(result_literal, evaluator_->Evaluate<Literal>(
-                                            *computation, arg_literals));
+    TF_ASSIGN_OR_RETURN(result_literal,
+                        evaluator_->Evaluate(*computation, arg_literals));
   }
 
   // Transform the result literal back into a ShapedBuffer.
@@ -100,10 +113,10 @@ StatusOr<ScopedShapedBuffer> InterpreterExecutable::ExecuteOnStream(
 
   uint64 end_micros = tensorflow::Env::Default()->NowMicros();
 
-  {
-    tensorflow::mutex_lock lock(mutex_);
+  ExecutionProfile* profile = run_options->run_options().execution_profile();
+  if (profile) {
     const double nanoseconds = (end_micros - start_micros) * 1000.0;
-    execution_profile_.set_compute_time_ns(std::max(nanoseconds, 1.0));
+    profile->set_compute_time_ns(std::max(nanoseconds, 1.0));
   }
 
   return std::move(result);
@@ -117,7 +130,7 @@ StatusOr<ScopedShapedBuffer> InterpreterExecutable::ExecuteAsyncOnStream(
 }
 
 /*static*/ int64 InterpreterExecutable::ShapeSizeBytes(const Shape& shape) {
-  if (ShapeUtil::IsOpaque(shape)) {
+  if (shape.IsOpaque()) {
     return sizeof(void*);
   }
   return ShapeUtil::ByteSizeOf(shape, sizeof(void*));

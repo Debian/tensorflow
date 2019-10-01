@@ -69,9 +69,9 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   return context->ResizeTensor(context, output, outputSize);
 }
 
-TfLiteStatus EvalFloat(TfLiteContext* context, TfLiteNode* node,
-                       const TfLiteTensor* lookup, const TfLiteTensor* value,
-                       TfLiteTensor* output) {
+TfLiteStatus EvalSimple(TfLiteContext* context, TfLiteNode* node,
+                        const TfLiteTensor* lookup, const TfLiteTensor* value,
+                        TfLiteTensor* output) {
   const int row_size = SizeOfDimension(value, 0);
   const int row_bytes = value->bytes / row_size;
 
@@ -117,7 +117,12 @@ TfLiteStatus EvalHybrid(TfLiteContext* context, TfLiteNode* node,
       // TODO(alanchiao): refactor scalar multiply into separate function
       // for ease of adding a neon equivalent if ever necessary.
       for (int j = 0; j < col_size; j++) {
-        const int8_t* value_ptr = reinterpret_cast<int8_t*>(value->data.uint8);
+        const int8_t* value_ptr;
+        if (value->type == kTfLiteUInt8) {
+          value_ptr = reinterpret_cast<int8_t*>(value->data.uint8);
+        } else {
+          value_ptr = value->data.int8;
+        }
         output->data.f[j + i * col_size] =
             value_ptr[j + idx * col_size] * scaling_factor;
       }
@@ -133,9 +138,14 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   TfLiteTensor* output = GetOutput(context, node, 0);
   switch (value->type) {
     case kTfLiteFloat32:
-      return EvalFloat(context, node, lookup, value, output);
+      return EvalSimple(context, node, lookup, value, output);
     case kTfLiteUInt8:
-      return EvalHybrid(context, node, lookup, value, output);
+    case kTfLiteInt8:
+      if (output->type == kTfLiteFloat32) {
+        return EvalHybrid(context, node, lookup, value, output);
+      } else {
+        return EvalSimple(context, node, lookup, value, output);
+      }
     default:
       context->ReportError(context, "Type not currently supported.");
       return kTfLiteError;

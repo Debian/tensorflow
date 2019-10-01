@@ -19,10 +19,8 @@ limitations under the License.
 
 namespace tensorflow {
 namespace data {
+namespace experimental {
 namespace {
-
-// See documentation in ../../ops/dataset_ops.cc for a high-level
-// description of the following op.
 
 class UnbatchDatasetOp : public UnaryDatasetOpKernel {
  public:
@@ -58,8 +56,8 @@ class UnbatchDatasetOp : public UnaryDatasetOpKernel {
 
     std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
-      return std::unique_ptr<IteratorBase>(
-          new Iterator({this, strings::StrCat(prefix, "::Unbatch")}));
+      return absl::make_unique<Iterator>(
+          Iterator::Params{this, strings::StrCat(prefix, "::Unbatch")});
     }
 
     const DataTypeVector& output_dtypes() const override {
@@ -70,6 +68,8 @@ class UnbatchDatasetOp : public UnaryDatasetOpKernel {
     }
 
     string DebugString() const override { return "UnbatchDatasetOp::Dataset"; }
+
+    bool IsStateful() const override { return input_->IsStateful(); }
 
    protected:
     Status AsGraphDefInternal(SerializationContext* ctx,
@@ -221,9 +221,12 @@ class UnbatchDatasetOp : public UnaryDatasetOpKernel {
   };
 };
 
+REGISTER_KERNEL_BUILDER(Name("UnbatchDataset").Device(DEVICE_CPU),
+                        UnbatchDatasetOp);
 REGISTER_KERNEL_BUILDER(Name("ExperimentalUnbatchDataset").Device(DEVICE_CPU),
                         UnbatchDatasetOp);
 
 }  // namespace
+}  // namespace experimental
 }  // namespace data
 }  // namespace tensorflow

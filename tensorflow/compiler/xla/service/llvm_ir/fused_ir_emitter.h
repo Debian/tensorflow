@@ -19,6 +19,7 @@ limitations under the License.
 #include <map>
 #include <unordered_map>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "llvm/IR/IRBuilder.h"
@@ -59,10 +60,16 @@ class FusedIrEmitter : public DfsHloVisitorWithDefault {
       std::function<std::vector<llvm_ir::IrArray>()>;
 
   FusedIrEmitter(GeneratorForOperandIrArrays operand_arrays_generator,
-                 ElementalIrEmitter* elemental_emitter)
+                 ElementalIrEmitter* elemental_emitter,
+                 llvm::Value* tile_param_x = nullptr,
+                 llvm::Value* tile_param_y = nullptr,
+                 absl::Span<llvm::Value* const> param_shmem_buffers = {})
       : operand_arrays_(),
         operand_arrays_generator_(std::move(operand_arrays_generator)),
-        tiled_parameter_info_(nullptr),
+        tile_param_x_(tile_param_x),
+        tile_param_y_(tile_param_y),
+        param_shmem_buffers_(param_shmem_buffers.begin(),
+                             param_shmem_buffers.end()),
         elemental_emitter_(elemental_emitter),
         b_(elemental_emitter->b()),
         module_(elemental_emitter->module()) {}
@@ -86,9 +93,13 @@ class FusedIrEmitter : public DfsHloVisitorWithDefault {
   // Returns the generator function for the given instruction.
   IndexedGenerator GetGenerator(const HloInstruction* instruction) const;
 
-  void SetTiledParameterInfo(const llvm_ir::TiledParameterInfo* info) {
-    tiled_parameter_info_ = info;
-  }
+  // Evaluates whether fusing 'producer' into 'consumer' might cause exponential
+  // behavior in FusedIrEmitter. We currently can have exponential time/memory
+  // requirements for emitting certain fusion kernels, in which case we don't
+  // want to fuse.
+  // TODO(b/119692968): Remove this once we have fixed our fusion emitter.
+  static bool IsFusedIrEmitterInefficient(const HloInstruction* consumer,
+                                          const HloInstruction* producer);
 
  protected:
   // Returns the IrArrays for the fusion instruction operands.
@@ -109,7 +120,15 @@ class FusedIrEmitter : public DfsHloVisitorWithDefault {
   absl::optional<std::vector<llvm_ir::IrArray>> operand_arrays_;
   GeneratorForOperandIrArrays operand_arrays_generator_;
 
-  const llvm_ir::TiledParameterInfo* tiled_parameter_info_;
+  // The x coordinate within a tile.
+  llvm::Value* tile_param_x_;
+
+  // The y coordinate within a tile.
+  llvm::Value* tile_param_y_;
+
+  // Param_buffers_[i] stores the tile buffer for the ith parameter or nullptr
+  // if the parameter is not tiled.
+  std::vector<llvm::Value*> param_shmem_buffers_;
 
   ElementalIrEmitter* elemental_emitter_;
 
@@ -134,8 +153,9 @@ class FusedIrEmitter : public DfsHloVisitorWithDefault {
 
   // Cache of generated values, lest we regenerate an element of a node with
   // multiple outgoing edges
-  std::unordered_map<const HloInstruction*,
-                     std::map<std::vector<llvm::Value*>, llvm::Value*>>
+  absl::flat_hash_map<
+      const HloInstruction*,
+      absl::flat_hash_map<std::vector<llvm::Value*>, llvm::Value*>>
       generated_value_cache_;
 };
 

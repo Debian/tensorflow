@@ -24,6 +24,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/profile_handler.h"
 #include "tensorflow/core/common_runtime/stats_publisher_interface.h"
 #include "tensorflow/core/debug/debug_graph_utils.h"
+#include "tensorflow/core/distributed_runtime/request_id.h"
 #include "tensorflow/core/distributed_runtime/scheduler.h"
 #include "tensorflow/core/distributed_runtime/worker_cache.h"
 #include "tensorflow/core/distributed_runtime/worker_interface.h"
@@ -91,7 +92,7 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
           n->name(),
           NodeDetails(n->type_string(),
                       strings::StrCat(
-                          "(", str_util::Join(n->requested_inputs(), ", "))));
+                          "(", absl::StrJoin(n->requested_inputs(), ", "))));
     }
   }
 
@@ -292,8 +293,8 @@ class MasterSession::ReffedClientGraph : public core::RefCounted {
     if (tot >= 0.1 * 1048576.0) {
       bytes = strings::Printf("[%.1fMB] ", tot / 1048576.0);
     }
-    return strings::StrCat(bytes, stats.node_name(), " = ",
-                           details.type_string, details.detail_text);
+    return strings::StrCat(bytes, stats.node_name(), " = ", details.type_string,
+                           details.detail_text);
   }
 
   // Send/Recv nodes that are the result of client-added
@@ -443,7 +444,7 @@ Status MasterSession::ReffedClientGraph::DoRegisterPartitions(
     Part* part = &partitions_.back();
     part->name = name_def.first;
     TrackFeedsAndFetches(part, name_def.second, popts);
-    part->worker = worker_cache_->CreateWorker(part->name);
+    part->worker = worker_cache_->GetOrCreateWorker(part->name);
     if (part->worker == nullptr) {
       s = errors::NotFound("worker ", part->name);
       break;
@@ -506,17 +507,20 @@ class RunManyGraphs {
   Call* get(int index) { return &calls_[index]; }
 
   // When the index-th call is done, updates the overall status.
-  void WhenDone(int index, const Status& s) {
+  void WhenDone(int index, const std::string& worker_name, const Status& s) {
     TRACEPRINTF("Partition %d %s", index, s.ToString().c_str());
     auto resp = get(index)->resp.get();
     if (resp->status_code() != error::Code::OK) {
       // resp->status_code will only be non-OK if s.ok().
       mutex_lock l(mu_);
-      ReportBadStatus(
-          Status(resp->status_code(), resp->status_error_message()));
+      ReportBadStatus(Status(resp->status_code(),
+                             strings::StrCat("From ", worker_name, ":\n",
+                                             resp->status_error_message())));
     } else if (!s.ok()) {
       mutex_lock l(mu_);
-      ReportBadStatus(s);
+      ReportBadStatus(Status(
+          s.code(),
+          strings::StrCat("From ", worker_name, ":\n", s.error_message())));
     }
     pending_.DecrementCount();
   }
@@ -530,7 +534,9 @@ class RunManyGraphs {
 
   Status status() const {
     mutex_lock l(mu_);
-    return status_;
+    // Concat status objects in this StatusGroup to get the aggregated status,
+    // as each status in status_group_ is already summarized status.
+    return status_group_.as_concatenated_status();
   }
 
  private:
@@ -538,22 +544,23 @@ class RunManyGraphs {
 
   BlockingCounter pending_;
   mutable mutex mu_;
-  Status status_ GUARDED_BY(mu_);
+  StatusGroup status_group_ GUARDED_BY(mu_);
+  bool cancel_issued_ GUARDED_BY(mu_) = false;
 
   void ReportBadStatus(const Status& s) EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-    // Start cancellation if we aren't already in an error state.
-    if (status_.ok()) {
+    VLOG(1) << "Master received error status " << s;
+    if (!cancel_issued_ && !StatusGroup::IsDerived(s)) {
+      // Only start cancelling other workers upon receiveing a non-derived
+      // error
+      cancel_issued_ = true;
+
+      VLOG(1) << "Master received error report. Cancelling remaining workers.";
       for (Call& call : calls_) {
         call.opts.StartCancel();
       }
     }
 
-    // Prefer primary failures over cancellations.  A cancellation may finish
-    // _before_ the original status is propagated; we override it in this case.
-    if (status_.ok() ||
-        str_util::StrContains(status_.error_message(), "[CHILD]")) {
-      status_ = s;
-    }
+    status_group_.Update(s);
   }
 
   TF_DISALLOW_COPY_AND_ASSIGN(RunManyGraphs);
@@ -638,6 +645,7 @@ Status MasterSession::ReffedClientGraph::RunPartitionsHelper(
     c->req->set_step_id(step_id);
     *c->req->mutable_exec_opts() = exec_opts;
     c->req->set_store_errors_in_response_body(true);
+    c->req->set_request_id(GetUniqueRequestId());
     // If any feeds are provided, send the feed values together
     // in the RunGraph request.
     // In the partial case, we only want to include feeds provided in the req.
@@ -689,13 +697,17 @@ Status MasterSession::ReffedClientGraph::RunPartitionsHelper(
     const Part& part = partitions_[i];
     RunManyGraphs::Call* call = calls.get(i);
     TRACEPRINTF("Partition %d %s", i, part.name.c_str());
-    part.worker->RunGraphAsync(
-        &call->opts, call->req.get(), call->resp.get(),
-        std::bind(&RunManyGraphs::WhenDone, &calls, i, std::placeholders::_1));
+    part.worker->RunGraphAsync(&call->opts, call->req.get(), call->resp.get(),
+                               std::bind(&RunManyGraphs::WhenDone, &calls, i,
+                                         part.name, std::placeholders::_1));
   }
 
   // Waits for the RunGraph calls.
-  call_opts->SetCancelCallback([&calls]() { calls.StartCancel(); });
+  call_opts->SetCancelCallback([&calls]() {
+    LOG(INFO) << "Client requested cancellation for RunStep, cancelling "
+                  "worker operations.";
+    calls.StartCancel();
+  });
   auto token = cm->get_cancellation_token();
   const bool success =
       cm->RegisterCallback(token, [&calls]() { calls.StartCancel(); });
@@ -1086,17 +1098,18 @@ void CopyAndSortStrings(size_t size,
 }  // namespace
 
 void BuildBuildGraphOptions(const RunStepRequestWrapper& req,
+                            const ConfigProto& config,
                             BuildGraphOptions* opts) {
   CallableOptions* callable_opts = &opts->callable_options;
-  CopyAndSortStrings(req.num_feeds(),
-                     [&req](size_t i) { return req.feed_name(i); },
-                     callable_opts->mutable_feed());
-  CopyAndSortStrings(req.num_fetches(),
-                     [&req](size_t i) { return req.fetch_name(i); },
-                     callable_opts->mutable_fetch());
-  CopyAndSortStrings(req.num_targets(),
-                     [&req](size_t i) { return req.target_name(i); },
-                     callable_opts->mutable_target());
+  CopyAndSortStrings(
+      req.num_feeds(), [&req](size_t i) { return req.feed_name(i); },
+      callable_opts->mutable_feed());
+  CopyAndSortStrings(
+      req.num_fetches(), [&req](size_t i) { return req.fetch_name(i); },
+      callable_opts->mutable_fetch());
+  CopyAndSortStrings(
+      req.num_targets(), [&req](size_t i) { return req.target_name(i); },
+      callable_opts->mutable_target());
 
   if (!req.options().debug_options().debug_tensor_watch_opts().empty()) {
     *callable_opts->mutable_run_options()->mutable_debug_options() =
@@ -1105,19 +1118,25 @@ void BuildBuildGraphOptions(const RunStepRequestWrapper& req,
 
   opts->collective_graph_key =
       req.options().experimental().collective_graph_key();
+  if (config.experimental().collective_deterministic_sequential_execution()) {
+    opts->collective_order = GraphCollectiveOrder::kEdges;
+  } else if (config.experimental().collective_nccl()) {
+    opts->collective_order = GraphCollectiveOrder::kAttrs;
+  }
 }
 
 void BuildBuildGraphOptions(const PartialRunSetupRequest& req,
                             BuildGraphOptions* opts) {
   CallableOptions* callable_opts = &opts->callable_options;
-  CopyAndSortStrings(req.feed_size(), [&req](size_t i) { return req.feed(i); },
-                     callable_opts->mutable_feed());
-  CopyAndSortStrings(req.fetch_size(),
-                     [&req](size_t i) { return req.fetch(i); },
-                     callable_opts->mutable_fetch());
-  CopyAndSortStrings(req.target_size(),
-                     [&req](size_t i) { return req.target(i); },
-                     callable_opts->mutable_target());
+  CopyAndSortStrings(
+      req.feed_size(), [&req](size_t i) { return req.feed(i); },
+      callable_opts->mutable_feed());
+  CopyAndSortStrings(
+      req.fetch_size(), [&req](size_t i) { return req.fetch(i); },
+      callable_opts->mutable_fetch());
+  CopyAndSortStrings(
+      req.target_size(), [&req](size_t i) { return req.target(i); },
+      callable_opts->mutable_target());
 
   // TODO(cais): Add TFDBG support to partial runs.
 }
@@ -1188,9 +1207,8 @@ MasterSession::MasterSession(
 
   VLOG(1) << "Session " << handle_ << " #local " << env->local_devices.size()
           << " #remote " << remote_devs_->size();
-
-  LOG(INFO) << "Start master session " << handle_
-            << " with config: " << session_opts_.config.ShortDebugString();
+  VLOG(1) << "Start master session " << handle_
+          << " with config: " << session_opts_.config.ShortDebugString();
 }
 
 MasterSession::~MasterSession() {
@@ -1202,7 +1220,7 @@ void MasterSession::UpdateLastAccessTime() {
   last_access_time_usec_.store(Env::Default()->NowMicros());
 }
 
-Status MasterSession::Create(GraphDef* graph_def,
+Status MasterSession::Create(GraphDef&& graph_def,
                              const WorkerCacheFactoryOptions& options) {
   if (session_opts_.config.use_per_session_threads() ||
       session_opts_.config.session_inter_op_thread_pool_size() > 0) {
@@ -1222,7 +1240,7 @@ Status MasterSession::Create(GraphDef* graph_def,
   {
     mutex_lock l(mu_);
     TF_RETURN_IF_ERROR(GraphExecutionState::MakeForBaseGraph(
-        graph_def, execution_options, &execution_state_));
+        std::move(graph_def), execution_options, &execution_state_));
   }
   should_delete_worker_sessions_ = true;
   return CreateWorkerSessions(options);
@@ -1261,8 +1279,15 @@ Status MasterSession::CreateWorkerSessions(
   // Create all the workers & kick off the computations.
   for (size_t i = 0; i < worker_names.size(); ++i) {
     workers[i].name = &worker_names[i];
-    workers[i].worker = worker_cache->CreateWorker(worker_names[i]);
+    workers[i].worker = worker_cache->GetOrCreateWorker(worker_names[i]);
     workers[i].request.set_session_handle(handle_);
+    if (session_opts_.config.experimental()
+            .share_cluster_devices_in_session()) {
+      for (const auto& remote_dev : devices_->devices()) {
+        *workers[i].request.add_cluster_device_attributes() =
+            remote_dev->attributes();
+      }
+    }
 
     DeviceNameUtils::ParsedName name;
     if (!DeviceNameUtils::ParseFullName(worker_names[i], &name)) {
@@ -1290,6 +1315,15 @@ Status MasterSession::CreateWorkerSessions(
       // because the worker will use its local configuration.
       workers[i].request.set_isolate_session_state(
           session_opts_.config.isolate_session_state());
+    }
+    if (session_opts_.config.experimental()
+            .share_session_state_in_clusterspec_propagation()) {
+      // In a dynamic cluster, the ClusterSpec info is usually propagated by
+      // master sessions. However, in data parallel training with multiple
+      // masters
+      // ("between-graph replication"), we need to disable isolation for
+      // different worker sessions to update the same variables in PS tasks.
+      workers[i].request.set_isolate_session_state(false);
     }
   }
 
@@ -1343,7 +1377,7 @@ Status MasterSession::DeleteWorkerSessions() {
   // Create all the workers & kick off the computations.
   for (size_t i = 0; i < worker_names.size(); ++i) {
     workers[i].name = &worker_names[i];
-    workers[i].worker = worker_cache->CreateWorker(worker_names[i]);
+    workers[i].worker = worker_cache->GetOrCreateWorker(worker_names[i]);
     workers[i].request.set_session_handle(handle_);
     // Since the worker may have gone away, set a timeout to avoid blocking the
     // session-close operation.
@@ -1359,9 +1393,7 @@ Status MasterSession::DeleteWorkerSessions() {
         &workers[i].call_opts, &workers[i].request, &workers[i].response, cb);
   }
 
-  if (!done.WaitFor(std::chrono::milliseconds(10000))) {
-    LOG(WARNING) << "Timeout for closing worker session";
-  }
+  done.Wait();
   for (size_t i = 0; i < workers.size(); ++i) {
     status.Update(workers[i].status);
   }
@@ -1859,7 +1891,7 @@ Status MasterSession::DoRunWithLocalExecution(
 
   // Prepare.
   BuildGraphOptions bgopts;
-  BuildBuildGraphOptions(req, &bgopts);
+  BuildBuildGraphOptions(req, session_opts_.config, &bgopts);
   ReffedClientGraph* rcg = nullptr;
   int64 count;
   TF_RETURN_IF_ERROR(StartStep(bgopts, false, &rcg, &count));

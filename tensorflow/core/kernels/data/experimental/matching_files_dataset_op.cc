@@ -32,6 +32,7 @@ limitations under the License.
 
 namespace tensorflow {
 namespace data {
+namespace experimental {
 namespace {
 
 class MatchingFilesDatasetOp : public DatasetOpKernel {
@@ -61,8 +62,8 @@ class MatchingFilesDatasetOp : public DatasetOpKernel {
 
     std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
-      return std::unique_ptr<IteratorBase>(
-          new Iterator({this, strings::StrCat(prefix, "::MatchingFiles")}));
+      return absl::make_unique<Iterator>(
+          Iterator::Params{this, strings::StrCat(prefix, "::MatchingFiles")});
     }
 
     const DataTypeVector& output_dtypes() const override {
@@ -308,7 +309,7 @@ class MatchingFilesDatasetOp : public DatasetOpKernel {
             const string child_path = io::JoinPath(current_dir, children[i]);
             // In case the child_path doesn't start with the fixed_prefix, then
             // we don't need to explore this path.
-            if (!str_util::StartsWith(child_path, fixed_prefix)) {
+            if (!absl::StartsWith(child_path, fixed_prefix)) {
               children_dir_status[i] =
                   errors::Cancelled("Operation not needed");
             } else {
@@ -366,10 +367,13 @@ class MatchingFilesDatasetOp : public DatasetOpKernel {
   };
 };
 
+REGISTER_KERNEL_BUILDER(Name("MatchingFilesDataset").Device(DEVICE_CPU),
+                        MatchingFilesDatasetOp);
 REGISTER_KERNEL_BUILDER(
     Name("ExperimentalMatchingFilesDataset").Device(DEVICE_CPU),
     MatchingFilesDatasetOp);
 
 }  // namespace
+}  // namespace experimental
 }  // namespace data
 }  // namespace tensorflow

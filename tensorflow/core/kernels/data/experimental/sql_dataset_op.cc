@@ -25,10 +25,8 @@ limitations under the License.
 
 namespace tensorflow {
 namespace data {
+namespace experimental {
 namespace {
-
-// See documentation in ../../ops/dataset_ops.cc for a high-level
-// description of the following ops.
 
 class SqlDatasetOp : public DatasetOpKernel {
  public:
@@ -91,8 +89,8 @@ class SqlDatasetOp : public DatasetOpKernel {
 
     std::unique_ptr<IteratorBase> MakeIteratorInternal(
         const string& prefix) const override {
-      return std::unique_ptr<IteratorBase>(
-          new Iterator({this, strings::StrCat(prefix, "::Sql")}));
+      return absl::make_unique<Iterator>(
+          Iterator::Params{this, strings::StrCat(prefix, "::Sql")});
     }
 
     const DataTypeVector& output_dtypes() const override {
@@ -199,7 +197,7 @@ class SqlDatasetOp : public DatasetOpKernel {
       }
 
       mutex mu_;
-      // TODO(shivaniagrawal): explore ways to seek into a SQLite databases.
+      // TODO(b/129062371): explore ways to seek into a SQLite databases.
       int64 next_calls_ GUARDED_BY(mu_) = 0;
       std::unique_ptr<sql::QueryConnection> query_connection_ GUARDED_BY(mu_);
       bool query_connection_initialized_ GUARDED_BY(mu_) = false;
@@ -214,9 +212,11 @@ class SqlDatasetOp : public DatasetOpKernel {
   std::vector<PartialTensorShape> output_shapes_;
 };
 
+REGISTER_KERNEL_BUILDER(Name("SqlDataset").Device(DEVICE_CPU), SqlDatasetOp);
 REGISTER_KERNEL_BUILDER(Name("ExperimentalSqlDataset").Device(DEVICE_CPU),
                         SqlDatasetOp);
 
 }  // namespace
+}  // namespace experimental
 }  // namespace data
 }  // namespace tensorflow

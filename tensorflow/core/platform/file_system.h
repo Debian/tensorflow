@@ -32,6 +32,7 @@ limitations under the License.
 
 #ifdef PLATFORM_WINDOWS
 #undef DeleteFile
+#undef CopyFile
 #endif
 
 namespace tensorflow {
@@ -234,6 +235,14 @@ class RandomAccessFile {
   RandomAccessFile() {}
   virtual ~RandomAccessFile();
 
+  /// \brief Returns the name of the file.
+  ///
+  /// This is an optional operation that may not be implemented by every
+  /// filesystem.
+  virtual Status Name(StringPiece* result) const {
+    return errors::Unimplemented("This filesystem does not support Name()");
+  }
+
   /// \brief Reads up to `n` bytes from the file starting at `offset`.
   ///
   /// `scratch[0..n-1]` may be written by this routine.  Sets `*result`
@@ -251,6 +260,16 @@ class RandomAccessFile {
   /// Safe for concurrent use by multiple threads.
   virtual Status Read(uint64 offset, size_t n, StringPiece* result,
                       char* scratch) const = 0;
+
+  // TODO(ebrevdo): Remove this ifdef when absl is updated.
+#if defined(PLATFORM_GOOGLE)
+  /// \brief Read up to `n` bytes from the file starting at `offset`.
+  virtual Status Read(uint64 offset, size_t n, absl::Cord* cord) const {
+    return errors::Unimplemented(
+        "Read(uint64, size_t, absl::Cord*) is not "
+        "implemented");
+  }
+#endif
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(RandomAccessFile);
@@ -297,6 +316,14 @@ class WritableFile {
   /// persisted, depending on the implementation.
   virtual Status Flush() = 0;
 
+  // \brief Returns the name of the file.
+  ///
+  /// This is an optional operation that may not be implemented by every
+  /// filesystem.
+  virtual Status Name(StringPiece* result) const {
+    return errors::Unimplemented("This filesystem does not support Name()");
+  }
+
   /// \brief Syncs contents of file to filesystem.
   ///
   /// This waits for confirmation from the filesystem that the contents
@@ -304,6 +331,16 @@ class WritableFile {
   /// or machine crashes after a successful Sync, the contents should
   /// be properly saved.
   virtual Status Sync() = 0;
+
+  /// \brief Retrieves the current write position in the file, or -1 on
+  /// error.
+  ///
+  /// This is an optional operation, subclasses may choose to return
+  /// errors::Unimplemented.
+  virtual Status Tell(int64* position) {
+    *position = -1;
+    return errors::Unimplemented("This filesystem does not support Tell()");
+  }
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(WritableFile);

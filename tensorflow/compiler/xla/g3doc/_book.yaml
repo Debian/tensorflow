@@ -25,8 +25,12 @@ upper_tabs:
         path: /xla/operation_semantics
       - title: Shapes and layout
         path: /xla/shapes
+      - title: Tiled layout
+        path: /xla/tiled_layout
       - title: Using AOT compilation
         path: /xla/tfcompile
+      - title: Writing custom calls
+        path: /xla/custom_call
       - heading: Tutorials
       - title: XLA compile API
         path: /xla/tutorials/xla_compile

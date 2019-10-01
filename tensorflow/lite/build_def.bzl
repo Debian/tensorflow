@@ -2,6 +2,7 @@
 
 load(
     "//tensorflow:tensorflow.bzl",
+    "tf_binary_additional_srcs",
     "tf_cc_shared_object",
     "tf_cc_test",
 )
@@ -12,17 +13,11 @@ def tflite_copts():
         "-DFARMHASH_NO_CXX_STRING",
     ] + select({
         str(Label("//tensorflow:android_arm64")): [
-            "-std=c++11",
             "-O3",
         ],
         str(Label("//tensorflow:android_arm")): [
             "-mfpu=neon",
-            "-mfloat-abi=softfp",
-            "-std=c++11",
             "-O3",
-        ],
-        str(Label("//tensorflow:android_x86")): [
-            "-DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK",
         ],
         str(Label("//tensorflow:ios_x86_64")): [
             "-msse4.1",
@@ -34,13 +29,11 @@ def tflite_copts():
         "//conditions:default": [
             "-Wno-sign-compare",
         ],
-    }) + select({
-        str(Label("//tensorflow:with_default_optimizations")): [],
-        "//conditions:default": ["-DGEMMLOWP_ALLOW_SLOW_SCALAR_FALLBACK"],
     })
 
     return copts
 
+EXPORTED_SYMBOLS = "//tensorflow/lite/java/src/main/native:exported_symbols.lds"
 LINKER_SCRIPT = "//tensorflow/lite/java/src/main/native:version_script.lds"
 
 def tflite_linkopts_unstripped():
@@ -58,7 +51,6 @@ def tflite_linkopts_unstripped():
     return select({
         "//tensorflow:android": [
             "-Wl,--no-export-dynamic",  # Only inc syms referenced by dynamic obj.
-            "-Wl,--exclude-libs,ALL",  # Exclude syms in all libs from auto export.
             "-Wl,--gc-sections",  # Eliminate unused code and data.
             "-Wl,--as-needed",  # Don't link unused libs.
         ],
@@ -85,47 +77,60 @@ def tflite_jni_linkopts_unstripped():
         "//conditions:default": [],
     })
 
-def tflite_linkopts():
-    """Defines linker flags to reduce size of TFLite binary."""
-    return tflite_linkopts_unstripped() + select({
+def tflite_symbol_opts():
+    """Defines linker flags whether to include symbols or not."""
+    return select({
         "//tensorflow:android": [
-            "-s",  # Omit symbol table.
-        ],
-        "//conditions:default": [],
-    })
-
-def tflite_jni_linkopts():
-    """Defines linker flags to reduce size of TFLite binary with JNI."""
-    return tflite_jni_linkopts_unstripped() + select({
-        "//tensorflow:android": [
-            "-s",  # Omit symbol table.
             "-latomic",  # Required for some uses of ISO C++11 <atomic> in x86.
         ],
         "//conditions:default": [],
+    }) + select({
+        "//tensorflow:debug": [],
+        "//conditions:default": [
+            "-s",  # Omit symbol table, for all non debug builds
+        ],
     })
+
+def tflite_linkopts():
+    """Defines linker flags to reduce size of TFLite binary."""
+    return tflite_linkopts_unstripped() + tflite_symbol_opts()
+
+def tflite_jni_linkopts():
+    """Defines linker flags to reduce size of TFLite binary with JNI."""
+    return tflite_jni_linkopts_unstripped() + tflite_symbol_opts()
 
 def tflite_jni_binary(
         name,
         copts = tflite_copts(),
         linkopts = tflite_jni_linkopts(),
         linkscript = LINKER_SCRIPT,
+        exported_symbols = EXPORTED_SYMBOLS,
         linkshared = 1,
         linkstatic = 1,
         testonly = 0,
         deps = [],
+        tags = [],
         srcs = []):
     """Builds a jni binary for TFLite."""
-    linkopts = linkopts + [
-        "-Wl,--version-script",  # Export only jni functions & classes.
-        "$(location {})".format(linkscript),
-    ]
+    linkopts = linkopts + select({
+        "//tensorflow:macos": [
+            "-Wl,-exported_symbols_list,$(location {})".format(exported_symbols),
+            "-Wl,-install_name,@rpath/" + name,
+        ],
+        "//tensorflow:windows": [],
+        "//conditions:default": [
+            "-Wl,--version-script,$(location {})".format(linkscript),
+            "-Wl,-soname," + name,
+        ],
+    })
     native.cc_binary(
         name = name,
         copts = copts,
         linkshared = linkshared,
         linkstatic = linkstatic,
-        deps = deps + [linkscript],
+        deps = deps + [linkscript, exported_symbols],
         srcs = srcs,
+        tags = tags,
         linkopts = linkopts,
         testonly = testonly,
     )
@@ -135,7 +140,8 @@ def tflite_cc_shared_object(
         copts = tflite_copts(),
         linkopts = [],
         linkstatic = 1,
-        deps = []):
+        deps = [],
+        visibility = None):
     """Builds a shared object for TFLite."""
     tf_cc_shared_object(
         name = name,
@@ -144,6 +150,7 @@ def tflite_cc_shared_object(
         linkopts = linkopts + tflite_jni_linkopts(),
         framework_so = [],
         deps = deps,
+        visibility = visibility,
     )
 
 def tf_to_tflite(name, src, options, out):
@@ -157,7 +164,7 @@ def tf_to_tflite(name, src, options, out):
     """
 
     toco_cmdline = " ".join([
-        "//tensorflow/lite/toco:toco",
+        "$(location //tensorflow/lite/toco:toco)",
         "--input_format=TENSORFLOW_GRAPHDEF",
         "--output_format=TFLITE",
         ("--input_file=$(location %s)" % src),
@@ -168,7 +175,7 @@ def tf_to_tflite(name, src, options, out):
         srcs = [src],
         outs = [out],
         cmd = toco_cmdline,
-        tools = ["//tensorflow/lite/toco:toco"],
+        tools = ["//tensorflow/lite/toco:toco"] + tf_binary_additional_srcs(),
     )
 
 def tflite_to_json(name, src, out):
@@ -225,20 +232,28 @@ def generated_test_models():
     return [
         "abs",
         "add",
+        "add_n",
         "arg_min_max",
         "avg_pool",
         "batch_to_space_nd",
+        "cast",
+        "ceil",
         "concat",
         "constant",
         "control_dep",
         "conv",
+        "conv2d_transpose",
         "conv_with_shared_weights",
         "conv_to_depthwiseconv_with_shared_weights",
+        "cos",
         "depthwiseconv",
         "div",
+        "elu",
         "equal",
         "exp",
+        "embedding_lookup",
         "expand_dims",
+        "eye",
         "fill",
         "floor",
         "floor_div",
@@ -246,12 +261,15 @@ def generated_test_models():
         "fully_connected",
         "fused_batch_norm",
         "gather",
+        "gather_nd",
         "gather_with_constant",
         "global_batch_norm",
         "greater",
         "greater_equal",
+        "identity",
         "sum",
         "l2norm",
+        "l2norm_shared_epsilon",
         "l2_pool",
         "leaky_relu",
         "less",
@@ -262,7 +280,9 @@ def generated_test_models():
         "logical_and",
         "logical_or",
         "logical_xor",
-        #"lstm", TODO(b/122889684): Resolve toco structured line parsing in oss.
+        "lstm",
+        "matrix_diag",
+        "matrix_set_diag",
         "max_pool",
         "maximum",
         "mean",
@@ -279,6 +299,7 @@ def generated_test_models():
         "prelu",
         "pow",
         "range",
+        "rank",
         "reduce_any",
         "reduce_max",
         "reduce_min",
@@ -288,6 +309,11 @@ def generated_test_models():
         "relu6",
         "reshape",
         "resize_bilinear",
+        "resolve_constant_strided_slice",
+        "reverse_sequence",
+        "reverse_v2",
+        "rfft2d",
+        "round",
         "rsqrt",
         "shape",
         "sigmoid",
@@ -305,12 +331,16 @@ def generated_test_models():
         "squeeze",
         "strided_slice",
         "strided_slice_1d_exhaustive",
-        "strided_slice_buggy",
+        "strided_slice_np_style",
         "sub",
         "tile",
         "topk",
         "transpose",
         "transpose_conv",
+        "unfused_gru",
+        "unidirectional_sequence_lstm",
+        "unidirectional_sequence_rnn",
+        "unique",
         "unpack",
         "unroll_batch_matmul",
         "where",
@@ -324,17 +354,17 @@ def generated_test_models_failing(conversion_mode):
     if conversion_mode == "toco-flex":
         return [
             "lstm",  # TODO(b/117510976): Restore when lstm flex conversion works.
+            "unidirectional_sequence_lstm",
+            "unidirectional_sequence_rnn",
         ]
-
-    return [
-        "unroll_batch_matmul",  # TODO(b/123030774): Fails in 1.13 tests.
-    ]
+    elif conversion_mode == "forward-compat":
+        return []
+    return []
 
 def generated_test_conversion_modes():
     """Returns a list of conversion modes."""
 
-    # TODO(nupurgarg): Add "pb2lite" when it's in open source. b/113614050.
-    return ["toco-flex", ""]
+    return ["toco-flex", "forward-compat", ""]
 
 def generated_test_models_all():
     """Generates a list of all tests with the different converters.
@@ -376,17 +406,16 @@ def gen_zip_test(name, test_name, conversion_mode, **kwargs):
     """
     toco = "//tensorflow/lite/toco:toco"
     flags = ""
-    if conversion_mode:
-        # TODO(nupurgarg): Comment in when pb2lite is in open source. b/113614050.
-        # if conversion_mode == "pb2lite":
-        #     toco = "//tensorflow/lite/experimental/pb2lite:pb2lite"
-        flags = "--ignore_toco_errors --run_with_flex"
+    if conversion_mode == "toco-flex":
+        flags += " --ignore_converter_errors --run_with_flex"
+    elif conversion_mode == "forward-compat":
+        flags += " --make_forward_compat_test"
 
     gen_zipped_test_file(
         name = "zip_%s" % test_name,
         file = "%s.zip" % test_name,
         toco = toco,
-        flags = flags,
+        flags = flags + " --save_graphdefs",
     )
     tf_cc_test(name, **kwargs)
 
@@ -440,10 +469,11 @@ def flex_dep(target_op_sets):
     else:
         return []
 
-def gen_model_coverage_test(model_name, data, failure_type, tags):
+def gen_model_coverage_test(src, model_name, data, failure_type, tags):
     """Generates Python test targets for testing TFLite models.
 
     Args:
+      src: Main source file.
       model_name: Name of the model to test (must be also listed in the 'data'
         dependencies)
       data: List of BUILD targets linking the data.
@@ -460,15 +490,16 @@ def gen_model_coverage_test(model_name, data, failure_type, tags):
         i = i + 1
         native.py_test(
             name = "model_coverage_test_%s_%s" % (model_name, target_op_sets.lower().replace(",", "_")),
-            srcs = ["model_coverage_test.py"],
+            srcs = [src],
+            main = src,
             size = "large",
-            main = "model_coverage_test.py",
             args = [
                 "--model_name=%s" % model_name,
                 "--target_ops=%s" % target_op_sets,
             ] + args,
             data = data,
             srcs_version = "PY2AND3",
+            python_version = "PY2",
             tags = [
                 "no_oss",
                 "no_windows",

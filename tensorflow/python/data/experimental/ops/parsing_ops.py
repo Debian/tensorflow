@@ -22,6 +22,7 @@ from tensorflow.python.data.util import structure
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import sparse_tensor
+from tensorflow.python.framework import tensor_spec
 from tensorflow.python.ops import gen_experimental_dataset_ops
 from tensorflow.python.ops import parsing_ops
 from tensorflow.python.util.tf_export import tf_export
@@ -31,10 +32,10 @@ class _ParseExampleDataset(dataset_ops.UnaryDataset):
   """A `Dataset` that parses `example` dataset into a `dict` dataset."""
 
   def __init__(self, input_dataset, features, num_parallel_calls):
-    super(_ParseExampleDataset, self).__init__(input_dataset)
     self._input_dataset = input_dataset
-    if not input_dataset._element_structure.is_compatible_with(  # pylint: disable=protected-access
-        structure.TensorStructure(dtypes.string, [None])):
+    if not structure.are_compatible(
+        input_dataset.element_spec,
+        tensor_spec.TensorSpec([None], dtypes.string)):
       raise TypeError("Input dataset should be a dataset of vectors of strings")
     self._num_parallel_calls = num_parallel_calls
     # pylint: disable=protected-access
@@ -58,14 +59,12 @@ class _ParseExampleDataset(dataset_ops.UnaryDataset):
     self._dense_defaults = dense_defaults_vec
     self._dense_shapes = dense_shapes
     self._dense_types = dense_types
-    dense_output_shapes = [
-        self._input_dataset.output_shapes.concatenate(shape)
-        for shape in dense_shape_as_shape
-    ]
-    sparse_output_shapes = [
-        self._input_dataset.output_shapes.concatenate([None])
-        for _ in range(len(sparse_keys))
-    ]
+    input_dataset_shape = dataset_ops.get_legacy_output_shapes(
+        self._input_dataset)
+    dense_output_shapes = [input_dataset_shape.concatenate(shape)
+                           for shape in dense_shape_as_shape]
+    sparse_output_shapes = [input_dataset_shape.concatenate([None])
+                            for _ in range(len(sparse_keys))]
 
     output_shapes = dict(
         zip(self._dense_keys + self._sparse_keys,
@@ -78,23 +77,24 @@ class _ParseExampleDataset(dataset_ops.UnaryDataset):
             [ops.Tensor for _ in range(len(self._dense_defaults))] +
             [sparse_tensor.SparseTensor for _ in range(len(self._sparse_keys))
             ]))
-    self._structure = structure.convert_legacy_structure(
+    self._element_spec = structure.convert_legacy_structure(
         output_types, output_shapes, output_classes)
 
-  def _as_variant_tensor(self):
-    return gen_experimental_dataset_ops.experimental_parse_example_dataset(
-        self._input_dataset._as_variant_tensor(),  # pylint: disable=protected-access
-        self._num_parallel_calls,
-        self._dense_defaults,
-        self._sparse_keys,
-        self._dense_keys,
-        self._sparse_types,
-        self._dense_shapes,
-        **dataset_ops.flat_structure(self))
+    variant_tensor = (
+        gen_experimental_dataset_ops.parse_example_dataset(
+            self._input_dataset._variant_tensor,  # pylint: disable=protected-access
+            self._num_parallel_calls,
+            self._dense_defaults,
+            self._sparse_keys,
+            self._dense_keys,
+            self._sparse_types,
+            self._dense_shapes,
+            **self._flat_structure))
+    super(_ParseExampleDataset, self).__init__(input_dataset, variant_tensor)
 
   @property
-  def _element_structure(self):
-    return self._structure
+  def element_spec(self):
+    return self._element_spec
 
 
 # TODO(b/111553342): add arguments names and example names as well.
@@ -110,7 +110,7 @@ def parse_example_dataset(features, num_parallel_calls=1):
   and `SparseTensor` objects. `features` is a dict from keys to `VarLenFeature`,
   `SparseFeature`, and `FixedLenFeature` objects. Each `VarLenFeature`
   and `SparseFeature` is mapped to a `SparseTensor`, and each
-  `FixedLenFeature` is mapped to a `Tensor`. See `tf.parse_example` for more
+  `FixedLenFeature` is mapped to a `Tensor`. See `tf.io.parse_example` for more
   details about feature dictionaries.
 
   Args:

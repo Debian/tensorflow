@@ -1,11 +1,18 @@
 # Description:
 #   GPU Direct RDMA Out-of-Band Tensor transport for TensorFlow.
 
-package(default_visibility = [
-    "//tensorflow:__subpackages__",
-])
+# For platform specific build config
+load(
+    "//tensorflow/core/platform:default/build_config.bzl",
+    "tf_proto_library_cc",
+)
 
-licenses(["notice"])  # Apache 2.0
+package(
+    default_visibility = [
+        "//tensorflow:__subpackages__",
+    ],
+    licenses = ["notice"],  # Apache 2.0
+)
 
 exports_files(["LICENSE"])
 
@@ -15,17 +22,6 @@ filegroup(
         "**/*.cc",
         "**/*.h",
     ]),
-)
-
-load(
-    "//tensorflow:tensorflow.bzl",
-    "tf_cuda_library",
-)
-
-# For platform specific build config
-load(
-    "//tensorflow/core:platform/default/build_config.bzl",
-    "tf_proto_library_cc",
 )
 
 tf_proto_library_cc(
@@ -66,7 +62,6 @@ cc_library(
         ":gdr_memory_manager",
         "//tensorflow/core:core_cpu_internal",
         "//tensorflow/core:framework",
-        "//tensorflow/core:gpu_runtime",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "//tensorflow/core/distributed_runtime:graph_mgr",
@@ -101,14 +96,36 @@ cc_library(
 )
 
 cc_library(
+    name = "gdr_collective_executor_mgr",
+    srcs = ["gdr_collective_executor_mgr.cc"],
+    hdrs = ["gdr_collective_executor_mgr.h"],
+    deps = [
+        ":gdr_memory_manager",
+        "//tensorflow/core:core_cpu_internal",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib_internal",
+        "//tensorflow/core/distributed_runtime:cancellable_call",
+        "//tensorflow/core/distributed_runtime:collective_param_resolver_distributed",
+        "//tensorflow/core/distributed_runtime:device_resolver_distributed",
+        "//tensorflow/core/distributed_runtime:request_id",
+        "//tensorflow/core/distributed_runtime:rpc_collective_executor_mgr",
+        "//tensorflow/core/distributed_runtime:worker_cache",
+    ],
+)
+
+cc_library(
     name = "gdr_server_lib",
     srcs = ["gdr_server_lib.cc"],
     hdrs = ["gdr_server_lib.h"],
     linkstatic = 1,  # Seems to be needed since alwayslink is broken in bazel
     deps = [
+        ":gdr_collective_executor_mgr",
         ":gdr_memory_manager",
         ":gdr_rendezvous_mgr",
         ":gdr_worker",
+        "//tensorflow/core:core_cpu_internal",
+        "//tensorflow/core/distributed_runtime:collective_param_resolver_distributed",
+        "//tensorflow/core/distributed_runtime:device_resolver_distributed",
         "//tensorflow/core/distributed_runtime/rpc:grpc_server_lib",
     ],
     alwayslink = 1,
