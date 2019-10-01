@@ -14,6 +14,7 @@ for burden in $BURDENS; do
 	# we don't build these
 	if $(echo $burden | grep 'lite/' >/dev/null 2>/dev/null); then continue; fi
 	if $(echo $burden | grep 'java/' >/dev/null 2>/dev/null); then continue; fi
+	if $(echo $burden | grep 'tpu/' >/dev/null 2>/dev/null); then continue; fi
 
 	# we omit the distro-unfriendly stuff
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
@@ -21,7 +22,7 @@ for burden in $BURDENS; do
 	# if it's a .bzl rules file
 	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null); then
 		mkdir -p $(dirname $target)
-		cp -v $burden $(dirname $target)
+		cp $burden $(dirname $target)
 	fi
 
 	if ! test -r $target; then
