@@ -21,6 +21,9 @@ for burden in $BURDENS; do
 	# we omit the distro-unfriendly stuff
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
 
+	# unconditionally copy the ninja syntax
+	cp $NINJA_SYNTAX $(dirname $target)/
+
 	# if it's a .bzl rules file
 	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null); then
 		mkdir -p $(dirname $target)
@@ -43,7 +46,6 @@ for burden in $BURDENS; do
 		echo "" >> $target
 		echo "f.close()" >> $target
 		echo Unresolved burden: $burden
-		cp $NINJA_SYNTAX $(dirname $target)/
 	fi
 done
 
