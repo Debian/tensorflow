@@ -35,11 +35,11 @@ for burden in $BURDENS; do
 		echo "import os, sys, re" >> $target
 		echo "from ninja_syntax import Writer" >> $target
 		echo "f = Writer(open('ninja.build', 'wt'))" >> $target
-		echo ""
-		echo ""
+		echo "" >> $target
+		echo "" >> $target
 		cat $burden >> $target
-		echo ""
-		echo ""
-		echo "f.close()"
+		echo "" >> $target
+		echo "" >> $target
+		echo "f.close()" >> $target
 	fi
 done
