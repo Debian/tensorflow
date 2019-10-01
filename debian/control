@@ -1,15 +1,14 @@
 Source: tensorflow
 Section: science
 Homepage: https://tensorflow.org/
-# Upstream-Git: https://github.com/tensorflow/tensorflow
 Priority: optional
-Standards-Version: 4.2.1
+Standards-Version: 4.4.0
 Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
 Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
-Uploaders: nobody 
+Uploaders: Mo Zhou <cdluminate@gmail.com>
 Build-Depends:
- debhelper (>= 11~),
+ debhelper-compat (= 12),
  dh-python,
  libcurl4-gnutls-dev,
  libdouble-conversion-dev (>= 3.0.0+git20180802.4e8b3b5~),
@@ -39,37 +38,9 @@ Build-Depends:
  python3-numpy,
  swig,
  zlib1g-dev,
-# libxsmm-dev,
-# libmkldnn-dev [amd64],
+ libmkldnn-dev [amd64],
 
-
-#Package: tensorflow
-#Section: metapackages
-#Architecture: any
-#Multi-Arch: same
-#Depends: ${misc:Depends},
-## python3-tensorflow (= ${binary:Version})
-# libtensorflow-dev (= ${binary:Version}),
-##Recommends:
-## libtensorflow-bin (= ${binary:Version}),
-#Suggests:
-# tensorflow-doc (= ${source:Version}),
-#Description: Computation using data flow graphs for scalable machine learning
-# TensorFlow is an open source software library for numerical computation
-# using data flow graphs. The graph nodes represent mathematical operations,
-# while the graph edges represent the multidimensional data arrays (tensors)
-# that flow between them. This flexible architecture enables you to deploy
-# computation to one or more CPUs or GPUs in a desktop, server, or mobile
-# device without rewriting code.
-# .
-# TensorFlow was originally developed by researchers and engineers working
-# on the Google Brain team within Google's Machine Intelligence Research
-# organization for the purposes of conducting machine learning and deep
-# neural networks research. The system is general enough to be applicable
-# in a wide variety of other domains, as well.
-# .
-# TensorFlow provides stable Python API and C APIs as well as without API
-# backwards compatibility guarantee like C++, Go, Java, JavaScript and Swift.
+# MISSING features: tensorflow lite, tensorflow extended, tensorflow.js
 
 Package: libtensorflow-framework2.0
 Section: libs
@@ -160,17 +131,17 @@ Description: Computation using data flow graphs for scalable machine learning (d
  .
  This package ships C and C++ headers files for tensorflow.
 
-#Package: python3-tensorflow
-#Architecture: any
-#Multi-Arch: foreign
-#Depends: ${misc:Depends}, ${shlibs:Depends},
-# libtensorflow-framework2.0 (>= ${source:Version}~),
-#Description: Computation using data flow graphs for scalable machine learning (Py3)
-# TensorFlow is an open source software library for numerical computation
-# using data flow graphs. The graph nodes represent mathematical operations,
-# while the graph edges represent the multidimensional data arrays (tensors)
-# that flow between them. This flexible architecture enables you to deploy
-# computation to one or more CPUs or GPUs in a desktop, server, or mobile
-# device without rewriting code.
-# .
-# This package ships Python3 interface of tensorflow.
+Package: python3-tensorflow
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends},
+ libtensorflow-framework2.0 (>= ${source:Version}~),
+Description: Computation using data flow graphs for scalable machine learning (Py3)
+ TensorFlow is an open source software library for numerical computation
+ using data flow graphs. The graph nodes represent mathematical operations,
+ while the graph edges represent the multidimensional data arrays (tensors)
+ that flow between them. This flexible architecture enables you to deploy
+ computation to one or more CPUs or GPUs in a desktop, server, or mobile
+ device without rewriting code.
+ .
+ This package ships Python3 interface of tensorflow.
