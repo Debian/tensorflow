@@ -19,7 +19,7 @@ for burden in $BURDENS; do
 	if $(echo $burden | grep 'third_party/' >/dev/null 2>/dev/null); then continue; fi
 
 	# if it's a .bzl rules file
-	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null);
+	if $(echo $burden | grep '.bzl$' >/dev/null 2>/dev/null); then
 		mkdir -p $(dirname $target)
 		cp -v $burden $(dirname $target)
 	fi
