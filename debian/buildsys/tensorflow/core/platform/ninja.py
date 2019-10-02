@@ -13,7 +13,9 @@ srcs = ["abi.cc",
 	"default/logging.cc",
 	"cpu_info.cc"]
 srcs = [os.path.join(d, x) for x in srcs]
-objs = [x.replace('.cc', '.o') for x in srcs]
 for x in srcs:
 	f.build(x.replace('.cc', '.o'), 'CXX', x)
-f.build('tensorflow/core/platform.phony', 'phony', objs)
+f.build('tensorflow/core/platform.phony', 'phony',
+        [x.replace('.cc', '.o') for x in srcs])
+f.variable('tensorflow_core_platform.objs',
+        [x.replace('.cc', '.o') for x in srcs])
