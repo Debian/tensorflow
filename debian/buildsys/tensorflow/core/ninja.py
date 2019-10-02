@@ -2,6 +2,9 @@
 #
 # Note that some protos are in neither additional_core_proto_srcs nor this
 # filegroup; e.g.  ones with individual proto_library targets.
+
+f.include('tensorflow/core/platform/build.ninja')
+
 COMMON_PROTO_SRCS = [
     "example/example.proto",
     "example/feature.proto",
