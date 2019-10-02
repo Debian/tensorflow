@@ -72,6 +72,11 @@ def protoGroup(name: str, paths: list):
         f.build([x.replace('.proto', '.pb.h'), x.replace('.proto', '.pb.cc')], 'PROTOC', x)
         f.build(x.replace('.proto', '.pb.o'), 'CXX', x.replace('.proto', '.pb.cc'), implicit=name+'_cc')
 
+def tf_proto_library(**kwargs):
+    name, srcs = kwargs['name'], kwargs['srcs']
+    protodeps, deps = kwargs['protodeps'], kwargs['deps']
+    raise NotImplementedError
+
 if '.' == d:
 	f.rule('PROTOC', 'protoc -I. --cpp_out=. \$in')
 	f.rule('CXX', 'ccache g++ -I. -O2 -fPIC -c -o \$out \$in')
