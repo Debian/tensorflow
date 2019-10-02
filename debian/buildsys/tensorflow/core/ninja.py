@@ -75,14 +75,14 @@ ADDITIONAL_CORE_PROTO_SRCS = [
 
 protos_all_proto = [os.path.join(d, x) for x in CORE_PROTO_SRCS + ADDITIONAL_CORE_PROTO_SRCS]
 
-f.build('protos_all_proto', 'phony', [re.sub('.proto$', '.pb.cc', x) for x in protos_all_proto])
+f.build('protos_all_cc', 'phony', [re.sub('.proto$', '.pb.cc', x) for x in protos_all_proto])
 for i in protos_all_proto:
     f.build([re.sub('.proto$', '.pb.cc', i),
             re.sub('.proto$', '.pb.h', i)],
             'PROTOC', i)
     f.build(re.sub('.proto$', '.pb.o', i),
             'CXX', re.sub('.proto$', '.pb.cc', i),
-            implicit='protos_all_proto')
+            implicit='protos_all_cc')
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
