@@ -62,11 +62,16 @@ EOF
 done
 }
 
+embedded(){
+	tar xvf debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz --strip-components=1 -C.
+}
+
 case $1 in
 	scan)
 		scan;;
 	copy)
 		copy;;
 	*)
+		embedded
 		copy;;
 esac
