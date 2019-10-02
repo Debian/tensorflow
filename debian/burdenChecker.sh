@@ -47,8 +47,8 @@ from ninja_syntax import Writer
 d = "$(dirname $target)"
 f = Writer(open(f'{d}/build.ninja', 'wt'))
 if '.' == d:
-	f.rule('PROTOC', 'protoc -I. -I.. -I../.. --cpp_out=. \$in')
-	f.rule('CXX', 'g++ -I. -O2 -fPIC -c -o \$out \$in')
+	f.rule('PROTOC', 'protoc -I. --cpp_out=. \$in')
+	f.rule('CXX', 'ccache g++ -I. -O2 -fPIC -c -o \$out \$in')
 EOF
 	cat $helper >> $target
 	cat >> $target <<EOF
@@ -66,11 +66,21 @@ embedded(){
 	tar xvf debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz --strip-components=1 -C.
 }
 
+build(){
+	ninja -v
+}
+
 case $1 in
 	scan)
 		scan;;
 	copy)
 		copy;;
+	b)
+		embedded
+		copy
+		build
+		;;
+
 	*)
 		embedded
 		copy;;

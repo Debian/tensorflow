@@ -329,19 +329,11 @@ for i in protos_all_proto:
 #    ],
 #)
 #
-#cc_library(
-#    name = "platform_strings",
-#    srcs = [
-#        "//tensorflow/core/platform:platform_strings.cc",
-#        "//tensorflow/core/platform:platform_strings_computed.h",
-#    ],
-#    hdrs = [
-#        "//tensorflow/core/platform:platform_strings.h",
-#    ],
-#    visibility = [":__subpackages__"],
-#    deps = [],
-#)
-#
+
+src = "tensorflow/core/platform/platform_strings.cc"
+f.variable('_platform_strings', src.replace('.cc', '.o'))
+f.build(src.replace('.cc', '.o'), 'CXX', src)
+
 #filegroup(
 #    name = "platform_other_hdrs",
 #    srcs = [
