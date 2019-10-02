@@ -29,9 +29,11 @@ for burden in $BURDENS; do
 	fi
 
 	# use the bazel BUILD file as a template
+	mkdir -p $(dirname $target)
 	if ! test -r $target; then
-		mkdir -p $(dirname $target)
 		cp -v $burden $target
+	else
+		cp -v $burden $target.template
 	fi
 done
 }
