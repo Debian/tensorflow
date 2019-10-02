@@ -5,6 +5,7 @@ set -e
 BURDENS=$(find . -type f \( -name '*.bzl' \) -o \( -name 'BUILD' \))
 NINJA_SYNTAX=debian/ninja_syntax.py
 
+scan(){
 for burden in $BURDENS; do
 	dirname=$(dirname $burden)
 	basename=$(basename $burden)
@@ -33,7 +34,9 @@ for burden in $BURDENS; do
 		cp -v $burden $target
 	fi
 done
+}
 
+copy(){
 for helper in $(find debian/buildsys/ -type f -name 'ninja.py'); do
 	target=${helper#debian/buildsys/}
 	cat > $target <<EOF
@@ -50,9 +53,19 @@ EOF
 	cat >> $target <<EOF
 f.close()
 EOF
-	echo "Generating $target ..."
-
-	# unconditionally copy the ninja syntax
 	mkdir -p $(dirname $target)
 	cp $NINJA_SYNTAX $(dirname $target)/$(basename $NINJA_SYNTAX)
+
+	echo "Generating ${target%ninja.py}build.ninja ..."
+	python3 $target
 done
+}
+
+case $1 in
+	scan)
+		scan;;
+	copy)
+		copy;;
+	*)
+		copy;;
+esac
