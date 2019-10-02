@@ -381,40 +381,11 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #
 ## Minimal lib so that tools used for mobile compilation
 ## don't have to depend on lib/platformlib.
-#cc_library(
-#    name = "lib_proto_parsing",
-#    srcs = [
-#        "//tensorflow/core/platform:protobuf.cc",
-#    ],
-#    hdrs = [
-#        "lib/bfloat16/bfloat16.h",
-#        "lib/core/errors.h",
-#        "lib/core/status.h",
-#        "lib/core/stringpiece.h",
-#        "lib/strings/numbers.h",
-#        "lib/strings/strcat.h",
-#        "//tensorflow/core/platform:init_main.h",
-#        "//tensorflow/core/platform:legacy_proto_hdrs",
-#        "//tensorflow/core/platform:logging.h",
-#        "//tensorflow/core/platform:macros.h",
-#        "//tensorflow/core/platform:platform.h",
-#        "//tensorflow/core/platform:protobuf.h",
-#        "//tensorflow/core/platform:tstring.h",
-#        "//tensorflow/core/platform:types.h",
-#        "//tensorflow/core/platform:windows/cpu_info.h",
-#    ],
-#    copts = tf_copts(),
-#    deps = tf_lib_proto_parsing_deps() + [
-#        "@com_google_absl//absl/strings",
-#        "@double_conversion//:double-conversion",
-#        "//tensorflow/core/platform:macros",
-#        "//tensorflow/core/platform:logging",
-#        "//tensorflow/core/platform:platform",
-#        "//tensorflow/core/platform:types",
-#        "//tensorflow/core/platform:cpu_info",
-#    ],
-#)
-#
+
+src = "tensorflow/core/platform/protobuf.cc"
+f.variable('_lib_proto_parsing', src.replace('.cc', '.o'))
+f.build(src.replace('.cc', '.o'), 'CXX', src)
+
 #cc_library(
 #    name = "lib_proto_compiler",
 #    hdrs = [
@@ -519,7 +490,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    hdrs = ["example/feature_util.h"],
 #    visibility = ["//visibility:public"],
 #    deps = [
-#        ":core_stringpiece",
 #        ":lib_proto_parsing",
 #        ":protos_all_cc",
 #    ],
@@ -533,18 +503,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #        "//tensorflow/core/platform",
 #        "//tensorflow/core/platform:abi",
 #        "//tensorflow/core/platform:stacktrace",
-#    ],
-#)
-#
-## Libraries that will eventually be moved into lib/core
-## Note that stringpiece_test can't be place here yet, because we are
-## required to use tf_cc_test, and that rule will change / into _
-#cc_library(
-#    name = "core_stringpiece",
-#    hdrs = ["lib/core/stringpiece.h"],
-#    copts = tf_copts(),
-#    deps = [
-#        "@com_google_absl//absl/strings",
 #    ],
 #)
 #
@@ -2206,8 +2164,7 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    copts = tf_copts(),
 #    defines = LIB_INTERNAL_DEFINES,
 #    deps = tf_additional_lib_deps() + [
-#               ":core_stringpiece",
-#               ":lib_hash_crc32c_accelerate_internal",
+        #    "lib/hash/crc32c_accelerate.cc", # SSE4.2
 #               ":lib_proto_parsing",
 #               ":platform_strings",
 #               "@com_google_absl//absl/memory",
@@ -2225,13 +2182,7 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #)
 #
 ## File compiled with extra flags to get cpu-specific acceleration.
-#cc_library(
-#    name = "lib_hash_crc32c_accelerate_internal",
-#    srcs = ["lib/hash/crc32c_accelerate.cc"],
-#    # -msse4.2 enables the use of crc32c compiler builtins.
-#    copts = tf_copts() + if_linux_x86_64(["-msse4.2"]),
-#)
-#
+
 #cc_library(
 #    name = "gif_internal",
 #    srcs = [
