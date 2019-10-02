@@ -67,7 +67,7 @@ embedded(){
 }
 
 build(){
-	ninja -v
+	NINJA_STATUS="[1;36m[%es (%p) %f/%t][0;m " ninja -v
 }
 
 case $1 in
