@@ -79,6 +79,7 @@ ADDITIONAL_CORE_PROTO_SRCS = [
 protos_all_proto = [os.path.join(d, x) for x in CORE_PROTO_SRCS + ADDITIONAL_CORE_PROTO_SRCS]
 
 f.build('protos_all_cc', 'phony', [re.sub('.proto$', '.pb.cc', x) for x in protos_all_proto])
+f.variable('protos_all_o', [x.replace('.proto', '.pb.o') for x in protos_all_proto])
 for i in protos_all_proto:
     f.build([re.sub('.proto$', '.pb.cc', i),
             re.sub('.proto$', '.pb.h', i)],
@@ -87,46 +88,11 @@ for i in protos_all_proto:
             'CXX', re.sub('.proto$', '.pb.cc', i),
             implicit='protos_all_cc')
 
-#filegroup(
-#    name = "platform_base_hdrs",
-#    srcs = [
-#        "//tensorflow/core/platform:byte_order.h",
-#        "//tensorflow/core/platform:cord.h",
-#        "//tensorflow/core/platform:env_time.h",
-#        "//tensorflow/core/platform:logging.h",
-#        "//tensorflow/core/platform:macros.h",
-#        "//tensorflow/core/platform:platform_strings.h",
-#        "//tensorflow/core/platform:tstring.h",
-#        "//tensorflow/core/platform:types.h",
-#    ],
-#    visibility = ["//visibility:private"],
-#)
-#
-#cc_library(
-#    name = "platform_base",
-#    hdrs = [":platform_base_hdrs"],
-#    copts = tf_copts(),
-#    tags = ["avoid_dep"],
-#    visibility = [":__subpackages__"],
-#    deps = [
-#        "//tensorflow/core/platform",
-#        "//tensorflow/core/platform:byte_order",
-#        "//tensorflow/core/platform:env_time",
-#        "//tensorflow/core/platform:logging",
-#        "//tensorflow/core/platform:macros",
-#        "//tensorflow/core/platform:types",
-#        "//tensorflow/core/platform/default/build_config:base",
-#        "@com_google_absl//absl/base",
-#        "@com_google_absl//absl/strings",
-#    ],
-#)
-#
 #cc_library(
 #    name = "framework_bounds_check",
 #    hdrs = ["framework/bounds_check.h"],
 #    visibility = ["//tensorflow/core/kernels:friends"],
 #    deps = [
-#        ":platform_base",
 #        "//third_party/eigen3",
 #    ],
 #)
@@ -170,7 +136,6 @@ for i in protos_all_proto:
 #    visibility = [":__subpackages__"],
 #    deps = [
 #        "//tensorflow/core/platform:platform",
-#        ":platform_base",
 #        "@com_google_absl//absl/base",
 #        "//tensorflow/core/platform/default/build_config:port",
 #        "@snappy",
@@ -209,7 +174,6 @@ for i in protos_all_proto:
 #    copts = tf_copts(),
 #    visibility = [":__subpackages__"],
 #    deps = [
-#        ":platform_base",
 #        ":platform_port",
 #        "//tensorflow/core/platform",
 #        "//tensorflow/core/platform/default/build_config:protobuf",
@@ -293,7 +257,6 @@ for i in protos_all_proto:
 #        ":error_codes_proto_cc",
 #        ":lib",
 #        ":lib_internal",
-#        ":platform_base",
 #        ":platform_port",
 #        ":platform_protobuf",
 #        "//tensorflow/core/platform",
@@ -403,7 +366,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    visibility = [":__subpackages__"],
 #    deps = [
 #        ":lib",
-#        ":platform_base",
 #        ":platform_env",
 #        ":platform_port",
 #        ":platform_protobuf",
@@ -443,7 +405,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    ],
 #    copts = tf_copts(),
 #    deps = tf_lib_proto_parsing_deps() + [
-#        ":platform_base",
 #        "@com_google_absl//absl/strings",
 #        "@double_conversion//:double-conversion",
 #        "//tensorflow/core/platform:macros",
@@ -522,8 +483,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #        "lib/strings/str_util.h",
 #        "lib/strings/strcat.h",
 #        "lib/strings/stringprintf.h",
-#        ":platform_base_hdrs",
-#        ":platform_env_hdrs",
 #        ":platform_file_system_hdrs",
 #        ":platform_other_hdrs",
 #        ":platform_port_hdrs",
@@ -585,7 +544,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    hdrs = ["lib/core/stringpiece.h"],
 #    copts = tf_copts(),
 #    deps = [
-#        ":platform_base",
 #        "@com_google_absl//absl/strings",
 #    ],
 #)
@@ -639,7 +597,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    ],
 #    copts = tf_copts(),
 #    deps = [
-#        ":platform_base",
 #        "//tensorflow/core/platform",
 #        "//tensorflow/core/platform/default/build_config:gtest",
 #    ],
@@ -1692,7 +1649,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #cc_library(
 #    name = "mobile_additional_lib_deps",
 #    deps = tf_additional_lib_deps() + [
-#        ":platform_base",
 #        "@com_google_absl//absl/container:flat_hash_map",
 #        "@com_google_absl//absl/container:flat_hash_set",
 #        "@com_google_absl//absl/strings",
@@ -2369,7 +2325,6 @@ f.build(src.replace('.cc', '.o'), 'CXX', src)
 #    copts = tf_copts(),
 #    linkopts = ["-ldl"],
 #    deps = [
-#        ":platform_base",
 #        "//tensorflow/core/platform/default/build_config:logging",
 #    ],
 #)
