@@ -46,6 +46,18 @@ import os, sys, re
 from ninja_syntax import Writer
 d = "$(dirname $target)"
 f = Writer(open(f'{d}/build.ninja', 'wt'))
+
+def protoGroup(name: str, paths: list):
+    f.variable(name+'_obj', [x.replace('.proto', '.pb.o') for x in paths])
+    f.build(name+'_obj', 'phony', [x.replace('.proto', '.pb.o') for x in paths])
+    f.variable(name+'_cc', [x.replace('.proto', '.pb.cc') for x in paths])
+    f.build(name+'_cc', 'phony', [x.replace('.proto', '.pb.cc') for x in paths])
+    f.variable(name+'_h', [x.replace('.proto', '.pb.h') for x in paths])
+    f.build(name+'_h', 'phony', [x.replace('.proto', '.pb.h') for x in paths])
+    for x in paths:
+        f.build([x.replace('.proto', '.pb.h'), x.replace('.proto', '.pb.cc')], 'PROTOC', x)
+        f.build(x.replace('.proto', '.pb.o'), 'CXX', x.replace('.proto', '.pb.cc'), implicit=name+'_cc')
+
 if '.' == d:
 	f.rule('PROTOC', 'protoc -I. --cpp_out=. \$in')
 	f.rule('CXX', 'ccache g++ -I. -O2 -fPIC -c -o \$out \$in')
@@ -63,7 +75,7 @@ done
 }
 
 embedded(){
-	tar xvf debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz --strip-components=1 -C.
+	tar xf debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz --strip-components=1 -C.
 }
 
 build(){
