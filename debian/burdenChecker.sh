@@ -45,9 +45,21 @@ for helper in $(find debian/buildsys/ -type f -name 'ninja.py'); do
 #!/usr/bin/python3
 # Copyright (C) 2019 Mo Zhou <lumin@debian.org>
 import os, sys, re
+import functools
+from glob import glob as _glob
 from ninja_syntax import Writer
 d = "$(dirname $target)"
 f = Writer(open(f'{d}/build.ninja', 'wt'))
+
+def glob(files: list, exclude: list):
+    files = [f'{d}/' +  x for x in files]
+    exclude = [f'{d}/' + x for x in exclude]
+    fs = functools.reduce(list.__sum__,
+            [_glob(x, recursive=True) for x in files])
+    exs = functools.reduce(list.__sum__,
+            [_glob(x, recursive=True) for x in exclude])
+    fs = list(filter(lambda x: x not in exs, fs))
+    return fs
 
 def protoGroup(name: str, paths: list):
     f.variable(name+'_obj', [x.replace('.proto', '.pb.o') for x in paths])
