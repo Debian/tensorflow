@@ -73,62 +73,19 @@ ADDITIONAL_CORE_PROTO_SRCS = [
     "util/test_log.proto",
 ]
 
-for i in CORE_PROTO_SRCS + ADDITIONAL_CORE_PROTO_SRCS:
-    f.build([re.sub('.proto$', '.pb.cc', i), re.sub('.proto$', '.pb.h', i)],
+protos_all_proto = [os.path.join(d, x) for x in CORE_PROTO_SRCS + ADDITIONAL_CORE_PROTO_SRCS]
+
+f.build('protos_all_proto', 'phony', [re.sub('.proto$', '.pb.cc', x) for x in protos_all_proto])
+for i in protos_all_proto:
+    f.build([re.sub('.proto$', '.pb.cc', i),
+            re.sub('.proto$', '.pb.h', i)],
             'PROTOC', i)
+    f.build(re.sub('.proto$', '.pb.o', i),
+            'CXX', re.sub('.proto$', '.pb.cc', i),
+            implicit='protos_all_proto')
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-tf_proto_library(
-    name = "protos_all",
-    srcs = [],
-    cc_api_version = 2,
-    make_default_target_header_only = True,
-    protodeps = [
-        ":protos_all_proto",
-        ":error_codes_proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-tf_jspb_proto_library(
-    name = "protos_all_jspb_proto",
-    visibility = ["//visibility:public"],
-    deps = [":protos_all_cc"],
-)
-
-proto_library(
-    name = "example_protos",
-    srcs = [
-        "example/example.proto",
-        "example/feature.proto",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-java_proto_library(
-    name = "example_java_proto",
-    visibility = ["//visibility:public"],
-    deps = [":example_protos"],
-)
-
-closure_proto_library(
-    name = "example_protos_closure",
-    visibility = ["//visibility:public"],
-    deps = [":example_protos"],
-)
-
-exports_files([
-    "framework/types.proto",
-])
-
-tf_proto_library(
-    name = "protos_test",
-    srcs = ["util/example_proto_fast_parsing_test.proto"],
-    cc_api_version = 2,
-    protodeps = tf_additional_all_protos(),
-    visibility = ["//visibility:public"],
-)
 
 filegroup(
     name = "platform_base_hdrs",
