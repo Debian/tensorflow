@@ -1,1 +1,1 @@
-f.include('core/build.ninja')
+f.include('tensorflow/core/build.ninja')

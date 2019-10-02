@@ -46,8 +46,9 @@ import os, sys, re
 from ninja_syntax import Writer
 d = "$(dirname $target)"
 f = Writer(open(f'{d}/build.ninja', 'wt'))
-f.rule('PROTOC', 'protoc -I. -I.. -I../.. --cpp_out=. \$in')
-f.rule('CXX', 'g++ -I. -O2 -fPIC -c -o \$out \$in')
+if '.' == d:
+	f.rule('PROTOC', 'protoc -I. -I.. -I../.. --cpp_out=. \$in')
+	f.rule('CXX', 'g++ -I. -O2 -fPIC -c -o \$out \$in')
 EOF
 	cat $helper >> $target
 	cat >> $target <<EOF
