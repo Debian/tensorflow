@@ -1,13 +1,21 @@
 #!/usr/bin/pypy3
 # FakeBazel
 # Copyright (C) 2019 Mo Zhou <lumin@debian.org>
-import os, sys, re, argparse, shlex
+import os, sys, re, argparse, shlex, json
 from ninja_syntax import Writer
 from typing import *
 
 DEBUG=os.getenv('DEBUG', False)
 
 class FakeBazel(object):
+    @staticmethod
+    def dirMangle(path: str):
+        path = path.replace('bazel-out/k8-opt/bin/', '')
+        path = path.replace('bazel-out/k8-opt/bin', './')
+        path = path.replace('bazel-out/host/bin/', '')
+        path = path.replace('bazel-out/host/bin', './')
+        path = path.replace('/_objs/', '/')
+        return path
     @staticmethod
     def parseBuildlog(path: str) -> List[str]:
         '''
@@ -38,6 +46,7 @@ class FakeBazel(object):
     def understandCmdlines(cmdlines: List[str]) -> (List):
         '''
         Understand the command lines and rebuild the dependency graph.
+        paths must be mangled.
         '''
         depgraph = []
         for cmd in cmdlines:
@@ -130,11 +139,11 @@ class FakeBazel(object):
                     elif re.match('.*\.d$', t):
                         pass
                     elif re.match('.*\.c[cp]?p?$', t):
-                        target['src'].append(t)
+                        target['src'].append(FakeBazel.dirMangle(t))
                     elif re.match('.*\.S$', t):
-                        target['src'].append(t)
+                        target['src'].append(FakeBazel.dirMangle(t))
                     elif re.match('-o', tokens[i-1]):
-                        target['obj'].append(t)
+                        target['obj'].append(FakeBazel.dirMangle(t))
                     else:
                         raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]} full={tokens}')
                 if DEBUG: print(target)
@@ -156,9 +165,9 @@ class FakeBazel(object):
                     if re.match('-I.*', t):
                         pass
                     elif re.match('--cpp_out=.*', t):
-                        target['flags'].append(t)
+                        target['flags'].append(FakeBazel.dirMangle(t))
                     elif re.match('.*\.proto$', t):
-                        target['proto'].append(t)
+                        target['proto'].append(FakeBazel.dirMangle(t))
                     else:
                         raise Exception(f'what is {t} in {cmd}?')
                 if DEBUG: print(target)
@@ -175,9 +184,9 @@ class FakeBazel(object):
         G = []
         for t in depgraph:
             if 'CXX' == t['type']:
-                if t['obj'][0] =='bazel-out/host/bin/external/com_google_protobuf/protoc':
+                if t['obj'][0] =='external/com_google_protobuf/protoc':
                     continue
-                if t['obj'][0] =='bazel-out/host/bin/external/nasm/nasm':
+                if t['obj'][0] =='external/nasm/nasm':
                     continue
                 if len(t['src'])==0:
                     pass
@@ -218,17 +227,45 @@ class FakeBazel(object):
                 if DEBUG: print(t)
         return G
     @staticmethod
+    def dedupGraph(depgraph: str):
+        G = []
+        for t in depgraph:
+            if t['type'] == 'CXX':
+                dup = [i for (i,x) in enumerate(G)
+                        if (x['type'] == 'CXX') and (x['src'] == t['src']) and (x['obj'] == t['obj'])]
+                if not dup:
+                    G.append(t)
+                else:
+                    print('merging', t)
+                    G[dup[0]]['flags'].extend(t['flags'])
+            elif t['type'] == 'PROTOC':
+                dup = [(i,x) for (i,x) in enumerate(G)
+                        if (x['type'] == 'PROTOC') and (x['proto'] == t['proto'])]
+                if not dup:
+                    G.append(t)
+                else:
+                    print('merging', t)
+                    #G[dup[0][0]]['flags'].extend(t['flags'])
+                    pass
+            else:
+                G.append(t)
+        return G
+    @staticmethod
     def generateNinja(depgraph: str, dest: str):
         '''
         Generate the NINJA file from the given depgraph
         '''
-        dedupdir, dedupproto, dedupobj = set(), set(), set()
+        dedupdir = set()
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
         F.rule('CXX', 'ccache g++ -I. -O2 -fPIC $flags -c -o $out $in')
         F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -c -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
+        # protos_all_cc target
+        protos = list(set(x['proto'][0] for x in depgraph if x['type']=='PROTOC'))
+        F.build('protos_all_cc', 'phony', [re.sub('\.proto$', '.pb.cc', x) for x in protos])
+        # small targets
         for t in depgraph:
             if t['type'] == 'CXX':
                 # src obj flags
@@ -237,31 +274,20 @@ class FakeBazel(object):
                 assert(len(src) <= 1)
                 assert(len(obj) == 1)
                 src = '' if len(src)<1 else src[0]
-                if src:
-                    src = src.replace('bazel-out/k8-opt/bin/', '').replace('bazel-out/host/bin/', '')
                 obj = obj[0]
-                if obj:
-                    obj = obj.replace('bazel-out/k8-opt/bin/', '').replace('bazel-out/host/bin/', '')
-                if obj not in dedupobj:
-                    dedupobj.add(obj)
-                else:
-                    continue
-                    print('DUPLICATE', src)
                 if re.match('.*\.c$', src) and obj.endswith('.o'):
-                    F.build(re.sub('\.c$', '.o', src), 'CXX', src, variables={'flags': flags})
+                    F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*\.cc$', src) and obj.endswith('.o'):
                     if re.match('.*\.pb\.cc$', src):
-                        F.build(re.sub('\.cc$', '.o', src), 'CXX', src,
-                                implicit=src, variables={'flags': flags})
+                        F.build(obj, 'CXX', src, implicit=src, variables={'flags': flags})
                     elif re.match('.*\.pb_text\.cc', src):
-                        F.build(obj, 'CXX', src, implicit=[src,
-                            'tensorflow/tools/proto_text/gen_proto_text_function'],
-                            variables={'flags': flags})
-                    else:
-                        F.build(re.sub('\.cc$', '.o', src), 'CXX', src,
+                        F.build(obj, 'CXX', src,
+                                implicit=[src, 'tensorflow/tools/proto_text/gen_proto_text_function'],
                                 variables={'flags': flags})
+                    else:
+                        F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
-                    F.build(re.sub('\.cpp$', '.o', src), 'CXX', src, variables={'flags': flags})
+                    F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*gen_proto_text_functions.*', obj):
                     F.build(obj, 'CXXEXEC', '', variables={'flags': flags})
                 else:
@@ -271,15 +297,6 @@ class FakeBazel(object):
                 assert(len(t['proto']) == 1)
                 proto, flags = t['proto'][0], ' '.join(t['flags'])
                 flags = re.sub('(.*)(--cpp_out=).*', '\\1\\2.', flags)
-                if proto not in dedupproto:
-                    dedupproto.add(proto)
-                else:
-                    continue
-                    dup = [x for x in depgraph if (x['type']=='PROTOC' and x['proto'][0]==proto)]
-                    print('NINJA-DEDUP')
-                    for x in dup:
-                        print(x)
-                    print(0)
                 F.build([re.sub('\.proto$', '.pb.cc', proto),
                     re.sub('\.proto$', '.pb.h', proto)],
                     'PROTOC', proto, variables={'flags': flags},
@@ -288,8 +305,6 @@ class FakeBazel(object):
                 if 'bazel-out/host/bin/tensorflow/tools/git/gen_git_source' in t['cmd']:
                     F.build('tensorflow/core/util/version_info.cc', 'CP',
                             'debian/patches/version_info.cc')
-                    F.build('bazel-out/k8-opt/bin/tensorflow/core/util/version_info.cc',
-                            'CP', 'debian/patches/version_info.cc')
             else:
                 print('MISSING', t)
         F.close()
@@ -302,6 +317,9 @@ class FakeBazel(object):
         sys.stdout.flush()
         depgraph = self.rinseGraph(depgraph)
         print(f'  -> {len(depgraph)} rinsed targets')
+        json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
+        depgraph = self.dedupGraph(depgraph)
+        print(f'  -> {len(depgraph)} deduped targets')
         self.generateNinja(depgraph, dest)
         print(f'  -> Generated Ninja file {dest}')
 
