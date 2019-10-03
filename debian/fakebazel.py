@@ -5,9 +5,15 @@ import os, sys, re, argparse, shlex
 from ninja_syntax import Writer
 from typing import *
 
+DEBUG=os.getenv('DEBUG', False)
+
 class FakeBazel(object):
     @staticmethod
     def parseBuildlog(path: str) -> List[str]:
+        '''
+        Read the Bazel buildlog (bazel build -s //tensorflow:xxx 2>&1 | tee log),
+        collect all the command lines inside it and return the cmdline list.
+        '''
         cmdlines = []
         lines = open(path, 'rt').readlines()
         states = [0, 0] # (anther SUBCOMMAND, bracket balance)
@@ -29,61 +35,36 @@ class FakeBazel(object):
                     pass
         return cmdlines
     @staticmethod
-    def stripCompilerArgs(line: str) -> str:
-        res = ['-f\S*?\s', '-g\d\s', '-O\d\s', '-M\w\s', '-W\S*?\s',
-                '-U_FORTIFY_SOURCE', '-iquote\s\S*?\s', '-isystem\s\S*?\s',
-                "-D__DATE__=.*?\s", "-D__TIME__=.*?\s",
-                "-D__TIMESTAMP__=.*?\s", '-D_FORTIFY_SOURCE=1']
-        for r in res:
-            line = re.sub(r, ' ', line)
-        #if line.startswith('/usr/lib/ccache/gcc'):
-        #    src, obj = [], ''
-        #    tokens = list(line.split())
-        #    for i, t in enumerate(tokens):
-        #        if t == '-o':
-        #            obj = tokens[i+1]
-        #    for i, t in enumerate(tokens):
-        #        if i == 0:
-        #            continue
-        #        if not t.startswith('-') and not t.endswith('.d'):
-        #            if t.endswith('.o') and re.match('.*\.so.*', obj):
-        #                src.append(t)
-        #            elif t.endswith('.o'):
-        #                pass
-        #            else:
-        #                src.append(t)
-        #    print(' [31;1mCC[m', src, '->', obj.replace('bazel-out/k8-opt/bin/', ''))
+    def rinseGraph(depgraph: List[str]) -> List[str]:
+        '''
+        Remove unwanted targets from the dependency graph,
+        especially those for external source files (e.g. protobuf)
+        '''
+        pass
+        #rinsed, count = [], 0
+        #for line in cmdlines:
+        #    line = re.sub("'", '', line)
+        #    if not FakeBazel.isUnwanted(line):
+        #if any(re.match(x, line) for x in [
+        #    '.*external/aws/aws-cpp-sdk-core/.*?.c[cp]?p?\s.*',
+        #    '.*external/boringssl.*?.c[cp]?p?\s.*',
+        #    '.*external/com_google_protobuf/.*?.c[cp]?p?\s.*',
+        #    '.*external/\S*?.c\s',
+        #    '.*external/\S.*?.cc\s',
+        #    '.*external/\S*?.cpp\s',
+        #    ]):
+        #    return True
         #else:
-        #    print(line)
-        return ' '.join(line.split())
-    @staticmethod
-    def isUnwanted(line: str) -> bool:
-        if any(re.match(x, line) for x in [
-            '.*external/aws/aws-cpp-sdk-core/.*?.c[cp]?p?\s.*',
-            '.*external/boringssl.*?.c[cp]?p?\s.*',
-            '.*external/com_google_protobuf/.*?.c[cp]?p?\s.*',
-            '.*external/\S*?.c\s',
-            '.*external/\S.*?.cc\s',
-            '.*external/\S*?.cpp\s',
-            ]):
-            return True
-        else:
-            return False
-    @staticmethod
-    def rinseCmdlines(cmdlines: List[str]) -> List[str]:
-        rinsed, count = [], 0
-        for line in cmdlines:
-            line = re.sub("'", '', line)
-            if not FakeBazel.isUnwanted(line):
-                rinsed.append(line)
-            else:
-                count += 1
-        print(f'* {count}/{len(cmdlines)} commands were drop out.')
-        return rinsed
+        #    return False
+        #        rinsed.append(line)
+        #    else:
+        #        count += 1
+        #print(f'* {count}/{len(cmdlines)} commands were drop out.')
+        #return rinsed
     @staticmethod
     def understandCmdlines(cmdlines: List[str]) -> (List):
         '''
-        Understand and Rinse the command lines
+        Understand the command lines and rebuild the dependency graph.
         '''
         depgraph = []
         for cmd in cmdlines:
@@ -183,13 +164,13 @@ class FakeBazel(object):
                         target['obj'].append(t)
                     else:
                         raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]} full={tokens}')
-                print(target)
+                if DEBUG: print(target)
                 depgraph.append(target)
             elif cmd.startswith('/bin/bash -c'):
                 # it's a shell command
                 target = {'type': 'CMD', 'cmd': []}
                 target['cmd'] = shlex.split(cmd)[-1]
-                print(target)
+                if DEBUG: print(target)
                 depgraph.append(target)
             elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
                 # we don't need this assember
@@ -207,14 +188,17 @@ class FakeBazel(object):
                         target['proto'].append(t)
                     else:
                         raise Exception(f'what is {t} in {cmd}?')
-                print(target)
+                if DEBUG: print(target)
                 depgraph.append(target)
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
     def __init__(self, path: str):
+        print(f'* Parsing[{path}]', end=' ')
+        sys.stdout.flush()
         cmdlines = self.parseBuildlog(path)
         depgraph = self.understandCmdlines(cmdlines)
-        print(f'* Parsed[{path}] {len(cmdlines)} command lines; {len(depgraph)} targets;')
+        print(f'-> {len(cmdlines)} command lines -> {len(depgraph)} targets')
+        sys.stdout.flush()
 
 fakeb = FakeBazel(sys.argv[1])
