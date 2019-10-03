@@ -12,3 +12,4 @@ cp -v debian/buildlogs/gen_proto_text_functions-2.params tensorflow/tools/proto_
 
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
+NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m " ninja -v

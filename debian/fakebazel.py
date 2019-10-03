@@ -256,6 +256,10 @@ class FakeBazel(object):
                         'external/farmhash.*',
                         ]):
                     continue
+                elif any(re.match(r, t['src'][0]) for r in [
+                    '.*tensorflow/core/platform/s3/aws_crypto.cc.*',
+                        ]):
+                    continue
             if 'CMD' == t['type']:
                 if 'external/jpeg' in t['cmd']: continue
                 if 'external/snappy' in t['cmd']: continue
@@ -303,7 +307,7 @@ class FakeBazel(object):
         dedupdir = set()
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
-        F.rule('CXX', 'ccache g++ -I. -Iexternal/com_google_absl -O2 -fPIC $flags -c -o $out $in')
+        F.rule('CXX', 'ccache g++ -I. -I/usr/include/eigen3/ -Ithird_party/eigen3 -Iexternal/com_google_absl -O2 -fPIC $flags -c -o $out $in')
         F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
@@ -330,20 +334,20 @@ class FakeBazel(object):
                 src = '' if len(src)<1 else src[0]
                 obj = obj[0]
                 if re.match('.*\.c$', src) and obj.endswith('.o'):
-                    F.build(obj, 'CXX', src, variables={'flags': flags})
+                    F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protoc_all_cc'])
                 elif re.match('.*\.cc$', src) and obj.endswith('.o'):
                     if re.match('.*\.pb\.cc$', src):
-                        F.build(obj, 'CXX', src, implicit=src, variables={'flags': flags})
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc', src])
                     elif re.match('.*\.pb_text\.cc', src):
-                        F.build(src, 'phony', 'proto_text_all_cc')
-                        F.build(obj, 'CXX', src, variables={'flags': flags})
+                        F.build(src, 'phony', 'proto_text_all_cc', implicit=['protos_all_cc'])
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                     else:
-                        F.build(obj, 'CXX', src, variables={'flags': flags})
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
-                    F.build(obj, 'CXX', src, variables={'flags': flags})
+                    F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                 elif re.match('.*gen_proto_text_functions.*', obj):
                     F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
-                            implicit=objs_gen_proto_text_functions)
+                            implicit=[*objs_gen_proto_text_functions, 'protos_all_cc'])
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
@@ -373,11 +377,11 @@ class FakeBazel(object):
         sys.stdout.flush()
         depgraph = self.rinseGraph(depgraph)
         print(f'  -> {len(depgraph)} rinsed targets')
-        json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
         depgraph = self.dedupGraph(depgraph)
         print(f'  -> {len(depgraph)} deduped targets')
         self.generateNinja(depgraph, dest)
         print(f'  -> Generated Ninja file {dest}')
+        json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
 
 
 if os.path.exists('buildlogs'):
