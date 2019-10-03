@@ -257,7 +257,7 @@ class FakeBazel(object):
                         ]):
                     continue
                 elif any(re.match(r, t['src'][0]) for r in [
-                    '.*tensorflow/core/platform/s3/aws_crypto.cc.*',
+                    '.*tensorflow/core/platform/s3/.*',
                         ]):
                     continue
             if 'CMD' == t['type']:
