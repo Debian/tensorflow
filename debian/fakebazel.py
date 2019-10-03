@@ -7,6 +7,42 @@ from typing import *
 
 DEBUG=os.getenv('DEBUG', False)
 
+objs_gen_proto_text_functions = '''
+external/com_google_absl/absl/base/base/cycleclock.o
+external/com_google_absl/absl/base/base/log_severity.o
+external/com_google_absl/absl/base/base/raw_logging.o
+external/com_google_absl/absl/base/base/spinlock.o
+external/com_google_absl/absl/base/base/sysinfo.o
+external/com_google_absl/absl/base/base/thread_identity.o
+external/com_google_absl/absl/base/base/unscaledcycleclock.o
+external/com_google_absl/absl/base/dynamic_annotations/dynamic_annotations.o
+external/com_google_absl/absl/base/spinlock_wait/spinlock_wait.o
+external/com_google_absl/absl/base/throw_delegate/throw_delegate.o
+external/com_google_absl/absl/numeric/int128/int128.o
+external/com_google_absl/absl/strings/internal/ostringstream.o
+external/com_google_absl/absl/strings/internal/utf8.o
+external/com_google_absl/absl/strings/strings/ascii.o
+external/com_google_absl/absl/strings/strings/charconv.o
+external/com_google_absl/absl/strings/strings/charconv_bigint.o
+external/com_google_absl/absl/strings/strings/charconv_parse.o
+external/com_google_absl/absl/strings/strings/escaping.o
+external/com_google_absl/absl/strings/strings/match.o
+external/com_google_absl/absl/strings/strings/memutil.o
+external/com_google_absl/absl/strings/strings/numbers.o
+external/com_google_absl/absl/strings/strings/str_cat.o
+external/com_google_absl/absl/strings/strings/str_replace.o
+external/com_google_absl/absl/strings/strings/str_split.o
+external/com_google_absl/absl/strings/strings/string_view.o
+external/com_google_absl/absl/strings/strings/substitute.o
+tensorflow/core/lib_proto_parsing/protobuf.o
+tensorflow/core/platform/cpu_info/cpu_info.o
+tensorflow/core/platform/env_time/0/env_time.o
+tensorflow/core/platform/env_time/1/env_time.o
+tensorflow/core/platform/logging/logging.o
+tensorflow/tools/proto_text/gen_proto_text_functions/gen_proto_text_functions.o
+tensorflow/tools/proto_text/gen_proto_text_functions_lib/gen_proto_text_functions_lib.o
+'''.split()
+
 class FakeBazel(object):
     @staticmethod
     def dirMangle(path: str):
@@ -129,7 +165,7 @@ class FakeBazel(object):
                         '-pass-exit-codes',
                         '-shared',
                         ]):
-                        target['flags'].append(t)
+                        target['flags'].append(FakeBazel.dirMangle(t))
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
                     elif re.match('-isystem', t) or re.match('-isystem', tokens[i-1]):
@@ -244,7 +280,7 @@ class FakeBazel(object):
                 if not dup:
                     G.append(t)
                 else:
-                    print('merging', t)
+                    #print('merging', t)
                     #G[dup[0][0]]['flags'].extend(t['flags'])
                     pass
             else:
@@ -258,8 +294,8 @@ class FakeBazel(object):
         dedupdir = set()
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
-        F.rule('CXX', 'ccache g++ -I. -O2 -fPIC $flags -c -o $out $in')
-        F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -c -o $out $in')
+        F.rule('CXX', 'ccache g++ -I. -Iexternal/com_google_absl -O2 -fPIC $flags -c -o $out $in')
+        F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
         # protos_all_cc target
@@ -282,14 +318,15 @@ class FakeBazel(object):
                         F.build(obj, 'CXX', src, implicit=src, variables={'flags': flags})
                     elif re.match('.*\.pb_text\.cc', src):
                         F.build(obj, 'CXX', src,
-                                implicit=[src, 'tensorflow/tools/proto_text/gen_proto_text_function'],
+                                implicit=[src, 'tensorflow/tools/proto_text/gen_proto_text_function.elf'],
                                 variables={'flags': flags})
                     else:
                         F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
                     F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*gen_proto_text_functions.*', obj):
-                    F.build(obj, 'CXXEXEC', '', variables={'flags': flags})
+                    F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
+                            implicit=objs_gen_proto_text_functions)
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
