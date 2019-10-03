@@ -221,7 +221,34 @@ class FakeBazel(object):
         '''
         Generate the NINJA file from the given depgraph
         '''
-        pass
+        dedupdir, dedupproto, dedupcc = set(), set(), set()
+        F = Writer(open(dest, 'wt'))
+        F.rule('PROTOC', 'protoc -I. $in $flags')
+        F.rule('CXX', 'ccache g++ -I. -O2 -fPIC $flags -c -o $out $in')
+        F.rule('MKDIR', 'mkdir -p $out')
+        for t in depgraph:
+            if t['type'] == 'CXX':
+                # src obj flags
+                pass
+            if t['type'] == 'PROTOC':
+                # proto flags
+                assert(len(t['proto']) == 1)
+                proto, flags = t['proto'][0], ' '.join(t['flags'])
+                flags = re.sub('(.*)(--cpp_out=).*', '\\1\\2.', flags)
+                if proto not in dedupproto:
+                    dedupproto.add(proto)
+                else:
+                    continue
+                    dup = [x for x in depgraph if (x['type']=='PROTOC' and x['proto'][0]==proto)]
+                    print('NINJA-DEDUP')
+                    for x in dup:
+                        print(x)
+                    print(0)
+                F.build([re.sub('\.proto$', '.pb.cc', proto),
+                    re.sub('\.proto$', '.pb.h', proto)],
+                    'PROTOC', proto, variables={'flags': flags},
+                    implicit=os.path.dirname(proto))
+        F.close()
     def __init__(self, path: str, dest: str = 'build.ninja'):
         print(f'* Parsing {path} ...')
         sys.stdout.flush()
@@ -231,6 +258,8 @@ class FakeBazel(object):
         sys.stdout.flush()
         depgraph = self.rinseGraph(depgraph)
         print(f'  -> {len(depgraph)} rinsed targets')
+        self.generateNinja(depgraph, dest)
+        print(f'  -> Generated Ninja file {dest}')
 
 
 if os.path.exists('buildlogs'):
