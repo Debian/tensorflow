@@ -199,6 +199,7 @@ class FakeBazel(object):
                         'external/highwayhash/.*',
                         'external/snappy/.*',
                         'external/nasm/.*',
+                        'external/farmhash.*',
                         ]):
                     continue
             if 'CMD' == t['type']:

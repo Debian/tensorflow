@@ -1,12 +1,11 @@
 # prepare embedded source code
 set -x
-if ! test -d debian/embedded/eigen3; then
-  tar xf debian/embedded/eigen/5a4931dafc1c.tar.gz -C debian/embedded/
-  mv debian/embedded/eigen-eigen-5a4931dafc1c debian/embedded/eigen3
+if ! test -d external/com_google_absl/; then
+  mkdir -p external/com_google_absl/
+  tar xf debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz -C external/com_google_absl/ --strip-components=1
 fi
-if ! test -d debian/embedded/fft; then
-  tar -zxf debian/embedded/fft.tgz -C debian/embedded/
-fi
-if ! test -d debian/embedded/abseil/build; then
-  cd debian/embedded/abseil; sh build-abseil-static.sh
-fi
+mkdir -p bazel-out
+ln -s . bazel-out
+ln -s . k8-opt
+ln -s . host
+ln -s . bin
