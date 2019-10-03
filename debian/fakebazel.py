@@ -90,7 +90,7 @@ class FakeBazel(object):
         for cmd in cmdlines:
             if cmd.startswith('/usr/lib/ccache/gcc'):
                 # it's a CXX/LD command
-                target = {'type': 'CXX', 'src': [], 'obj': [], 'def': []}
+                target = {'type': 'CXX', 'src': [], 'obj': [], 'flags': []}
                 tokens = shlex.split(cmd)
                 for (i,t) in enumerate(tokens[1:], 1):
                     if re.match('-g\d', t):
@@ -103,6 +103,8 @@ class FakeBazel(object):
                         pass
                     elif re.match('-M\w', t):
                         pass
+                    elif re.match('-std=.*', t):
+                        target['flags'].append(t)
                     elif re.match('-U_FORTIFY_SOURCE', t):
                         pass
                     elif re.match("-D__TIME__=.*?", t):
@@ -113,31 +115,42 @@ class FakeBazel(object):
                         pass
                     elif re.match('-D_FORTIFY_SOURCE=1', t):
                         pass
-                    elif re.match('-fstack-protect', t):
+                    elif any(re.match(r, t) for r in [
+                        '-fstack-protect',
+                        '-fno-omit-frame-pointer',
+                        '-ffunction-sections',
+                        '-fdata-sections',
+                        '-fno-canonical-system-headers',
+                        '-frandom-seed=.*',
+                        ]):
                         pass
-                    elif re.match('-Wall', t):
+                    elif any(re.match(r, t) for r in [
+                        '-Wall',
+                        '-Woverloaded-virtual',
+                        '-Wunused-but-set-parameter',
+                        '-Wno-free-nonheap-object',
+                        '-Wno-shift-negative-value',
+                        '-Wno-builtin-macro-redefined',
+                        '-Wno-sign-compare',
+                        '-Wno-unused-function',
+                        '-Wno-write-strings',
+                        '-Wextra',
+                        '-Wcast-qual',
+                        '-Wconversion-null',
+                        '-Wmissing-declarations',
+                        '-Woverlength-strings',
+                        '-Wpointer-arith',
+                        '-Wunused-local-typedefs',
+                        '-Wunused-result',
+                        '-Wvarargs',
+                        '-Wvla',
+                        '-Wwrite-strings',
+                        ]):
                         pass
-                    elif re.match('-Wunused-but-set-parameter', t):
-                        pass
-                    elif re.match('-Wno-free-nonheap-object', t):
-                        pass
-                    elif re.match('-Wno-shift-negative-value', t):
-                        pass
-                    elif re.match('-fno-omit-frame-pointer', t):
-                        pass
-                    elif re.match('-ffunction-sections', t):
-                        pass
-                    elif re.match('-fdata-sections', t):
-                        pass
-                    elif re.match('-fno-canonical-system-headers', t):
-                        pass
-                    elif re.match('-Wno-builtin-macro-redefined', t):
                         pass
                     elif re.match('-D\S+', t):
-                        target['def'].append(t)
+                        target['flags'].append(t)
                     elif re.match('.*\.d$', t):
-                        pass
-                    elif re.match('-frandom-seed=.*', t):
                         pass
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
@@ -150,6 +163,13 @@ class FakeBazel(object):
                     else:
                         raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]}')
                 print(target)
+                depgraph.append(target)
+            elif cmd.startswith('/bin/bash -c'):
+                # it's a shell command
+                target = {'type': 'CMD', 'cmd': []}
+                target['cmd'] = shlex.split(cmd)[-1]
+                print(target)
+                depgraph.append(target)
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return [], {}
