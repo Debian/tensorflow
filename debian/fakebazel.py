@@ -77,6 +77,7 @@ class FakeBazel(object):
                         '-c',
                         '-o',
                         '-O\d',
+                        '-Os',
                         '-M\w',
                         '-m.*',
                         '-U_FORTIFY_SOURCE',
@@ -361,8 +362,5 @@ class FakeBazel(object):
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
 
 
-if os.path.exists('buildlogs'):
-    fakeb = FakeBazel('buildlogs/libtensorflow_framework.so.log')
-else:
-    fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log')
-
+#fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log')
+fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log')
