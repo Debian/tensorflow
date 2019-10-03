@@ -348,6 +348,9 @@ class FakeBazel(object):
                 elif re.match('.*gen_proto_text_functions.*', obj):
                     F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
                             implicit=[*objs_gen_proto_text_functions, 'protos_all_cc'])
+                elif re.match('.*libtensorflow_framework.*', obj):
+                    F.build(obj, 'CXX', '', variables={'flags': flags},
+                            implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
