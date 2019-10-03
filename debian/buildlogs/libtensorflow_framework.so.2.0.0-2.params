@@ -1086,15 +1086,8 @@ tensorflow/core/platform/env_time/0/env_time.pic.o
 -whole-archive
 tensorflow/core/platform/env_time/1/env_time.pic.o
 -no-whole-archive
--whole-archive
-external/snappy/snappy/snappy.pic.o
--no-whole-archive
--whole-archive
-external/snappy/snappy/snappy-sinksource.pic.o
--no-whole-archive
--whole-archive
-external/snappy/snappy/snappy-stubs-internal.pic.o
--no-whole-archive
+
+-lsnappy
 
 -ldouble-conversion
 
