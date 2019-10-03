@@ -9,3 +9,6 @@ fi
 #ln -s . host
 #ln -s . bin
 cp -v debian/buildlogs/gen_proto_text_functions-2.params tensorflow/tools/proto_text/gen_proto_text_functions-2.params
+
+which pypy3 && PY=pypy3 || PY=python3
+$PY debian/fakebazel.py

@@ -43,6 +43,15 @@ tensorflow/tools/proto_text/gen_proto_text_functions/gen_proto_text_functions.o
 tensorflow/tools/proto_text/gen_proto_text_functions_lib/gen_proto_text_functions_lib.o
 '''.split()
 
+inputs1_proto_text = """
+tensorflow/core tensorflow/core/ tensorflow/core/lib/core/error_codes.proto tensorflow/tools/proto_text/placeholder.txt
+""".split()
+
+inputs2_proto_text = """
+tensorflow/core tensorflow/core/ tensorflow/core/example/example.proto tensorflow/core/example/feature.proto tensorflow/core/framework/allocation_description.proto tensorflow/core/framework/api_def.proto tensorflow/core/framework/attr_value.proto tensorflow/core/framework/cost_graph.proto tensorflow/core/framework/device_attributes.proto tensorflow/core/framework/function.proto tensorflow/core/framework/graph.proto tensorflow/core/framework/graph_transfer_info.proto tensorflow/core/framework/kernel_def.proto tensorflow/core/framework/log_memory.proto tensorflow/core/framework/node_def.proto tensorflow/core/framework/op_def.proto tensorflow/core/framework/reader_base.proto tensorflow/core/framework/remote_fused_graph_execute_info.proto tensorflow/core/framework/resource_handle.proto tensorflow/core/framework/step_stats.proto tensorflow/core/framework/summary.proto tensorflow/core/framework/tensor.proto tensorflow/core/framework/tensor_description.proto tensorflow/core/framework/tensor_shape.proto tensorflow/core/framework/tensor_slice.proto tensorflow/core/framework/types.proto tensorflow/core/framework/variable.proto tensorflow/core/framework/versions.proto tensorflow/core/protobuf/config.proto tensorflow/core/protobuf/cluster.proto tensorflow/core/protobuf/debug.proto tensorflow/core/protobuf/device_properties.proto tensorflow/core/protobuf/graph_debug_info.proto tensorflow/core/protobuf/queue_runner.proto tensorflow/core/protobuf/rewriter_config.proto tensorflow/core/protobuf/tensor_bundle.proto tensorflow/core/protobuf/saver.proto tensorflow/core/protobuf/verifier_config.proto tensorflow/core/protobuf/trace_events.proto tensorflow/core/util/event.proto tensorflow/core/util/memmapped_file_system.proto tensorflow/core/util/saved_tensor_slice.proto tensorflow/core/lib/core/error_codes.proto tensorflow/tools/proto_text/placeholder.txt
+""".split()
+
+
 class FakeBazel(object):
     @staticmethod
     def dirMangle(path: str):
@@ -298,9 +307,18 @@ class FakeBazel(object):
         F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
+        F.rule('PROTO_TEXT', './tensorflow/tools/proto_text/gen_proto_text_functions.elf $in')
         # protos_all_cc target
         protos = list(set(x['proto'][0] for x in depgraph if x['type']=='PROTOC'))
         F.build('protos_all_cc', 'phony', [re.sub('\.proto$', '.pb.cc', x) for x in protos])
+        # gen_proto_text_function
+        F.build('gen_proto_text_functions', 'phony', 'tensorflow/tools/proto_text/gen_proto_text_functions.elf')
+        # inputs{1,2}_proto_text
+        F.build('inputs1_proto_text', 'PROTO_TEXT', inputs1_proto_text,
+                implicit='gen_proto_text_functions')
+        F.build('inputs2_proto_text', 'PROTO_TEXT', inputs2_proto_text,
+                implicit='gen_proto_text_functions')
+        F.build('proto_text_all_cc', 'phony', ['inputs1_proto_text', 'inputs2_proto_text'])
         # small targets
         for t in depgraph:
             if t['type'] == 'CXX':
@@ -317,9 +335,8 @@ class FakeBazel(object):
                     if re.match('.*\.pb\.cc$', src):
                         F.build(obj, 'CXX', src, implicit=src, variables={'flags': flags})
                     elif re.match('.*\.pb_text\.cc', src):
-                        F.build(obj, 'CXX', src,
-                                implicit=[src, 'tensorflow/tools/proto_text/gen_proto_text_function.elf'],
-                                variables={'flags': flags})
+                        F.build(src, 'phony', 'proto_text_all_cc')
+                        F.build(obj, 'CXX', src, variables={'flags': flags})
                     else:
                         F.build(obj, 'CXX', src, variables={'flags': flags})
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
@@ -342,6 +359,8 @@ class FakeBazel(object):
                 if 'bazel-out/host/bin/tensorflow/tools/git/gen_git_source' in t['cmd']:
                     F.build('tensorflow/core/util/version_info.cc', 'CP',
                             'debian/patches/version_info.cc')
+                else:
+                    print('MISSING', FakeBazel.dirMangle(t['cmd']))
             else:
                 print('MISSING', t)
         F.close()
