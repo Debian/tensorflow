@@ -25,7 +25,7 @@ export TF_SET_ANDROID_WORKSPACE=0
 export TF_DOWNLOAD_CLANG=0
 export TF_IGNORE_MAX_BAZEL_VERSION=1
 
-echo > .tf_configure.bazelrc <<EOF
+cat > .tf_configure.bazelrc <<EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
 build --action_env PYTHON_LIB_PATH="/usr/lib/python3.7/dist-packages"
 build --python_path="/usr/bin/python3"
@@ -42,6 +42,10 @@ test --build_tag_filters=-benchmark-test,-no_oss
 test --test_tag_filters=-gpu
 test --build_tag_filters=-gpu
 build --action_env TF_CONFIGURE_IOS="0"
+EOF
+
+cat > tools/python_bin_path.sh <<EOF
+export PYTHON_BIN_PATH="/usr/bin/python3"
 EOF
 
 bazel clean
