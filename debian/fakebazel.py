@@ -35,76 +35,6 @@ class FakeBazel(object):
                     pass
         return cmdlines
     @staticmethod
-    def rinseGraph(depgraph: List[str]) -> List[str]:
-        '''
-        Remove unwanted targets from the dependency graph,
-        especially those for external source files (e.g. protobuf)
-        '''
-        G = []
-        for t in depgraph:
-            if 'CXX' == t['type']:
-                if t['obj'][0] =='bazel-out/host/bin/external/com_google_protobuf/protoc':
-                    continue
-                if t['obj'][0] =='bazel-out/host/bin/external/nasm/nasm':
-                    continue
-                if len(t['src'])==0:
-                    pass
-                elif any(re.match(r, t['src'][0]) for r in[
-                        'external/com_google_protobuf/.*',
-                        'external/boringssl/.*',
-                        'external/aws/.*',
-                        #'external/com_google_absl/.*',
-                        'external/curl/.*',
-                        'external/fft2d/.*',
-                        'external/com_googlesource_code_re2/.*',
-                        'external/nsync/.*',
-                        'external/jpeg/.*',
-                        'external/hwloc/.*',
-                        'external/gif_archive/.*',
-                        'external/zlib_archive/.*',
-                        'external/double_conversion/.*',
-                        'external/jsoncpp_git/.*',
-                        'external/highwayhash/.*',
-                        'external/snappy/.*',
-                        'external/nasm/.*',
-                        ]):
-                    continue
-            if 'CMD' == t['type']:
-                if 'external/jpeg' in t['cmd']: continue
-                if 'external/snappy' in t['cmd']: continue
-                if 'external/com_google_protobuf' in t['cmd']: continue
-                if 'external/nasm' in t['cmd']: continue
-            G.append(t)
-        for t in G:
-            if t['type'] == 'CXX':
-                if len(t['src']) == 0:
-                    print(t)
-                else:
-                    print(t['src'])
-            else:
-                print(t)
-        return G
-        #rinsed, count = [], 0
-        #for line in cmdlines:
-        #    line = re.sub("'", '', line)
-        #    if not FakeBazel.isUnwanted(line):
-        #if any(re.match(x, line) for x in [
-        #    '.*external/aws/aws-cpp-sdk-core/.*?.c[cp]?p?\s.*',
-        #    '.*external/boringssl.*?.c[cp]?p?\s.*',
-        #    '.*external/com_google_protobuf/.*?.c[cp]?p?\s.*',
-        #    '.*external/\S*?.c\s',
-        #    '.*external/\S.*?.cc\s',
-        #    '.*external/\S*?.cpp\s',
-        #    ]):
-        #    return True
-        #else:
-        #    return False
-        #        rinsed.append(line)
-        #    else:
-        #        count += 1
-        #print(f'* {count}/{len(cmdlines)} commands were drop out.')
-        #return rinsed
-    @staticmethod
     def understandCmdlines(cmdlines: List[str]) -> (List):
         '''
         Understand the command lines and rebuild the dependency graph.
@@ -236,7 +166,63 @@ class FakeBazel(object):
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
-    def __init__(self, path: str):
+    @staticmethod
+    def rinseGraph(depgraph: List[str]) -> List[str]:
+        '''
+        Remove unwanted targets from the dependency graph,
+        especially those for external source files (e.g. protobuf)
+        '''
+        G = []
+        for t in depgraph:
+            if 'CXX' == t['type']:
+                if t['obj'][0] =='bazel-out/host/bin/external/com_google_protobuf/protoc':
+                    continue
+                if t['obj'][0] =='bazel-out/host/bin/external/nasm/nasm':
+                    continue
+                if len(t['src'])==0:
+                    pass
+                elif any(re.match(r, t['src'][0]) for r in[
+                        'external/com_google_protobuf/.*',
+                        'external/boringssl/.*',
+                        'external/aws/.*',
+                        #'external/com_google_absl/.*',
+                        'external/curl/.*',
+                        'external/fft2d/.*',
+                        'external/com_googlesource_code_re2/.*',
+                        'external/nsync/.*',
+                        'external/jpeg/.*',
+                        'external/hwloc/.*',
+                        'external/gif_archive/.*',
+                        'external/zlib_archive/.*',
+                        'external/double_conversion/.*',
+                        'external/jsoncpp_git/.*',
+                        'external/highwayhash/.*',
+                        'external/snappy/.*',
+                        'external/nasm/.*',
+                        ]):
+                    continue
+            if 'CMD' == t['type']:
+                if 'external/jpeg' in t['cmd']: continue
+                if 'external/snappy' in t['cmd']: continue
+                if 'external/com_google_protobuf' in t['cmd']: continue
+                if 'external/nasm' in t['cmd']: continue
+            G.append(t)
+        for t in G:
+            if t['type'] == 'CXX':
+                if len(t['src']) == 0:
+                    if DEBUG: print(t)
+                else:
+                    if DEBUG: print(t['src'])
+            else:
+                if DEBUG: print(t)
+        return G
+    @staticmethod
+    def generateNinja(depgraph: str, dest: str):
+        '''
+        Generate the NINJA file from the given depgraph
+        '''
+        pass
+    def __init__(self, path: str, dest: str = 'build.ninja'):
         print(f'* Parsing {path} ...')
         sys.stdout.flush()
         cmdlines = self.parseBuildlog(path)
@@ -244,5 +230,10 @@ class FakeBazel(object):
         print(f'  -> {len(cmdlines)} command lines -> {len(depgraph)} targets')
         sys.stdout.flush()
         depgraph = self.rinseGraph(depgraph)
+        print(f'  -> {len(depgraph)} rinsed targets')
 
-fakeb = FakeBazel(sys.argv[1])
+
+if os.path.exists('buildlogs'):
+    fakeb = FakeBazel('buildlogs/libtensorflow_framework.so.log')
+else:
+    fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log')
