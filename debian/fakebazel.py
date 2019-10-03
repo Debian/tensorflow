@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/pypy3
 # FakeBazel
 # Copyright (C) 2019 Mo Zhou <lumin@debian.org>
 import os, sys, re, argparse, shlex
@@ -40,7 +40,50 @@ class FakeBazel(object):
         Remove unwanted targets from the dependency graph,
         especially those for external source files (e.g. protobuf)
         '''
-        pass
+        G = []
+        for t in depgraph:
+            if 'CXX' == t['type']:
+                if t['obj'][0] =='bazel-out/host/bin/external/com_google_protobuf/protoc':
+                    continue
+                if t['obj'][0] =='bazel-out/host/bin/external/nasm/nasm':
+                    continue
+                if len(t['src'])==0:
+                    pass
+                elif any(re.match(r, t['src'][0]) for r in[
+                        'external/com_google_protobuf/.*',
+                        'external/boringssl/.*',
+                        'external/aws/.*',
+                        #'external/com_google_absl/.*',
+                        'external/curl/.*',
+                        'external/fft2d/.*',
+                        'external/com_googlesource_code_re2/.*',
+                        'external/nsync/.*',
+                        'external/jpeg/.*',
+                        'external/hwloc/.*',
+                        'external/gif_archive/.*',
+                        'external/zlib_archive/.*',
+                        'external/double_conversion/.*',
+                        'external/jsoncpp_git/.*',
+                        'external/highwayhash/.*',
+                        'external/snappy/.*',
+                        'external/nasm/.*',
+                        ]):
+                    continue
+            if 'CMD' == t['type']:
+                if 'external/jpeg' in t['cmd']: continue
+                if 'external/snappy' in t['cmd']: continue
+                if 'external/com_google_protobuf' in t['cmd']: continue
+                if 'external/nasm' in t['cmd']: continue
+            G.append(t)
+        for t in G:
+            if t['type'] == 'CXX':
+                if len(t['src']) == 0:
+                    print(t)
+                else:
+                    print(t['src'])
+            else:
+                print(t)
+        return G
         #rinsed, count = [], 0
         #for line in cmdlines:
         #    line = re.sub("'", '', line)
@@ -194,11 +237,12 @@ class FakeBazel(object):
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
     def __init__(self, path: str):
-        print(f'* Parsing[{path}]', end=' ')
+        print(f'* Parsing {path} ...')
         sys.stdout.flush()
         cmdlines = self.parseBuildlog(path)
         depgraph = self.understandCmdlines(cmdlines)
-        print(f'-> {len(cmdlines)} command lines -> {len(depgraph)} targets')
+        print(f'  -> {len(cmdlines)} command lines -> {len(depgraph)} targets')
         sys.stdout.flush()
+        depgraph = self.rinseGraph(depgraph)
 
 fakeb = FakeBazel(sys.argv[1])
