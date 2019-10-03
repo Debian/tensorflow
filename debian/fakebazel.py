@@ -229,7 +229,22 @@ class FakeBazel(object):
         for t in depgraph:
             if t['type'] == 'CXX':
                 # src obj flags
-                pass
+                src, obj, flags = t['src'], t['obj'], t['flags']
+                assert(len(src) <= 1)
+                assert(len(obj) == 1)
+                src = '' if len(src)<1 else src[0]
+                obj = obj[0]
+                if src and src not in dedupcc:
+                    dedupcc.add(src)
+                else:
+                    continue
+                    print('DUPLICATE', src)
+                if re.match('.*\.c$', src):
+                    F.build(re.sub('\.c$', '.o', src), 'CXX', src)
+                if re.match('.*\.cc$', src):
+                    F.build(re.sub('\.cc$', '.o', src), 'CXX', src)
+                if re.match('.*\.cpp$', src):
+                    F.build(re.sub('\.cpp$', '.o', src), 'CXX', src)
             if t['type'] == 'PROTOC':
                 # proto flags
                 assert(len(t['proto']) == 1)
