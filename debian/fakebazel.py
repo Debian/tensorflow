@@ -222,31 +222,51 @@ class FakeBazel(object):
         '''
         Generate the NINJA file from the given depgraph
         '''
-        dedupdir, dedupproto, dedupcc = set(), set(), set()
+        dedupdir, dedupproto, dedupobj = set(), set(), set()
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
         F.rule('CXX', 'ccache g++ -I. -O2 -fPIC $flags -c -o $out $in')
+        F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -c -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
+        F.rule('CP', 'cp -v $in $out')
         for t in depgraph:
             if t['type'] == 'CXX':
                 # src obj flags
                 src, obj, flags = t['src'], t['obj'], t['flags']
+                flags = ' '.join(flags)
                 assert(len(src) <= 1)
                 assert(len(obj) == 1)
                 src = '' if len(src)<1 else src[0]
+                if src:
+                    src = src.replace('bazel-out/k8-opt/bin/', '').replace('bazel-out/host/bin/', '')
                 obj = obj[0]
-                if src and src not in dedupcc:
-                    dedupcc.add(src)
+                if obj:
+                    obj = obj.replace('bazel-out/k8-opt/bin/', '').replace('bazel-out/host/bin/', '')
+                if obj not in dedupobj:
+                    dedupobj.add(obj)
                 else:
                     continue
                     print('DUPLICATE', src)
-                if re.match('.*\.c$', src):
-                    F.build(re.sub('\.c$', '.o', src), 'CXX', src)
-                if re.match('.*\.cc$', src):
-                    F.build(re.sub('\.cc$', '.o', src), 'CXX', src)
-                if re.match('.*\.cpp$', src):
-                    F.build(re.sub('\.cpp$', '.o', src), 'CXX', src)
-            if t['type'] == 'PROTOC':
+                if re.match('.*\.c$', src) and obj.endswith('.o'):
+                    F.build(re.sub('\.c$', '.o', src), 'CXX', src, variables={'flags': flags})
+                elif re.match('.*\.cc$', src) and obj.endswith('.o'):
+                    if re.match('.*\.pb\.cc$', src):
+                        F.build(re.sub('\.cc$', '.o', src), 'CXX', src,
+                                implicit=src, variables={'flags': flags})
+                    elif re.match('.*\.pb_text\.cc', src):
+                        F.build(obj, 'CXX', src, implicit=[src,
+                            'tensorflow/tools/proto_text/gen_proto_text_function'],
+                            variables={'flags': flags})
+                    else:
+                        F.build(re.sub('\.cc$', '.o', src), 'CXX', src,
+                                variables={'flags': flags})
+                elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
+                    F.build(re.sub('\.cpp$', '.o', src), 'CXX', src, variables={'flags': flags})
+                elif re.match('.*gen_proto_text_functions.*', obj):
+                    F.build(obj, 'CXXEXEC', '', variables={'flags': flags})
+                else:
+                    print('???????', t)
+            elif t['type'] == 'PROTOC':
                 # proto flags
                 assert(len(t['proto']) == 1)
                 proto, flags = t['proto'][0], ' '.join(t['flags'])
@@ -264,6 +284,14 @@ class FakeBazel(object):
                     re.sub('\.proto$', '.pb.h', proto)],
                     'PROTOC', proto, variables={'flags': flags},
                     implicit=os.path.dirname(proto))
+            elif t['type'] == 'CMD':
+                if 'bazel-out/host/bin/tensorflow/tools/git/gen_git_source' in t['cmd']:
+                    F.build('tensorflow/core/util/version_info.cc', 'CP',
+                            'debian/patches/version_info.cc')
+                    F.build('bazel-out/k8-opt/bin/tensorflow/core/util/version_info.cc',
+                            'CP', 'debian/patches/version_info.cc')
+            else:
+                print('MISSING', t)
         F.close()
     def __init__(self, path: str, dest: str = 'build.ninja'):
         print(f'* Parsing {path} ...')
