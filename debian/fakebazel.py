@@ -27,7 +27,6 @@ class FakeBazel(object):
                     states[0] = 1
                 else:
                     pass
-        print(f'* Parsed[{path}] {len(cmdlines)} command lines.')
         return cmdlines
     @staticmethod
     def stripCompilerArgs(line: str) -> str:
@@ -82,7 +81,7 @@ class FakeBazel(object):
         print(f'* {count}/{len(cmdlines)} commands were drop out.')
         return rinsed
     @staticmethod
-    def understandCmdlines(cmdlines: List[str]) -> (List, List):
+    def understandCmdlines(cmdlines: List[str]) -> (List):
         '''
         Understand and Rinse the command lines
         '''
@@ -165,6 +164,7 @@ class FakeBazel(object):
                         '-std=.*',
                         '-Wl.*',
                         '-pass-exit-codes',
+                        '-shared',
                         ]):
                         target['flags'].append(t)
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
@@ -192,12 +192,29 @@ class FakeBazel(object):
                 print(target)
                 depgraph.append(target)
             elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
+                # we don't need this assember
                 continue
+            elif cmd.startswith('bazel-out/host/bin/external/com_google_protobuf/protoc'):
+                # it's a protobuf compiler command
+                target = {'type': 'PROTOC', 'proto': [], 'flags': []}
+                tokens = shlex.split(cmd)
+                for t in tokens[1:]:
+                    if re.match('-I.*', t):
+                        pass
+                    elif re.match('--cpp_out=.*', t):
+                        target['flags'].append(t)
+                    elif re.match('.*\.proto$', t):
+                        target['proto'].append(t)
+                    else:
+                        raise Exception(f'what is {t} in {cmd}?')
+                print(target)
+                depgraph.append(target)
             else:
                 raise Exception(f"cannot understand: {cmd}")
-        return [], {}
+        return depgraph
     def __init__(self, path: str):
         cmdlines = self.parseBuildlog(path)
-        cmdlines, depgraph = self.understandCmdlines(cmdlines)
+        depgraph = self.understandCmdlines(cmdlines)
+        print(f'* Parsed[{path}] {len(cmdlines)} command lines; {len(depgraph)} targets;')
 
 fakeb = FakeBazel(sys.argv[1])
