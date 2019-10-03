@@ -93,27 +93,22 @@ class FakeBazel(object):
                 target = {'type': 'CXX', 'src': [], 'obj': [], 'flags': []}
                 tokens = shlex.split(cmd)
                 for (i,t) in enumerate(tokens[1:], 1):
-                    if re.match('-g\d', t):
-                        pass
-                    elif re.match('-c', t):
-                        pass
-                    elif re.match('-o', t):
-                        pass
-                    elif re.match('-O\d', t):
-                        pass
-                    elif re.match('-M\w', t):
-                        pass
-                    elif re.match('-std=.*', t):
-                        target['flags'].append(t)
-                    elif re.match('-U_FORTIFY_SOURCE', t):
-                        pass
-                    elif re.match("-D__TIME__=.*?", t):
-                        pass
-                    elif re.match("-D__TIMESTAMP__=.*?", t):
-                        pass
-                    elif re.match("-D__DATE__=.*?", t):
-                        pass
-                    elif re.match('-D_FORTIFY_SOURCE=1', t):
+                    if any(re.match(r, t) for r in [
+                        '-g\d',
+                        '-c',
+                        '-o',
+                        '-O\d',
+                        '-M\w',
+                        '-m.*',
+                        '-U_FORTIFY_SOURCE',
+                        "-D__TIME__=.*?",
+                        "-D__TIMESTAMP__=.*?",
+                        "-D__DATE__=.*?",
+                        '-D_FORTIFY_SOURCE=1',
+                        '-Iexternal/.*',
+                        '-I.',
+                        '-B.*',
+                        ]):
                         pass
                     elif any(re.match(r, t) for r in [
                         '-fstack-protect',
@@ -122,6 +117,11 @@ class FakeBazel(object):
                         '-fdata-sections',
                         '-fno-canonical-system-headers',
                         '-frandom-seed=.*',
+                        '-fexceptions',
+                        '-fno-exceptions',
+                        '-ftemplate-depth.*',
+                        '-fno-com.*',
+                        '-fuse-ld.*',
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
@@ -145,23 +145,44 @@ class FakeBazel(object):
                         '-Wvarargs',
                         '-Wvla',
                         '-Wwrite-strings',
+                        '-Wno-missing-field-initializers',
+                        '-Wa,--noexecstack',
+                        '-Werror',
+                        '-Wformat=.*',
+                        '-Wsign-compare',
+                        '-Wmissing.*',
+                        '-Wshadow.*',
+                        '-Wold-st.*',
+                        '-Wstrict.*',
+                        '-Wno.*',
+                        '-w', # Inhibit all warning messages. https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#Warning-Options
                         ]):
                         pass
-                        pass
-                    elif re.match('-D\S+', t):
+                    elif any(re.match(r, t) for r in [
+                        '-D\S+',
+                        '-pthread',
+                        '-fPIC',
+                        '-std=.*',
+                        '-Wl.*',
+                        '-pass-exit-codes',
+                        ]):
                         target['flags'].append(t)
-                    elif re.match('.*\.d$', t):
-                        pass
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
                     elif re.match('-isystem', t) or re.match('-isystem', tokens[i-1]):
                         pass
+                    elif re.match('-x', t) or re.match('-x', tokens[i-1]):
+                        pass
+                    elif re.match('.*\.d$', t):
+                        pass
                     elif re.match('.*\.c[cp]?p?$', t):
+                        target['src'].append(t)
+                    elif re.match('.*\.S$', t):
                         target['src'].append(t)
                     elif re.match('-o', tokens[i-1]):
                         target['obj'].append(t)
                     else:
-                        raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]}')
+                        raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]} full={tokens}')
                 print(target)
                 depgraph.append(target)
             elif cmd.startswith('/bin/bash -c'):
@@ -170,6 +191,8 @@ class FakeBazel(object):
                 target['cmd'] = shlex.split(cmd)[-1]
                 print(target)
                 depgraph.append(target)
+            elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
+                continue
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return [], {}
