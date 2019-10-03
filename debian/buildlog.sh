@@ -48,10 +48,21 @@ cat > tools/python_bin_path.sh <<EOF
 export PYTHON_BIN_PATH="/usr/bin/python3"
 EOF
 
-bazel clean
-bazel build --config=v2 //tensorflow:libtensorflow_framework.so -s 2>&1 | tee debian/libtensorflow_framework.so.log
-bazel clean
-bazel build --config=v2 //tensorflow:libtensorflow.so -s 2>&1 | tee debian/libtensorflow.so.log
-bazel clean
-bazel build --config=v2 //tensorflow:libtensorflow_cc.so -s 2>&1 | tee debian/libtensorflow_cc.so.log
+if ! test -r debian/libtensorflow_framework.so.log; then
+	bazel clean
+	bazel build --config=v2 //tensorflow:libtensorflow_framework.so -s 2>&1 | tee debian/libtensorflow_framework.so.log
+fi
+if ! test -r debian/libtensorflow.so.log; then
+	bazel clean
+	bazel build --config=v2 //tensorflow:libtensorflow.so -s 2>&1 | tee debian/libtensorflow.so.log
+fi
+if ! test -r debian/libtensorflow_cc.so.log; then
+	bazel clean
+	bazel build --config=v2 //tensorflow:libtensorflow_cc.so -s 2>&1 | tee debian/libtensorflow_cc.so.log
+fi
+if ! test -r debian/install_headers.log; then
+	bazel clean
+	bazel build --config=v2 //tensorflow:install_headers 
+	find bazel-bin/tensorflow/include > debian/install_headers.log
+fi
 bazel clean
