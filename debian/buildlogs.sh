@@ -3,6 +3,8 @@ set -e
 # reference: https://git.archlinux.org/svntogit/community.git/tree/trunk/PKGBUILD?h=packages/tensorflow
 # reference: https://github.com/gentoo/gentoo/blob/master/sci-libs/tensorflow/tensorflow-2.0.0.ebuild
 
+# Dependency: bazel 0.26.1, linux, amd64
+
 export PYTHON_BIN_PATH=/usr/bin/python3
 export USE_DEFAULT_PYTHON_LIB_PATH=1
 export TF_NEED_JEMALLOC=0
@@ -64,5 +66,5 @@ fi
 if ! test -r $LOGDIR/install_headers.log; then
 	bazel clean
 	bazel build --config=v2 //tensorflow:install_headers 
-	find bazel-bin/tensorflow/include > $LOGDIR/install_headers.log
+	find bazel-bin/tensorflow/include -type f > $LOGDIR/install_headers.log
 fi
