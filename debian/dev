@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+source debian/profile.sh
 
 cat > /dev/null <<EOF
 Differences between this build and upstream's standard bazel build
@@ -45,7 +46,7 @@ done
 build() {
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
-NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m " ninja -v
+ninja -v
 }
 
 case $1 in
