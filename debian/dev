@@ -18,9 +18,9 @@ Differences between this build and upstream's standard bazel build
 4. aws sdk or amazon s3 related stuff are excluded from the build.
 EOF
 
+configure() {
 # prepare embedded source code
 bash debian/embedded.sh
-
 # prepare misc files
 mkdir -p external/bazel_tools/tools/genrule/
 cp -v debian/patches/genrule-setup.sh external/bazel_tools/tools/genrule/genrule-setup.sh
@@ -39,6 +39,7 @@ for I in $(ls debian/buildlogs/*gen_cc-2.params); do
 	   	$I
 	cp -v $I tensorflow/cc/ops
 done
+}
 
 # trigger build
 build() {
@@ -49,7 +50,13 @@ NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m " ninja -v
 
 case $1 in
 	configure) # used in debian/rules
+		configure
+		;;
+	buildlogs) # re-generate buildlogs with bazel
+		bash debian/buildlogs.sh
 		;;
 	*) # used manually for develpment
-		build;;
+		configure
+		build
+		;;
 esac

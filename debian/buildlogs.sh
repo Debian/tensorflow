@@ -53,18 +53,22 @@ EOF
 LOGDIR=debian/buildlogs/
 if ! test -r $LOGDIR/libtensorflow_framework.so.log; then
 	bazel clean
-	bazel build --config=v2 //tensorflow:libtensorflow_framework.so -s 2>&1 | tee $LOGDIR/libtensorflow_framework.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow_framework.so 2>&1 | tee $LOGDIR/libtensorflow_framework.so.log
 fi
 if ! test -r $LOGDIR/libtensorflow.so.log; then
 	bazel clean
-	bazel build --config=v2 //tensorflow:libtensorflow.so -s 2>&1 | tee $LOGDIR/libtensorflow.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow.so 2>&1 | tee $LOGDIR/libtensorflow.so.log
 fi
 if ! test -r $LOGDIR/libtensorflow_cc.so.log; then
 	bazel clean
-	bazel build --config=v2 //tensorflow:libtensorflow_cc.so -s 2>&1 | tee $LOGDIR/libtensorflow_cc.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow_cc.so 2>&1 | tee $LOGDIR/libtensorflow_cc.so.log
 fi
 if ! test -r $LOGDIR/install_headers.log; then
 	bazel clean
 	bazel build --config=v2 //tensorflow:install_headers 
 	find bazel-bin/tensorflow/include -type f > $LOGDIR/install_headers.log
+fi
+if ! test -r $LOGDIR/tensorflow_tests.log; then
+	bazel clean
+	bazel test  --config=v2 -s //tensorflow/... 2>&1 | tee $LOGDIR/tensorflow_tests.log
 fi
