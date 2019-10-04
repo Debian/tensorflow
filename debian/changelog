@@ -1,8 +1,12 @@
-tensorflow (1.13.1-1) UNRELEASED; urgency=medium
+tensorflow (2.0.0-1) UNRELEASED; urgency=medium
 
-  * New upstream version 1.13.1
+  * New upstream version 2.0.0 (Re-introduced after ROM).
+  * Rewrite the buildsystem, which rebulids the dependency graph from
+    Bazel buildlog, and generates a usable Ninja bulid to approximate
+    the original results. The reverse-engineering-styled build could
+    produce better results compared to the previous build systems.
 
- -- Mo Zhou <cdluminate@gmail.com>  Thu, 28 Feb 2019 03:13:49 +0000
+ -- Mo Zhou <cdluminate@gmail.com>  Fri, 04 Oct 2019 22:51:53 +0800
 
 tensorflow (1.10.1+dfsg-A2) experimental; urgency=medium
 
