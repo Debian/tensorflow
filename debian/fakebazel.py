@@ -312,12 +312,12 @@ class FakeBazel(object):
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
         F.rule('CXX', 'ccache g++ -I. -Iexternal -Iexternal/eigen3 -Iexternal/com_google_absl -O2 -fPIC $flags -c -o $out $in')
-        F.rule('CXXEXEC', 'ccache g++ -I. -O2 -fPIE -pie $flags -o $out $in')
-        F.rule('CXXSO', 'ccache g++ -fPIC $flags -o $out $in')
+        F.rule('CXXEXEC', 'ccache g++ -I. -Ltensorflow -O2 -fPIE -pie $flags -o $out $in')
+        F.rule('CXXSO', 'ccache g++ -shared -fPIC -Ltensorflow $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
         F.rule('PROTO_TEXT', './tensorflow/tools/proto_text/gen_proto_text_functions.elf $in')
-        F.rule('SYMLINK', 'ln -s $in $out')
+        F.rule('SYMLINK', 'LD_LIBRARY_PATH=tensorflow ln -s $in $out')
         F.rule('SH', 'bash $in')
         # protos_all_cc target
         protos = list(set(x['proto'][0] for x in depgraph if x['type']=='PROTOC'))
@@ -356,8 +356,9 @@ class FakeBazel(object):
                     F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
                             implicit=[*objs_gen_proto_text_functions, 'protos_all_cc'])
                 elif re.match('.*tensorflow/cc/.*gen_cc', obj):
+                    objs_gen_cc = [x.strip() for x in open(obj+'-2.params').readlines() if x.strip().endswith('.o')]
                     F.build(obj, 'CXXEXEC', src, variables={'flags': flags},
-                            implicit=['protos_all_cc'])
+                            implicit=[*objs_gen_cc, 'protos_all_cc', 'proto_text_all_cc'])
                 elif re.match('.*libtensorflow_framework.*', obj):
                     F.build(obj, 'CXXSO', '', variables={'flags': flags},
                             implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
@@ -403,9 +404,11 @@ class FakeBazel(object):
                 if re.match('.*tensorflow/cc.*rule.genrule_script\.sh$', sh):
                     depexe = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
                             'tensorflow/cc/ops/\\1_gen_cc', sh)
-                    outcc = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
+                    outcc_internal = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
                             'tensorflow/cc/ops/\\1_internal.cc', sh)
-                    F.build(outcc, 'SH', sh, implicit=[depexe])
+                    outcc = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
+                            'tensorflow/cc/ops/\\1.cc', sh)
+                    F.build([outcc, outcc_internal], 'SH', sh, implicit=[depexe])
                 else:
                     print('MISSING', t)
             else:

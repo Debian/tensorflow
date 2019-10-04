@@ -28,6 +28,9 @@ tensorflow/core/math_ops_op_lib/math_ops.o
 
 -lre2
 
+-lprotobuf
+-lprotobuf-lite
+
 
 external/com_google_absl/absl/hash/hash/hash.o
 
@@ -96,6 +99,8 @@ external/com_google_absl/absl/time/internal/cctz/civil_time/civil_time_detail.o
 
 
 -lfarmhash
+
+-lnsync_cpp
 
 
 -lhighwayhash
