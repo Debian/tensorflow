@@ -149,11 +149,13 @@ class FakeBazel(object):
                         '-pass-exit-codes',
                         '-shared',
                         ]):
-                        target['flags'].append(FakeBazel.dirMangle(t))
                         if '-DTENSORFLOW_USE_MKLDNN_CONTRACTION_KERNEL' in t:
                             # we have mkldnn 1.X, but the reference build use 0.X
                             # so adding another flag
-                            target['flags'].append('-DENABLE_MKLDNN_V1')
+                            #target['flags'].extend([t, '-DENABLE_MKLDNN_V1'])
+                            pass
+                        else:
+                            target['flags'].append(FakeBazel.dirMangle(t))
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
                     elif re.match('-isystem', t) or re.match('-isystem', tokens[i-1]):
