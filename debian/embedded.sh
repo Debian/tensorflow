@@ -18,25 +18,3 @@ cp -v debian/buildlogs/libtensorflow_framework.so.2.0.0-2.params tensorflow/
 cp -v debian/patches/version_info.cc tensorflow/core/util/version_info.cc
 cp -v debian/patches/cuda_config.h third_party/gpus/cuda/cuda_config.h
 cp -v debian/patches/tensorrt_config.h third_party/tensorrt/tensorrt_config.h
-
-mkdir -p external/bazel_tools/tools/genrule/
-cp -v debian/patches/genrule-setup.sh external/bazel_tools/tools/genrule/genrule-setup.sh
-for I in $(ls debian/buildlogs/*.genrule_script.sh); do
-	cp -v $I tensorflow/cc/
-	sed -i -e 's@bazel-out/k8-opt/bin/@@g' \
-		-e 's@bazel-out/host/bin/@@g' tensorflow/cc/$(basename $I)
-done
-mkdir -p tensorflow/cc/ops
-for I in $(ls debian/buildlogs/*gen_cc-2.params); do
-	sed -i -e 's@bazel-out/k8-opt/bin/@@g' \
-		-e 's@bazel-out/host/bin/@@g' \
-		-e 's@/_objs/@/@g' \
-		-e 's@--start-lib@@g' \
-		-e 's@--end-lib@@g' \
-	   	$I
-	cp -v $I tensorflow/cc/ops
-done
-
-which pypy3 && PY=pypy3 || PY=python3
-$PY debian/fakebazel.py
-NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m " ninja -v
