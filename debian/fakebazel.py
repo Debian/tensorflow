@@ -317,6 +317,7 @@ class FakeBazel(object):
         F.rule('MKDIR', 'mkdir -p $out')
         F.rule('CP', 'cp -v $in $out')
         F.rule('PROTO_TEXT', './tensorflow/tools/proto_text/gen_proto_text_functions.elf $in')
+        F.rule('SYMLINK', 'ln -s $in $out')
         # protos_all_cc target
         protos = list(set(x['proto'][0] for x in depgraph if x['type']=='PROTOC'))
         F.build('protos_all_cc', 'phony', [re.sub('\.proto$', '.pb.cc', x) for x in protos])
@@ -356,6 +357,8 @@ class FakeBazel(object):
                 elif re.match('.*libtensorflow_framework.*', obj):
                     F.build(obj, 'CXXSO', '', variables={'flags': flags},
                             implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
+                    F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', obj)
+                    F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', obj)
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
@@ -403,7 +406,7 @@ class FakeBazel(object):
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
 
 
-#fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
-#        'libtensorflow_framework.ninja')
+fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
+        'libtensorflow_framework.ninja')
 fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log')
 #fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log')

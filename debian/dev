@@ -55,6 +55,11 @@ case $1 in
 	buildlogs) # re-generate buildlogs with bazel
 		bash debian/buildlogs.sh
 		;;
+	fake)
+		configure
+		which pypy3 && PY=pypy3 || PY=python3
+		$PY debian/fakebazel.py
+		;;;
 	*) # used manually for develpment
 		configure
 		build
