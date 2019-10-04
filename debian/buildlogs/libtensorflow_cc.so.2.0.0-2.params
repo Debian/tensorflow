@@ -2664,15 +2664,6 @@ tensorflow/core/platform/cloud/time_util/time_util.pic.o
 tensorflow/core/platform/hadoop/hadoop_file_system/hadoop_file_system.pic.o
 -no-whole-archive
 -whole-archive
-tensorflow/core/platform/s3/s3_file_system/s3_file_system.pic.o
--no-whole-archive
--whole-archive
-tensorflow/core/platform/s3/aws_crypto/aws_crypto.pic.o
--no-whole-archive
--whole-archive
-tensorflow/core/platform/s3/aws_logging/aws_logging.pic.o
--no-whole-archive
--whole-archive
 tensorflow/core/core_cpu_base_no_ops/eval_const_tensor.pic.o
 -no-whole-archive
 -whole-archive
