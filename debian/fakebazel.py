@@ -255,6 +255,7 @@ class FakeBazel(object):
                         'external/com_github_nanopb_nanopb.*',
                         'external/png_archive.*',
                         'external/org_sqlite.*',
+                        'third_party/icu.*',
                         ]):
                     continue
                 elif any(re.match(r, t['src'][0]) for r in [
@@ -405,3 +406,4 @@ class FakeBazel(object):
 #fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
 #        'libtensorflow_framework.ninja')
 fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log')
+#fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log')
