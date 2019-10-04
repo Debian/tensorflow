@@ -1,6 +1,23 @@
 #!/bin/bash
 set -e
 
+cat > /dev/null <<EOF
+Differences between this build and upstream's standard bazel build
+
+1. upstream builds external dependencies in specified versions.
+   we use the system libraries instead, except for:
+   * Eigen3: tensorflow seems tightly coupled with specific eigen3 snapshot.
+     we use the embedded one as well.
+   * Abseil: google's "C++ STL" moves so fast, and it's not available in
+     our archive. we use the embedded one as well.
+
+2. bazel specifiec directory layout is mangled in our build.
+
+3. bazel specific compiler arguments such as '-O3' are stripped.
+
+4. aws sdk or amazon s3 related stuff are excluded from the build.
+EOF
+
 # prepare embedded source code
 bash debian/embedded.sh
 
@@ -31,8 +48,8 @@ NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m " ninja -v
 }
 
 case $1 in
-	configure)
+	configure) # used in debian/rules
 		;;
-	*)
+	*) # used manually for develpment
 		build;;
 esac
