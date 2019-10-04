@@ -19,6 +19,7 @@ fi
 #ln -s . bin
 cp -v debian/buildlogs/gen_proto_text_functions-2.params tensorflow/tools/proto_text/gen_proto_text_functions-2.params
 cp -v debian/buildlogs/libtensorflow_framework.so.2.0.0-2.params tensorflow/
+cp -v debian/patches/version_info.cc tensorflow/core/util/version_info.cc
 cp -v debian/patches/cuda_config.h third_party/gpus/cuda/cuda_config.h
 cp -v debian/patches/tensorrt_config.h third_party/tensorrt/tensorrt_config.h
 

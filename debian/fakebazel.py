@@ -88,6 +88,7 @@ class FakeBazel(object):
                         '-Iexternal/.*',
                         '-I.',
                         '-B.*',
+                        '-Lbazel-out.*',
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
@@ -155,6 +156,13 @@ class FakeBazel(object):
                         pass
                     elif re.match('-x', t) or re.match('-x', tokens[i-1]):
                         pass
+                    elif re.match('-z', t) or re.match('-z', tokens[i-1]):
+                        # -z is passed directly on to the linker along with
+                        #  the keyword keyword. See the section in the
+                        # documentation of your linker for permitted values
+                        # and their meanings.
+                        if not re.match('-z', t):
+                            target['flags'].extend(['-z', t])
                     elif re.match('.*\.d$', t):
                         pass
                     elif re.match('.*\.c[cp]?p?$', t):
@@ -173,6 +181,12 @@ class FakeBazel(object):
                 target['cmd'] = shlex.split(cmd)[-1]
                 if DEBUG: print(target)
                 depgraph.append(target)
+            elif cmd.startswith('/bin/bash') and not cmd.startswith('/bin/bash -c'):
+                # it's a shell script
+                target = {'type': 'SHELL', 'sh': []}
+                target['sh'] = shlex.split(cmd)[-1]
+                if DEBUG: print(target)
+                depgraph.append(target)
             elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
                 # we don't need this assember
                 continue
@@ -185,8 +199,12 @@ class FakeBazel(object):
                         pass
                     elif re.match('--cpp_out=.*', t):
                         target['flags'].append(FakeBazel.dirMangle(t))
+                    elif re.match('--grpc_out=.*', t):
+                        target['flags'].append(FakeBazel.dirMangle(t))
                     elif re.match('.*\.proto$', t):
                         target['proto'].append(FakeBazel.dirMangle(t))
+                    elif re.match('--plugin=protoc-gen-grpc=\S*', t):
+                        target['flags'].append('--plugin=protoc-gen-grpc=/usr/bin/grpc_cpp_plugin')
                     else:
                         raise Exception(f'what is {t} in {cmd}?')
                 if DEBUG: print(target)
@@ -206,6 +224,8 @@ class FakeBazel(object):
                 if t['obj'][0] =='external/com_google_protobuf/protoc':
                     continue
                 if t['obj'][0] =='external/nasm/nasm':
+                    continue
+                if t['obj'][0] == 'external/grpc/grpc_cpp_plugin':
                     continue
                 if len(t['src'])==0:
                     pass
@@ -228,6 +248,13 @@ class FakeBazel(object):
                         'external/snappy/.*',
                         'external/nasm/.*',
                         'external/farmhash.*',
+                        'external/grpc.*',
+                        'external/mkl_dnn.*',
+                        'external/lmdb.*',
+                        'external/icu.*',
+                        'external/com_github_nanopb_nanopb.*',
+                        'external/png_archive.*',
+                        'external/org_sqlite.*',
                         ]):
                     continue
                 elif any(re.match(r, t['src'][0]) for r in [
@@ -259,8 +286,9 @@ class FakeBazel(object):
                 if not dup:
                     G.append(t)
                 else:
-                    print('merging', t)
+                    if DEBUG: print('merging', t)
                     G[dup[0]]['flags'].extend(t['flags'])
+                    G[dup[0]]['flags'] = list(set(G[dup[0]]['flags']))
             elif t['type'] == 'PROTOC':
                 dup = [(i,x) for (i,x) in enumerate(G)
                         if (x['type'] == 'PROTOC') and (x['proto'] == t['proto'])]
@@ -330,6 +358,8 @@ class FakeBazel(object):
                     print('???????', t)
             elif t['type'] == 'PROTOC':
                 # proto flags
+                if len(t['proto']) > 1:
+                    print('len_proto>1?????????', t)
                 assert(len(t['proto']) == 1)
                 proto, flags = t['proto'][0], ' '.join(t['flags'])
                 flags = re.sub('(.*)(--cpp_out=).*', '\\1\\2.', flags)
@@ -339,8 +369,7 @@ class FakeBazel(object):
                     implicit=os.path.dirname(proto))
             elif t['type'] == 'CMD':
                 if 'bazel-out/host/bin/tensorflow/tools/git/gen_git_source' in t['cmd']:
-                    F.build('tensorflow/core/util/version_info.cc', 'CP',
-                            'debian/patches/version_info.cc')
+                    pass
                 else:
                     print('MISSING', FakeBazel.dirMangle(t['cmd']))
             else:
@@ -362,5 +391,6 @@ class FakeBazel(object):
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
 
 
-#fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log')
+#fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
+#        'libtensorflow_framework.ninja')
 fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log')
