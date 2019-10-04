@@ -118,6 +118,7 @@ case $1 in
 		for I in $(cat debian/buildlogs/install_headers.log); do
 			install -vDm0644 $I $DESTDIR/$I
 		done
+		;;
 	*) # used manually for develpment
 		configure
 		build
