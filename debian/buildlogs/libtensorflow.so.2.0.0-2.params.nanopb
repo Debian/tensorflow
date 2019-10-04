@@ -1,0 +1,20 @@
+diff --git a/debian/buildlogs/libtensorflow.so.2.0.0-2.params b/debian/buildlogs/libtensorflow.so.2.0.0-2.params
+index 40d173d6..4d694aa2 100644
+--- a/debian/buildlogs/libtensorflow.so.2.0.0-2.params
++++ b/debian/buildlogs/libtensorflow.so.2.0.0-2.params
+@@ -2742,15 +2742,6 @@ tensorflow/core/eager_service_proto_cc/eager_service.pb.pic.o
+ -whole-archive
+ tensorflow/core/eager_service_proto_cc/eager_service.grpc.pb.pic.o
+ -no-whole-archive
+-#-whole-archive
+-#external/com_github_nanopb_nanopb/nanopb/pb_common.pic.o
+-#-no-whole-archive
+-#-whole-archive
+-#external/com_github_nanopb_nanopb/nanopb/pb_decode.pic.o
+-#-no-whole-archive
+-#-whole-archive
+-#external/com_github_nanopb_nanopb/nanopb/pb_encode.pic.o
+-#-no-whole-archive
+ -whole-archive
+ tensorflow/core/core_cpu_internal/graph_execution_state.pic.o
+ -no-whole-archive
