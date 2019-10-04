@@ -472,7 +472,8 @@ class FakeBazel(object):
                             'tensorflow/cc/ops/\\1_internal.cc', sh)
                     outcc = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
                             'tensorflow/cc/ops/\\1.cc', sh)
-                    F.build([outcc, outcc_internal], 'SH', sh, implicit=[depexe])
+                    #F.build([outcc, outcc_internal], 'SH', sh, implicit=[depexe])
+                    pass
                 else:
                     print('MISSING', t)
             else:
