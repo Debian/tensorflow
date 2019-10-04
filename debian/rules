@@ -10,6 +10,8 @@ LIBDIR=debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
 
 override_dh_auto_configure:
 	$(SHELL) debian/dev configure # read code for detail
+	$(SHELL) tensorflow/c/generate-pc.sh \
+	   	-p usr -l lib/$(DEB_HOST_MULTIARCH) -v 2.0.0
 
 override_dh_auto_build:
 	python3 debian/fakebazel.py
@@ -19,9 +21,14 @@ override_dh_auto_build:
 	dh_auto_build -- -f libtensorflow_cc.ninja tensorflow/libtensorflow_cc.so
 	#dh_auto_build -- -f pippackage.gen.ninja
 
+override_dh_auto_test:
+	: # TODO
+
 override_dh_auto_install:
 	$(SHELL) debian/dev install_headers debian/tmp/usr/include/
 	mkdir -p $(LIBDIR)
 	install -vm0644 tensorflow/libtensorflow_framework.so* $(LIBDIR)
 	install -vm0644 tensorflow/libtensorflow.so* $(LIBDIR)
 	install -vm0644 tensorflow/libtensorflow_cc.so* $(LIBDIR)
+	install -vm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
+	install -vm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_pc.pc

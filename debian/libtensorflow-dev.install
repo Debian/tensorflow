@@ -2,3 +2,4 @@ usr/include/tensorflow
 usr/lib/*/libtensorflow_framework.so
 usr/lib/*/libtensorflow.so
 usr/lib/*/libtensorflow_cc.so
+usr/lib/*/pkgconfig
