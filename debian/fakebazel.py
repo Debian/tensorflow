@@ -458,7 +458,7 @@ class FakeBazel(object):
                 print('MISSING', t)
         F.close()
     def __init__(self, path: str, dest: str = 'build.ninja'):
-        print(f'* Parsing {path} ...')
+        print(cyan(f'* Parsing {path} ...'))
         sys.stdout.flush()
         cmdlines = self.parseBuildlog(path)
         depgraph = self.understandCmdlines(cmdlines)
@@ -471,14 +471,15 @@ class FakeBazel(object):
         self.generateNinja(depgraph, dest)
         print(f'  -> Generated Ninja file {dest}')
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
+        print(yellow(f'  (json fore debugging stored in -> depgraph_debug.json)'))
 
 
 fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
-        'libtensorflow_framework.ninja')
-fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
-        'libtensorflow_cc.ninja')
+        'libtensorflow_framework.ninja') # fundamental
 fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
-        'libtensorflow.ninja')
+        'libtensorflow.ninja') # C, Python
+fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
+        'libtensorflow_cc.ninja') # C++
 
 #    cursor.variable(
 #        'INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/' +
