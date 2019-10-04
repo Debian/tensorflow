@@ -11,38 +11,38 @@ Build-Depends:
  debhelper-compat (= 12),
  dh-python,
  libcurl4-gnutls-dev,
- libdouble-conversion-dev (>= 3.0.0+git20180802.4e8b3b5~),
+ libdouble-conversion-dev,
  libfarmhash-dev,
  libgemmlowp-dev,
  libgif-dev,
- libgrpc++-dev (>= 1.14.1~),
+ libgrpc++-dev (>= 1.23~),
+ libgrpc-dev (>= 1.23~),
  libgtest-dev,
  libhighwayhash-dev,
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
+ libmkldnn-dev [amd64],
  libnsync-dev,
  libpng-dev,
- libprotobuf-dev (>= 3.6.0~),
- libprotoc-dev (>= 3.6.0~),
+ libprotobuf-dev (>= 3.8~),
+ libprotoc-dev (>= 3.8~),
  libre2-dev,
  libsnappy-dev,
  libsqlite3-dev,
  libsuperlu-dev,
- llvm-7-dev (>= 1:7~+rc2-1~exp1~),
  ninja-build,
- protobuf-compiler (>= 3.6.0~),
- protobuf-compiler-grpc,
+ protobuf-compiler (>= 3.8.0~),
+ protobuf-compiler-grpc (>= 1.23~),
  python3,
  python3-all-dev,
  python3-numpy,
  swig,
  zlib1g-dev,
- libmkldnn-dev [amd64],
 
 # MISSING features: tensorflow lite, tensorflow extended, tensorflow.js
 
-Package: libtensorflow-framework2.0
+Package: libtensorflow-framework2
 Section: libs
 Architecture: any
 Multi-Arch: same
@@ -76,11 +76,12 @@ Description: Computation using data flow graphs for scalable machine learning
  ops. Since other languages use the same libtensorflow_framework.so, op
  libraries are language agnostic.
 
-Package: libtensorflow2.0
+Package: libtensorflow2
 Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
+ libtensorflow_framework2 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (C)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -92,11 +93,12 @@ Description: Computation using data flow graphs for scalable machine learning (C
  This package ships shared object libtensorflow.so.2.0, which exports
  C API for TensorFlow (i.e. symbols named "*TF_*" or "*TFE_*").
 
-Package: libtensorflow-cc2.0
+Package: libtensorflow-cc2
 Section: libs
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
+ libtensorflow_framework2 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (C++)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -113,14 +115,9 @@ Section: libdevel
 Architecture: any
 Multi-Arch: same
 Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2.0 (= ${binary:Version}),
- libtensorflow2.0 (= ${binary:Version}),
- libtensorflow-cc2.0 (= ${binary:Version}),
- libprotobuf-dev (>= 3.6.0~),
- libgrpc++-dev (>= 1.14.1~),
- llvm-7-dev (>= 1:7~+rc2-1~exp1~),
-Suggests:
- tensorflow-doc (= ${source:Version}),
+ libtensorflow-framework2 (= ${binary:Version}),
+ libtensorflow2 (= ${binary:Version}),
+ libtensorflow-cc2 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (dev)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -135,7 +132,7 @@ Package: python3-tensorflow
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2.0 (>= ${source:Version}~),
+ libtensorflow-framework2 (= ${binary:Version}),
 Description: Computation using data flow graphs for scalable machine learning (Py3)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
