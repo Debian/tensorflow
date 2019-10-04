@@ -53,16 +53,13 @@ ninja -v
 }
 
 case $1 in
-	configure) # used in debian/rules
-		configure
-		;;
-	buildlogs) # re-generate buildlogs with bazel
-		bash debian/buildlogs.sh
-		;;
-	fake)
+	configure|fake) # used in debian/rules
 		configure
 		which pypy3 && PY=pypy3 || PY=python3
 		$PY debian/fakebazel.py
+		;;
+	buildlogs) # re-generate buildlogs with bazel
+		bash debian/buildlogs.sh
 		;;
 	*) # used manually for develpment
 		configure
