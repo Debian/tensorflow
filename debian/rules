@@ -8,6 +8,9 @@ LIBDIR=debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
 %:
 	dh $@ -Sninja -D.
 
+override_dh_auto_clean:
+	: # TODO
+
 override_dh_auto_configure:
 	$(SHELL) debian/dev configure # read code for detail
 	$(SHELL) tensorflow/c/generate-pc.sh \
