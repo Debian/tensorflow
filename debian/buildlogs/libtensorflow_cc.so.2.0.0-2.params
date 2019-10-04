@@ -1596,9 +1596,6 @@ tensorflow/core/kernels/substr_op/substr_op.pic.o
 tensorflow/core/kernels/unicode_ops/unicode_ops.pic.o
 -no-whole-archive
 -whole-archive
-third_party/icu/data/conversion_data/conversion_data.pic.o
--no-whole-archive
--whole-archive
 tensorflow/core/kernels/unicode_script_op/unicode_script_op.pic.o
 -no-whole-archive
 -whole-archive
