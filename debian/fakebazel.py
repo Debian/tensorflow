@@ -89,6 +89,7 @@ class FakeBazel(object):
                         '-I.',
                         '-B.*',
                         '-Lbazel-out.*',
+                        '-DTENSORFLOW_USE_MKLDNN_CONTRACTION_KERNEL', # FIXME: we have mkldnn 1.X, but the reference build use 0.X
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
