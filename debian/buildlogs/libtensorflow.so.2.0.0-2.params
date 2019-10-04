@@ -594,12 +594,6 @@ tensorflow/core/kernels/mfcc_dct/mfcc_dct.pic.o
 tensorflow/core/kernels/mfcc_mel_filterbank/mfcc_mel_filterbank.pic.o
 -no-whole-archive
 -whole-archive
-tensorflow/core/kernels/spectrogram_op/spectrogram_op.pic.o
--no-whole-archive
--whole-archive
-tensorflow/core/kernels/spectrogram/spectrogram.pic.o
--no-whole-archive
--whole-archive
 tensorflow/core/kernels/batch_kernels/batch_kernels.pic.o
 -no-whole-archive
 -whole-archive
@@ -3198,6 +3192,7 @@ external/com_google_absl/absl/time/internal/cctz/time_zone/zone_info_source.pic.
 -whole-archive
 external/com_google_absl/absl/time/internal/cctz/civil_time/civil_time_detail.pic.o
 -no-whole-archive
+-lcrypto
 -lcurl
 -ldl
 -ldouble-conversion
@@ -3216,11 +3211,14 @@ external/com_google_absl/absl/time/internal/cctz/civil_time/civil_time_detail.pi
 -lnsync
 -lnsync_cpp
 -lpng
+-lprotobuf
+-lprotobuf-lite
 -lpthread
 -lre2
 -lrt
 -lsnappy
 -lsqlite3
+-lssl
 -lssl
 -lstdc++
 -lz
