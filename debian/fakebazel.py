@@ -318,6 +318,7 @@ class FakeBazel(object):
         F.rule('CP', 'cp -v $in $out')
         F.rule('PROTO_TEXT', './tensorflow/tools/proto_text/gen_proto_text_functions.elf $in')
         F.rule('SYMLINK', 'ln -s $in $out')
+        F.rule('SH', 'bash $in')
         # protos_all_cc target
         protos = list(set(x['proto'][0] for x in depgraph if x['type']=='PROTOC'))
         F.build('protos_all_cc', 'phony', [re.sub('\.proto$', '.pb.cc', x) for x in protos])
@@ -354,6 +355,9 @@ class FakeBazel(object):
                 elif re.match('.*gen_proto_text_functions.*', obj):
                     F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
                             implicit=[*objs_gen_proto_text_functions, 'protos_all_cc'])
+                elif re.match('.*tensorflow/cc/.*gen_cc', obj):
+                    F.build(obj, 'CXXEXEC', src, variables={'flags': flags},
+                            implicit=['protos_all_cc'])
                 elif re.match('.*libtensorflow_framework.*', obj):
                     F.build(obj, 'CXXSO', '', variables={'flags': flags},
                             implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
@@ -393,6 +397,17 @@ class FakeBazel(object):
                     pass
                 else:
                     print('MISSING', FakeBazel.dirMangle(t['cmd']))
+            elif t['type'] == 'SHELL':
+                # sh
+                sh = FakeBazel.dirMangle(t['sh'])
+                if re.match('.*tensorflow/cc.*rule.genrule_script\.sh$', sh):
+                    depexe = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
+                            'tensorflow/cc/ops/\\1_gen_cc', sh)
+                    outcc = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
+                            'tensorflow/cc/ops/\\1_internal.cc', sh)
+                    F.build(outcc, 'SH', sh, implicit=[depexe])
+                else:
+                    print('MISSING', t)
             else:
                 print('MISSING', t)
         F.close()
