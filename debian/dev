@@ -113,6 +113,11 @@ case $1 in
 	gen_cc_ops)
 		gen_cc_ops
 		;;
+	install_headers)
+		DESTDIR=$1
+		for I in $(cat debian/buildlogs/install_headers.log); do
+			install -vDm0644 $I $DESTDIR/$I
+		done
 	*) # used manually for develpment
 		configure
 		build
