@@ -53,28 +53,28 @@ ninja -v
 }
 
 gen_cc_ops() {
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/array_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/audio_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/candidate_sampling_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/control_flow_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/data_flow_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/image_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/io_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/linalg_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/list_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/logging_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/lookup_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/manip_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/math_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/nn_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/no_op_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/parsing_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/random_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/sparse_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/state_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/string_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/training_ops_gen_cc
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/user_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/array_ops_gen_cc \
+	    tensorflow/cc/ops/audio_ops_gen_cc \
+	    tensorflow/cc/ops/candidate_sampling_ops_gen_cc \
+	    tensorflow/cc/ops/control_flow_ops_gen_cc \
+	    tensorflow/cc/ops/data_flow_ops_gen_cc \
+	    tensorflow/cc/ops/image_ops_gen_cc \
+	    tensorflow/cc/ops/io_ops_gen_cc \
+	    tensorflow/cc/ops/linalg_ops_gen_cc \
+	    tensorflow/cc/ops/list_ops_gen_cc \
+	    tensorflow/cc/ops/logging_ops_gen_cc \
+	    tensorflow/cc/ops/lookup_ops_gen_cc \
+	    tensorflow/cc/ops/manip_ops_gen_cc \
+	    tensorflow/cc/ops/math_ops_gen_cc \
+	    tensorflow/cc/ops/nn_ops_gen_cc \
+	    tensorflow/cc/ops/no_op_gen_cc \
+	    tensorflow/cc/ops/parsing_ops_gen_cc \
+	    tensorflow/cc/ops/random_ops_gen_cc \
+	    tensorflow/cc/ops/sparse_ops_gen_cc \
+	    tensorflow/cc/ops/state_ops_gen_cc \
+	    tensorflow/cc/ops/string_ops_gen_cc \
+	    tensorflow/cc/ops/training_ops_gen_cc \
+	    tensorflow/cc/ops/user_ops_gen_cc
 	set -x
 	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/array_ops_genrule.genrule_script.sh
 	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/audio_ops_genrule.genrule_script.sh
