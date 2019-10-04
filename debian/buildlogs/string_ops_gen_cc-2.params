@@ -16,14 +16,7 @@ tensorflow/core/string_ops_op_lib/string_ops.o
 tensorflow/core/lib_proto_parsing/protobuf.o
 
 
-external/double_conversion/double-conversion/bignum.o
-external/double_conversion/double-conversion/bignum-dtoa.o
-external/double_conversion/double-conversion/cached-powers.o
-external/double_conversion/double-conversion/diy-fp.o
-external/double_conversion/double-conversion/double-conversion.o
-external/double_conversion/double-conversion/fast-dtoa.o
-external/double_conversion/double-conversion/fixed-dtoa.o
-external/double_conversion/double-conversion/strtod.o
+-ldouble-conversion
 
 
 tensorflow/core/platform/cpu_info/cpu_info.o
