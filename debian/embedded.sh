@@ -26,6 +26,10 @@ for I in $(ls debian/buildlogs/*.genrule_script.sh); do
 	sed -i -e 's@bazel-out/k8-opt/bin/@@g' \
 		-e 's@bazel-out/host/bin/@@g' tensorflow/cc/$(basename $I)
 done
+mkdir -p tensorflow/cc/ops
+for I in $(ls debian/buildlogs/*gen_cc-2.params); do
+	cp -v $I tensorflow/cc/ops
+done
 
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
