@@ -189,15 +189,6 @@ tensorflow/core/eager_service_proto_cc/eager_service.pb.pic.o
 tensorflow/core/eager_service_proto_cc/eager_service.grpc.pb.pic.o
 -no-whole-archive
 -whole-archive
-external/com_github_nanopb_nanopb/nanopb/pb_common.pic.o
--no-whole-archive
--whole-archive
-external/com_github_nanopb_nanopb/nanopb/pb_decode.pic.o
--no-whole-archive
--whole-archive
-external/com_github_nanopb_nanopb/nanopb/pb_encode.pic.o
--no-whole-archive
--whole-archive
 tensorflow/core/distributed_runtime/call_options/call_options.pic.o
 -no-whole-archive
 -whole-archive
