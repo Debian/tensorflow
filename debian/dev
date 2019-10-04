@@ -46,11 +46,10 @@ done
 build() {
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
-ninja -v -f libtensorflow_framework.ninja
+ninja -v -f libtensorflow_framework.ninja tensorflow/libtensorflow_framework.so
 gen_cc_ops
-ninja -v -f libtensorflow.ninja
-#ln -sf libtensorflow_cc.ninja build.ninja
-#ninja -v
+ninja -v -f libtensorflow.ninja tensorflow/libtensorflow.so
+ninja -v -f libtensorflow_cc.ninja tensorflow/libtensorflow_cc.so
 }
 
 gen_cc_ops() {
