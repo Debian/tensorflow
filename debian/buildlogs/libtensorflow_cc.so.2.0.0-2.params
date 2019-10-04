@@ -3240,6 +3240,8 @@ external/com_google_absl/absl/base/spinlock_wait/spinlock_wait.pic.o
 -lnsync
 -lnsync_cpp
 -lpng
+-lprotobuf
+-lprotobuf-lite
 -lpthread
 -lre2
 -lrt
