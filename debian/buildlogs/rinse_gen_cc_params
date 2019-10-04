@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+sed -i -e '/external\/gif_archive/d' \
+	-e '/external\/jpeg/d' \
+	-e '/external\/com_googlesource_code_re2/d' \
+	-e '/external\/farmhash/d' \
+	-e '/external\/highwayhash/d' \
+	-e '/external\/fft2d/d' \
+	-e '/external\/zlib/d' \
+	$1
+
+cat >> $1 << EOF
+-lgif
+-ljpeg
+-lre2
+-lfarmhash
+-lhighwayhash
+-lz
+EOF

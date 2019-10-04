@@ -142,3 +142,9 @@ external/com_google_absl/absl/base/spinlock_wait/spinlock_wait.o
 -lm
 -lstdc++
 -lm
+-lgif
+-ljpeg
+-lre2
+-lfarmhash
+-lhighwayhash
+-lz

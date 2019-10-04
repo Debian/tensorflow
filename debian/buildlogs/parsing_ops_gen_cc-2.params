@@ -20,118 +20,12 @@ tensorflow/core/platform/env_time/1/env_time.o
 tensorflow/core/parsing_ops_op_lib/parsing_ops.o
 -no-whole-archive
 
-external/gif_archive/gif/dgif_lib.o
-external/gif_archive/gif/egif_lib.o
-external/gif_archive/gif/gif_err.o
-external/gif_archive/gif/gif_font.o
-external/gif_archive/gif/gif_hash.o
-external/gif_archive/gif/gifalloc.o
-external/gif_archive/gif/openbsd-reallocarray.o
-external/gif_archive/gif/quantize.o
 
 
-external/jpeg/jpeg/jaricom.o
-external/jpeg/jpeg/jcapimin.o
-external/jpeg/jpeg/jcapistd.o
-external/jpeg/jpeg/jcarith.o
-external/jpeg/jpeg/jccoefct.o
-external/jpeg/jpeg/jccolor.o
-external/jpeg/jpeg/jcdctmgr.o
-external/jpeg/jpeg/jchuff.o
-external/jpeg/jpeg/jcinit.o
-external/jpeg/jpeg/jcmainct.o
-external/jpeg/jpeg/jcmarker.o
-external/jpeg/jpeg/jcmaster.o
-external/jpeg/jpeg/jcomapi.o
-external/jpeg/jpeg/jcparam.o
-external/jpeg/jpeg/jcphuff.o
-external/jpeg/jpeg/jcprepct.o
-external/jpeg/jpeg/jcsample.o
-external/jpeg/jpeg/jctrans.o
-external/jpeg/jpeg/jdapimin.o
-external/jpeg/jpeg/jdapistd.o
-external/jpeg/jpeg/jdarith.o
-external/jpeg/jpeg/jdatadst.o
-external/jpeg/jpeg/jdatasrc.o
-external/jpeg/jpeg/jdcoefct.o
-external/jpeg/jpeg/jdcolor.o
-external/jpeg/jpeg/jddctmgr.o
-external/jpeg/jpeg/jdhuff.o
-external/jpeg/jpeg/jdinput.o
-external/jpeg/jpeg/jdmainct.o
-external/jpeg/jpeg/jdmarker.o
-external/jpeg/jpeg/jdmaster.o
-external/jpeg/jpeg/jdmerge.o
-external/jpeg/jpeg/jdphuff.o
-external/jpeg/jpeg/jdpostct.o
-external/jpeg/jpeg/jdsample.o
-external/jpeg/jpeg/jdtrans.o
-external/jpeg/jpeg/jerror.o
-external/jpeg/jpeg/jfdctflt.o
-external/jpeg/jpeg/jfdctfst.o
-external/jpeg/jpeg/jfdctint.o
-external/jpeg/jpeg/jidctflt.o
-external/jpeg/jpeg/jidctfst.o
-external/jpeg/jpeg/jidctint.o
-external/jpeg/jpeg/jidctred.o
-external/jpeg/jpeg/jmemmgr.o
-external/jpeg/jpeg/jmemnobs.o
-external/jpeg/jpeg/jquant1.o
-external/jpeg/jpeg/jquant2.o
-external/jpeg/jpeg/jutils.o
 
 
-external/jpeg/simd/x86_64/jccolor-avx2.o
-external/jpeg/simd/x86_64/jccolor-sse2.o
-external/jpeg/simd/x86_64/jcgray-avx2.o
-external/jpeg/simd/x86_64/jcgray-sse2.o
-external/jpeg/simd/x86_64/jchuff-sse2.o
-external/jpeg/simd/x86_64/jcphuff-sse2.o
-external/jpeg/simd/x86_64/jcsample-avx2.o
-external/jpeg/simd/x86_64/jcsample-sse2.o
-external/jpeg/simd/x86_64/jdcolor-avx2.o
-external/jpeg/simd/x86_64/jdcolor-sse2.o
-external/jpeg/simd/x86_64/jdmerge-avx2.o
-external/jpeg/simd/x86_64/jdmerge-sse2.o
-external/jpeg/simd/x86_64/jdsample-avx2.o
-external/jpeg/simd/x86_64/jdsample-sse2.o
-external/jpeg/simd/x86_64/jfdctflt-sse.o
-external/jpeg/simd/x86_64/jfdctfst-sse2.o
-external/jpeg/simd/x86_64/jfdctint-avx2.o
-external/jpeg/simd/x86_64/jfdctint-sse2.o
-external/jpeg/simd/x86_64/jidctflt-sse2.o
-external/jpeg/simd/x86_64/jidctfst-sse2.o
-external/jpeg/simd/x86_64/jidctint-avx2.o
-external/jpeg/simd/x86_64/jidctint-sse2.o
-external/jpeg/simd/x86_64/jidctred-sse2.o
-external/jpeg/simd/x86_64/jquantf-sse2.o
-external/jpeg/simd/x86_64/jquanti-avx2.o
-external/jpeg/simd/x86_64/jquanti-sse2.o
-external/jpeg/simd/x86_64/jsimdcpu.o
-external/jpeg/simd_x86_64/jsimd.o
 
 
-external/com_googlesource_code_re2/re2/bitstate.o
-external/com_googlesource_code_re2/re2/compile.o
-external/com_googlesource_code_re2/re2/dfa.o
-external/com_googlesource_code_re2/re2/filtered_re2.o
-external/com_googlesource_code_re2/re2/mimics_pcre.o
-external/com_googlesource_code_re2/re2/nfa.o
-external/com_googlesource_code_re2/re2/onepass.o
-external/com_googlesource_code_re2/re2/parse.o
-external/com_googlesource_code_re2/re2/perl_groups.o
-external/com_googlesource_code_re2/re2/prefilter.o
-external/com_googlesource_code_re2/re2/prefilter_tree.o
-external/com_googlesource_code_re2/re2/prog.o
-external/com_googlesource_code_re2/re2/re2.o
-external/com_googlesource_code_re2/re2/regexp.o
-external/com_googlesource_code_re2/re2/set.o
-external/com_googlesource_code_re2/re2/simplify.o
-external/com_googlesource_code_re2/re2/tostring.o
-external/com_googlesource_code_re2/re2/unicode_casefold.o
-external/com_googlesource_code_re2/re2/unicode_groups.o
-external/com_googlesource_code_re2/re2/rune.o
-external/com_googlesource_code_re2/re2/strutil.o
 
 
 external/com_google_absl/absl/hash/hash/hash.o
@@ -200,34 +94,14 @@ external/com_google_absl/absl/time/internal/cctz/time_zone/zone_info_source.o
 external/com_google_absl/absl/time/internal/cctz/civil_time/civil_time_detail.o
 
 
-external/farmhash_archive/farmhash/farmhash.o
 
 
-external/fft2d/fft2d/fftsg.o
-external/fft2d/fft2d/fftsg2d.o
 
 
-external/highwayhash/sip_hash/sip_hash.o
 
 
-external/highwayhash/arch_specific/arch_specific.o
 
 
-external/zlib_archive/zlib/adler32.o
-external/zlib_archive/zlib/compress.o
-external/zlib_archive/zlib/crc32.o
-external/zlib_archive/zlib/deflate.o
-external/zlib_archive/zlib/gzclose.o
-external/zlib_archive/zlib/gzlib.o
-external/zlib_archive/zlib/gzread.o
-external/zlib_archive/zlib/gzwrite.o
-external/zlib_archive/zlib/infback.o
-external/zlib_archive/zlib/inffast.o
-external/zlib_archive/zlib/inflate.o
-external/zlib_archive/zlib/inftrees.o
-external/zlib_archive/zlib/trees.o
-external/zlib_archive/zlib/uncompr.o
-external/zlib_archive/zlib/zutil.o
 
 
 external/com_google_absl/absl/strings/strings/ascii.o
@@ -278,3 +152,9 @@ external/com_google_absl/absl/base/spinlock_wait/spinlock_wait.o
 -lm
 -lstdc++
 -lm
+-lgif
+-ljpeg
+-lre2
+-lfarmhash
+-lhighwayhash
+-lz
