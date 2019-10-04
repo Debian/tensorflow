@@ -89,7 +89,6 @@ class FakeBazel(object):
                         '-I.',
                         '-B.*',
                         '-Lbazel-out.*',
-                        '-DTENSORFLOW_USE_MKLDNN_CONTRACTION_KERNEL', # FIXME: we have mkldnn 1.X, but the reference build use 0.X
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
@@ -151,6 +150,10 @@ class FakeBazel(object):
                         '-shared',
                         ]):
                         target['flags'].append(FakeBazel.dirMangle(t))
+                        if '-DTENSORFLOW_USE_MKLDNN_CONTRACTION_KERNEL' in t:
+                            # we have mkldnn 1.X, but the reference build use 0.X
+                            # so adding another flag
+                            target['flags'].append('-DENABLE_MKLDNN_V1')
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
                     elif re.match('-isystem', t) or re.match('-isystem', tokens[i-1]):
