@@ -4,6 +4,7 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m "
 
 LIBDIR=debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
+SHELL=/bin/bash
 
 %:
 	dh $@ -Sninja -D.
