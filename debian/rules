@@ -10,13 +10,8 @@ override_dh_auto_configure:
 	$(SHELL) debian/dev configure # read code for detail
 
 override_dh_auto_build:
-	dh_auto_build -- -f proto_text.gen.ninja
-	dh_auto_build -- -f proto_text.ninja
-	dh_auto_build -- -f libtensorflow_framework.gen.ninja
 	dh_auto_build -- -f libtensorflow_framework.ninja
-	dh_auto_build -- -f libtensorflow.gen.ninja
 	dh_auto_build -- -f libtensorflow.ninja
-	dh_auto_build -- -f libtensorflow_cc.gen.ninja
 	dh_auto_build -- -f libtensorflow_cc.ninja
 	#dh_auto_build -- -f pippackage.gen.ninja
 
