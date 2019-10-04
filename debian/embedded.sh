@@ -13,15 +13,19 @@ if ! test -d external/include/; then
   mkdir external/include
   ln -s /usr/include/jsoncpp/json external/include/
 fi
-#ln -s . bazel-out
-#ln -s . k8-opt
-#ln -s . host
-#ln -s . bin
 cp -v debian/buildlogs/gen_proto_text_functions-2.params tensorflow/tools/proto_text/gen_proto_text_functions-2.params
 cp -v debian/buildlogs/libtensorflow_framework.so.2.0.0-2.params tensorflow/
 cp -v debian/patches/version_info.cc tensorflow/core/util/version_info.cc
 cp -v debian/patches/cuda_config.h third_party/gpus/cuda/cuda_config.h
 cp -v debian/patches/tensorrt_config.h third_party/tensorrt/tensorrt_config.h
+
+mkdir -p external/bazel_tools/tools/genrule/
+cp -v debian/patches/genrule-setup.sh external/bazel_tools/tools/genrule/genrule-setup.sh
+for I in $(ls debian/buildlogs/*.genrule_script.sh); do
+	cp -v $I tensorflow/cc/
+	sed -i -e 's@bazel-out/k8-opt/bin/@@g' \
+		-e 's@bazel-out/host/bin/@@g' tensorflow/cc/$(basename $I)
+done
 
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
