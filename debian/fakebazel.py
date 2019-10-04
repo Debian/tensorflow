@@ -26,9 +26,6 @@ from typing import *
 DEBUG=os.getenv('DEBUG', False)
 
 
-objs_gen_proto_text_functions = [x.strip() for x in
-        open('debian/buildlogs/gen_proto_text_functions-2.params').readlines() if x.strip().endswith('.o')]
-
 inputs1_proto_text = """
 tensorflow/core tensorflow/core/ tensorflow/core/lib/core/error_codes.proto tensorflow/tools/proto_text/placeholder.txt
 """.split()
@@ -37,9 +34,6 @@ inputs2_proto_text = """
 tensorflow/core tensorflow/core/ tensorflow/core/example/example.proto tensorflow/core/example/feature.proto tensorflow/core/framework/allocation_description.proto tensorflow/core/framework/api_def.proto tensorflow/core/framework/attr_value.proto tensorflow/core/framework/cost_graph.proto tensorflow/core/framework/device_attributes.proto tensorflow/core/framework/function.proto tensorflow/core/framework/graph.proto tensorflow/core/framework/graph_transfer_info.proto tensorflow/core/framework/kernel_def.proto tensorflow/core/framework/log_memory.proto tensorflow/core/framework/node_def.proto tensorflow/core/framework/op_def.proto tensorflow/core/framework/reader_base.proto tensorflow/core/framework/remote_fused_graph_execute_info.proto tensorflow/core/framework/resource_handle.proto tensorflow/core/framework/step_stats.proto tensorflow/core/framework/summary.proto tensorflow/core/framework/tensor.proto tensorflow/core/framework/tensor_description.proto tensorflow/core/framework/tensor_shape.proto tensorflow/core/framework/tensor_slice.proto tensorflow/core/framework/types.proto tensorflow/core/framework/variable.proto tensorflow/core/framework/versions.proto tensorflow/core/protobuf/config.proto tensorflow/core/protobuf/cluster.proto tensorflow/core/protobuf/debug.proto tensorflow/core/protobuf/device_properties.proto tensorflow/core/protobuf/graph_debug_info.proto tensorflow/core/protobuf/queue_runner.proto tensorflow/core/protobuf/rewriter_config.proto tensorflow/core/protobuf/tensor_bundle.proto tensorflow/core/protobuf/saver.proto tensorflow/core/protobuf/verifier_config.proto tensorflow/core/protobuf/trace_events.proto tensorflow/core/util/event.proto tensorflow/core/util/memmapped_file_system.proto tensorflow/core/util/saved_tensor_slice.proto tensorflow/core/lib/core/error_codes.proto tensorflow/tools/proto_text/placeholder.txt
 """.split()
 
-
-objs_libtensorflow_framework = [x.strip() for x in
-        open('debian/buildlogs/libtensorflow_framework.so.2.0.0-2.params').readlines() if x.strip().endswith('.o')]
 
 def cyan(s: str) -> str:
     return f'\033[1;36m{s}\033[0;m'
@@ -396,6 +390,9 @@ class FakeBazel(object):
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
                     F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                 elif re.match('.*gen_proto_text_functions.*', obj):
+                    objs_gen_proto_text_functions = [x.strip() for x in
+                        open('debian/buildlogs/gen_proto_text_functions-2.params').readlines()
+                        if x.strip().endswith('.o')]
                     F.build(obj+'.elf', 'CXXEXEC', '', variables={'flags': flags},
                             implicit=[*objs_gen_proto_text_functions, 'protos_all_cc'])
                 elif re.match('.*tensorflow/cc/.*gen_cc', obj):
@@ -403,12 +400,36 @@ class FakeBazel(object):
                     F.build(obj, 'CXXEXEC', src, variables={'flags': flags},
                             implicit=[*objs_gen_cc, 'protos_all_cc', 'proto_text_all_cc'])
                 elif re.match('.*libtensorflow_framework.*', obj):
+                    objs_libtensorflow_framework = [x.strip() for x in
+                        open('debian/buildlogs/libtensorflow_framework.so.2.0.0-2.params').readlines()
+                        if x.strip().endswith('.o')]
                     F.build(obj, 'CXXSO', '', variables={'flags': flags},
                             implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
                     F.build(os.path.basename(obj), 'phony', obj)
                     F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', os.path.basename(obj))  # .so.2 -> .so.2.0.0
                     F.build(os.path.basename(obj.replace('.so.2.0.0', '.so.2')), 'phony', obj.replace('.so.2.0.0', '.so.2'))
                     F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', os.path.basename(obj.replace('.so.2.0.0', '.so.2')))  # .so -> .so.2
+                elif re.match('.*libtensorflow\.so.*', obj):
+                    objs_libtensorflow = [x.strip() for x in
+                        open('debian/buildlogs/libtensorflow.so.2.0.0-2.params').readlines()
+                        if x.strip().endswith('.o')]
+                    F.build(obj, 'CXXSO', '', variables={'flags': flags},
+                            implicit=[*objs_libtensorflow, 'protos_all_cc'])
+                    F.build(os.path.basename(obj), 'phony', obj)
+                    F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', os.path.basename(obj))  # .so.2 -> .so.2.0.0
+                    F.build(os.path.basename(obj.replace('.so.2.0.0', '.so.2')), 'phony', obj.replace('.so.2.0.0', '.so.2'))
+                    F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', os.path.basename(obj.replace('.so.2.0.0', '.so.2')))  # .so -> .so.2
+                elif re.match('.*libtensorflow_cc\.so.*', obj):
+                    objs_libtensorflow = [x.strip() for x in
+                        open('debian/buildlogs/libtensorflow_cc.so.2.0.0-2.params').readlines()
+                        if x.strip().endswith('.o')]
+                    F.build(obj, 'CXXSO', '', variables={'flags': flags},
+                            implicit=[*objs_libtensorflow, 'protos_all_cc'])
+                    F.build(os.path.basename(obj), 'phony', obj)
+                    F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', os.path.basename(obj))  # .so.2 -> .so.2.0.0
+                    F.build(os.path.basename(obj.replace('.so.2.0.0', '.so.2')), 'phony', obj.replace('.so.2.0.0', '.so.2'))
+                    F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', os.path.basename(obj.replace('.so.2.0.0', '.so.2')))  # .so -> .so.2
+
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
