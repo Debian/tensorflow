@@ -443,5 +443,7 @@ class FakeBazel(object):
 
 fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
         'libtensorflow_framework.ninja')
-fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log')
-#fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log')
+fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
+        'libtensorflow_cc.ninja')
+fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
+        'libtensorflow.ninja')

@@ -46,6 +46,9 @@ done
 build() {
 which pypy3 && PY=pypy3 || PY=python3
 $PY debian/fakebazel.py
+#ln -sf libtensorflow_framework.ninja build.ninja
+#ln -sf libtensorflow.ninja build.ninja
+ln -sf libtensorflow_cc.ninja build.ninja
 ninja -v
 }
 
