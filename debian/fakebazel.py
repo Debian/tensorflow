@@ -357,8 +357,10 @@ class FakeBazel(object):
                 elif re.match('.*libtensorflow_framework.*', obj):
                     F.build(obj, 'CXXSO', '', variables={'flags': flags},
                             implicit=[*objs_libtensorflow_framework, 'protos_all_cc'])
-                    F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', obj)
-                    F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', obj)
+                    F.build(os.path.basename(obj), 'phony', obj)
+                    F.build(obj.replace('.so.2.0.0', '.so.2'), 'SYMLINK', os.path.basename(obj))  # .so.2 -> .so.2.0.0
+                    F.build(os.path.basename(obj.replace('.so.2.0.0', '.so.2')), 'phony', obj.replace('.so.2.0.0', '.so.2'))
+                    F.build(obj.replace('.so.2.0.0', '.so'), 'SYMLINK', os.path.basename(obj.replace('.so.2.0.0', '.so.2')))  # .so -> .so.2
                 else:
                     print('???????', t)
             elif t['type'] == 'PROTOC':
