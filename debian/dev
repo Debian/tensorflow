@@ -52,6 +52,55 @@ ln -sf libtensorflow_cc.ninja build.ninja
 ninja -v
 }
 
+gen_cc_ops() {
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/array_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/audio_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/candidate_sampling_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/control_flow_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/data_flow_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/image_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/io_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/linalg_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/list_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/logging_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/lookup_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/manip_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/math_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/nn_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/no_op_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/parsing_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/random_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/sparse_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/state_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/string_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/training_ops_gen_cc
+	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/user_ops_gen_cc
+	set -x
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/array_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/audio_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/candidate_sampling_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/control_flow_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/data_flow_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/image_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/io_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/linalg_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/list_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/logging_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/lookup_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/manip_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/math_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/nn_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/no_op_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/parsing_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/random_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/sparse_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/state_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/string_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/training_ops_genrule.genrule_script.sh
+	LD_LIBRARY_PATH=tensorflow bash tensorflow/cc/user_ops_genrule.genrule_script.sh
+	set +x
+}
+
 case $1 in
 	configure|fake) # used in debian/rules
 		configure
@@ -60,6 +109,9 @@ case $1 in
 		;;
 	buildlogs) # re-generate buildlogs with bazel
 		bash debian/buildlogs.sh
+		;;
+	gen_cc_ops)
+		gen_cc_ops
 		;;
 	*) # used manually for develpment
 		configure
