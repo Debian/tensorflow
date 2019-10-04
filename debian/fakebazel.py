@@ -312,7 +312,7 @@ class FakeBazel(object):
         dedupdir = set()
         F = Writer(open(dest, 'wt'))
         F.rule('PROTOC', 'protoc -I. $in $flags')
-        F.rule('CXX', 'ccache g++ -I. -Iexternal -Iexternal/eigen3 -Iexternal/com_google_absl -O2 -fPIC $flags -c -o $out $in')
+        F.rule('CXX', 'ccache g++ -I. -Iexternal -Iexternal/eigen3 -Iexternal/com_google_absl -I/usr/include/gemmlowp -O2 -fPIC $flags -c -o $out $in')
         F.rule('CXXEXEC', 'ccache g++ -I. -Ltensorflow -O2 -fPIE -pie $flags -o $out $in')
         F.rule('CXXSO', 'ccache g++ -shared -fPIC -Ltensorflow $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
