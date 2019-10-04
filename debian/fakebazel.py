@@ -266,6 +266,7 @@ class FakeBazel(object):
                 if 'external/snappy' in t['cmd']: continue
                 if 'external/com_google_protobuf' in t['cmd']: continue
                 if 'external/nasm' in t['cmd']: continue
+                if 'external/png_archive/scripts/pnglibconf.h.prebuilt' in t['cmd']: continue
             G.append(t)
         for t in G:
             if t['type'] == 'CXX':
@@ -362,14 +363,24 @@ class FakeBazel(object):
                     print('len_proto>1?????????', t)
                 assert(len(t['proto']) == 1)
                 proto, flags = t['proto'][0], ' '.join(t['flags'])
-                flags = re.sub('(.*)(--cpp_out=).*', '\\1\\2.', flags)
-                F.build([re.sub('\.proto$', '.pb.cc', proto),
-                    re.sub('\.proto$', '.pb.h', proto)],
-                    'PROTOC', proto, variables={'flags': flags},
-                    implicit=os.path.dirname(proto))
+                #flags = re.sub('(.*)(--cpp_out=).*', '\\1\\2.', flags)
+                if 'grpc' in flags:
+                    F.build([re.sub('\.proto$', '.pb.cc', proto),
+                        re.sub('\.proto$', '.grpc.pb.cc', proto),
+                        re.sub('\.proto$', '.grpc.pb.h', proto),
+                        re.sub('\.proto$', '.pb.h', proto)],
+                        'PROTOC', proto, variables={'flags': flags},
+                        implicit=os.path.dirname(proto))
+                else:
+                    F.build([re.sub('\.proto$', '.pb.cc', proto),
+                        re.sub('\.proto$', '.pb.h', proto)],
+                        'PROTOC', proto, variables={'flags': flags},
+                        implicit=os.path.dirname(proto))
             elif t['type'] == 'CMD':
                 if 'bazel-out/host/bin/tensorflow/tools/git/gen_git_source' in t['cmd']:
                     pass
+                elif 'tensorflow/tools/proto_text/gen_proto_text_functions' in t['cmd']:
+                    print(t)
                 else:
                     print('MISSING', FakeBazel.dirMangle(t['cmd']))
             else:
