@@ -387,6 +387,10 @@ class FakeBazel(object):
                     pass
                 elif 'tensorflow/tools/proto_text/gen_proto_text_functions' in t['cmd']:
                     print(t)
+                elif all(x in t['cmd'] for x in ['libtensorflow.so', 'ln -sf']):
+                    pass
+                elif all(x in t['cmd'] for x in ['libtensorflow_framework.so', 'ln -sf']):
+                    pass
                 else:
                     print('MISSING', FakeBazel.dirMangle(t['cmd']))
             else:
