@@ -1,22 +1,13 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-# colorized output reduces burden to my eye
-export NINJA_STATUS=[1;36m[%es (%p) %f/%t][0;m 
+# mandatorily colorized output reduces burden to human eyes
+export NINJA_STATUS="[1;31m[%es (%p) %f/%t][0;m "
 
 %:
 	dh $@ -Sninja -D.
 
-override_dh_auto_clean:
-	$(SHELL) debian/shogun-clean.sh
-
 override_dh_auto_configure:
-	$(SHELL) debian/burdenChecker.sh  # generate our ninja build generator
-
-#	-find . -type f -name '.gitignore' -delete
-#	-find tensorflow/examples/ -type f -exec chmod a-x '{}' +
-#	$(SHELL) debian/embedded.sh
-#	patch -p1 < debian/patches/fft-cxx-no-mangle.patch
-#	$(SHELL) debian/shogun-gen.sh
+	$(SHELL) debian/dev configure # read code for detail
 
 override_dh_auto_build:
 	dh_auto_build -- -f proto_text.gen.ninja
