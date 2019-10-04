@@ -100,8 +100,6 @@ external/com_google_absl/absl/time/internal/cctz/civil_time/civil_time_detail.o
 
 -lfarmhash
 
--lnsync_cpp
-
 
 -lhighwayhash
 

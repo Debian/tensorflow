@@ -1360,6 +1360,7 @@ external/com_google_absl/absl/strings/str_format_internal/parser.pic.o
 -no-whole-archive
 
 -lnsync
+-lnsync_cpp
 
 -whole-archive
 tensorflow/core/kernels/lookup_util/lookup_util.pic.o
