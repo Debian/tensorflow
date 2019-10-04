@@ -151,3 +151,4 @@ external/com_google_absl/absl/base/spinlock_wait/spinlock_wait.o
 -lfarmhash
 -lhighwayhash
 -lz
+-lprotobuf
