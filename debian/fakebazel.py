@@ -348,7 +348,7 @@ class FakeBazel(object):
         CCACHE = 'ccache ' if os.path.exists('/usr/bin/ccache') else ''
         F.variable('CXX', str(os.getenv('CXX','g++')))
         F.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + str(os.getenv('CPPFLAGS', '')))
-        F.variable('CXXFLAGS', '-O2 -gsplit-dwarf -DNDEBUG ' + str(os.getenv('CXXFLAGS', '')))
+        F.variable('CXXFLAGS', '-O2 -w -gsplit-dwarf -DNDEBUG ' + str(os.getenv('CXXFLAGS', '')))
         F.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now ' + str(os.getenv('LDFLAGS', '')))
         F.newline()
         F.comment(f'rules')
