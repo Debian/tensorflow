@@ -1,6 +1,5 @@
 #!/bin/bash
 set -ex
-
 # required variables ([*]=must)
 # src [*]
 # elf [*]
@@ -8,6 +7,8 @@ set -ex
 # libs
 # incs
 # tflib \in {c, cc, f}, default=f
+
+trap "{ rm -f *.o; }" EXIT
 
 CXX="ccache g++"
 XE=xe
