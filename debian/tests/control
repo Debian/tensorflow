@@ -1,4 +1,4 @@
-Test: libtf-sanity.sh
+Tests: libtf-sanity.sh
 Depends: @, build-essential, libtensorflow-dev
 Restrictions: allow-stderr
 
