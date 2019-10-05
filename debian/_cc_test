@@ -56,7 +56,7 @@ $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 _CXX
 _LD || _retry
 
-./$elf 
+./$elf --gtest_color=yes || ./$elf
 
 rm ${objs[@]}
 if [[ -z $_CC_NORM ]]; then
