@@ -510,7 +510,7 @@ if __name__ == '__main__':
 
 def load(*args, **kwargs):
     for f in args:
-        print(f'BZL[{red("load")}] {f}')
+        if DEBUG: print(f'BZL[{red("load")}] {f}')
 
 tf_additional_test_deps = lambda *x, **y: []
 cc_header_only_library = lambda *x, **y: []
@@ -598,30 +598,30 @@ alias = lambda *x, **y: []
 def tf_proto_library(**kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
-    print(f'BZL[tf_proto_library] name={name} srcs={srcs}')
+    if DEBUG: print(f'BZL[tf_proto_library] name={name} srcs={srcs}')
 
 def proto_library(**kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
-    print(f'BZL[proto_library] name={name} srcs={srcs}')
+    if DEBUG: print(f'BZL[proto_library] name={name} srcs={srcs}')
 
 def filegroup(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
-    print(f'BZL[filegroup] name={name} srcs={srcs}')
+    if DEBUG: print(f'BZL[filegroup] name={name} srcs={srcs}')
 
 def cc_library(*args, **kwargs):
     name = kwargs['name']
     hdrs = kwargs['hdrs'] if 'hdrs' in kwargs else []
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[{yellow("cc_library")}] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[{yellow("cc_library")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_cc_tests(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[{green("tf_cc_tests")}] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[{green("tf_cc_tests")}] name={name} srcs={srcs} deps={deps}')
     tf_cc_test(*args, **kwargs)
 
 def tf_cuda_library(*args, **kwargs):
@@ -629,30 +629,30 @@ def tf_cuda_library(*args, **kwargs):
     hdrs = kwargs['hdrs'] if 'hdrs' in kwargs else []
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[{red("tf_cuda_library")}] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[{red("tf_cuda_library")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_gen_op_libs(*args, **kwargs):
     op_lib_names = kwargs['op_lib_names']
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[tf_ten_op_libs] op_lib_names={op_lib_names} deps={deps}')
+    if DEBUG: print(f'BZL[tf_ten_op_libs] op_lib_names={op_lib_names} deps={deps}')
 
 def tf_cc_tests_gpu(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[tf_cc_tests_gpu] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[tf_cc_tests_gpu] name={name} srcs={srcs} deps={deps}')
 
 def tf_cc_test_mkl(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[tf_cc_tests_mkl] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[tf_cc_tests_mkl] name={name} srcs={srcs} deps={deps}')
 
 def tf_cuda_cc_test(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[tf_cuda_cc_test] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[tf_cuda_cc_test] name={name} srcs={srcs} deps={deps}')
 
 def glob(exprs, exclude=[]):
     dirname = "tensorflow/core" #os.path.dirname(__file__)
@@ -668,7 +668,7 @@ def glob(exprs, exclude=[]):
     for i in flist:
         if i not in fexclude:
             rinsed.append(i)
-    print(f'BZL[{violet("glob")}] {rinsed}')
+    if DEBUG: print(f'BZL[{violet("glob")}] {rinsed}')
     return rinsed
 
 def tf_cc_test(*args, **kwargs):
@@ -678,7 +678,7 @@ def tf_cc_test(*args, **kwargs):
     name = kwargs['name']
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
-    print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
+    if DEBUG: print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
 
     ccsrc = []
     tflib = []
@@ -686,12 +686,16 @@ def tf_cc_test(*args, **kwargs):
     libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a"]
 
     def srcProcess(p):
-        if p.startswith('//tensorflow'):
+        if re.match('//tensorflow.*\.cc', p):
             p = re.sub('^//', '', p)
             p = re.sub(':', '/', p)
             ccsrc.append(p)
+        elif re.match('\w+/.*\.cc', p):
+            p = os.path.join('tensorflow/core', p)
+            ccsrc.append(p)
         else:
-            raise Exception(f"srcProcess: don't know how to understand {p}")
+            ccsrc.append(p)
+            print(cyan(f"srcProcess: don't know how to understand {p}"))
 
     def depProcess(d):
         if any(re.match(x, d) for x in [
@@ -708,12 +712,14 @@ def tf_cc_test(*args, **kwargs):
                 "tensorflow/core/platform/test.cc",
                 "tensorflow/core/platform/default/test_benchmark.cc",
                 "tensorflow/core/platform/posix/test.cc",
-                "tensorflow/core/platform/test_main.cc",
                 ])
+        elif re.match(':test_main', d):
+            ccsrc.append("tensorflow/core/platform/test_main.cc")
         elif re.match('@com_google_absl.*', d):
             pass
         else:
-            raise Exception(f"depProcess: don't know how to understand {d}")
+            ccsrc.append(d)
+            print(red(f"depProcess: don't know how to understand {d}"))
 
     for x in srcs:
         srcProcess(x)
