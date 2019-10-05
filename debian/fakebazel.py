@@ -682,7 +682,7 @@ def tf_cc_test(*args, **kwargs):
 
     ccsrc = []
     tflib = []
-    flags = ['-I.']
+    flags = ['-I.', '-I/usr/include/tensorflow']
     libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a"]
 
     def srcProcess(p):
@@ -702,10 +702,14 @@ def tf_cc_test(*args, **kwargs):
                 ':framework',
                 ':lib',
                 ':lib_internal',
+                ':core',
+                ':core_cpu',
+                ':core_cpu_internal',
                 ]):
             libs.append('-ltensorflow_framework')
         elif any(re.match(x, d) for x in [
                 ':test',
+                ':test_main',
                 ]):
             ccsrc.extend([
                 "tensorflow/core/util/reporter.cc",
@@ -713,10 +717,25 @@ def tf_cc_test(*args, **kwargs):
                 "tensorflow/core/platform/default/test_benchmark.cc",
                 "tensorflow/core/platform/posix/test.cc",
                 ])
-        elif re.match(':test_main', d):
             ccsrc.append("tensorflow/core/platform/test_main.cc")
-        elif re.match('@com_google_absl.*', d):
+        elif any(re.match(x,d) for x in [
+                '@com_google_absl.*',
+                '//third_party/eigen3',
+                '@com_google_googletest//:gtest_main',
+                '@zlib_archive//:zlib',
+                ]):
             pass
+        elif any(re.match(x, d) for x in [
+                '//tensorflow/cc:cc_ops',
+                '//tensorflow/cc:cc_ops_internal',
+                '//tensorflow/cc:.*',
+                '//tensorflow/core/.*',
+                ':all_kernels',
+                ':array_ops_op_lib',
+                ':.*',
+                '//tensorflow/c/kernels:bitcast_op_lib',
+                ]):
+            libs.append('-ltensorflow_cc')
         else:
             ccsrc.append(d)
             print(red(f"depProcess: don't know how to understand {d}"))
