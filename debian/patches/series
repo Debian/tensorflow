@@ -1,0 +1,6 @@
+
+# The following files are handled by debian/embedded.sh
+#cuda_config.h
+#genrule-setup.sh
+#tensorrt_config.h
+#version_info.cc

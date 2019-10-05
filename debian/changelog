@@ -3,7 +3,7 @@ tensorflow (2.0.0-1) UNRELEASED; urgency=medium
   * New upstream version 2.0.0 (Oct 2019).
   * Rewrite the buildsystem, which reconstructs the dependency graph
     by parsing the Bazel buildlog, and subsequently generates a Ninja
-    bulid to approximate the original build sequence.
+    build to approximate the original build sequence.
 
  -- Mo Zhou <cdluminate@gmail.com>  Sat, 05 Oct 2019 15:46:46 +0800
 
