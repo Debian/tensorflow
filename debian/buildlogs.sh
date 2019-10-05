@@ -89,6 +89,6 @@ fi
 log=$LOGDIR/build_pip_package.log
 if [[ ! -r $log ]]; then
 	bazel clean
+	# https://www.tensorflow.org/install/source#tensorflow_2x
 	bazel build --config=v2 -s //tensorflow/tools/pip_package:build_pip_package 2>&1 | tee $log
 fi
-
