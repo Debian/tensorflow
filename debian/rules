@@ -48,4 +48,4 @@ override_dh_auto_install:
 	ln -sf libtensorflow_cc.so.2 $(LIBDIR)/libtensorflow_cc.so
 	# pkg-config
 	install -vDm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
-	install -vDm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_pc.pc
+	install -vDm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_cc.pc
