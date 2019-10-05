@@ -1,16 +1,18 @@
 #!/bin/bash
 set -ex
 
-# required variables
-# src
-# elf
+# required variables ([*]=must)
+# src [*]
+# elf [*]
 # flags
+# libs
+# incs
 
 # CXX
-xe -avj0 g++ -O2 -fPIC $flags -c -- "${src[@]}"
+xe -avj0 g++ -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
 # LD
-g++ -fPIE -pie -O2 -Wl,--start-group \
-	-ltensorflow_cc \
+g++ -fPIE -pie -O2 $flags -Wl,--start-group \
+	-ltensorflow_cc -ltensorflow_framework $libs \
 	*.o \
 	-Wl,--end-group -o $elf
 
