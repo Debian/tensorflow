@@ -5,16 +5,8 @@ src=(
 tensorflow/tools/lib_package/libtensorflow_test.c
 )
 elf=libtensorflow_test.elf
+flags=
 
-# CXX
-xe -avj0 gcc -O2 -fPIC -c -- "${src[@]}"
-# LD
-gcc -fPIE -pie -O2 -Wl,--start-group \
-	-ltensorflow \
-	*.o \
-	-Wl,--end-group -o $elf
-
-./$elf
-rm *.o $elf
+source debian/_c_test
 
 exit 0

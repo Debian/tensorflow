@@ -1,0 +1,18 @@
+#!/bin/bash
+set -ex
+
+# Requires the following variables
+# src
+# elf
+# flags
+
+# CXX
+xe -avj0 gcc -O2 -fPIC $flags -c -- "${src[@]}"
+# LD
+gcc -fPIE -pie -O2 -Wl,--start-group \
+	-ltensorflow \
+	*.o \
+	-Wl,--end-group -o $elf
+
+./$elf
+rm *.o $elf
