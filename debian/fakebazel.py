@@ -771,3 +771,6 @@ def tf_cc_test(*args, **kwargs):
             ])
     os.chmod(name, 0o755)
     print(f'{red("FakeBazel")}[{blue("GenTest")}] -> {green(name)}')
+    with open('__alltests', 'at') as f:
+        f.write(f'set +e; /bin/bash {name}\n')
+    os.chmod('__alltests', 0o755)
