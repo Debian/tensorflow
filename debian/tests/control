@@ -29,7 +29,3 @@ Restrictions: allow-stderr
 #Test-Command: sh debian/tests/tf_ex_adding_an_op.sh
 #Depends: @, build-essential, libprotobuf-dev,
 #Restrictions: allow-stderr
-#
-#Test-Command: sh debian/tests/capi.sh
-#Depends: @, build-essential, libprotobuf-dev, libgtest-dev,
-#Restrictions: allow-stderr
