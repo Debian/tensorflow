@@ -102,6 +102,29 @@ gen_cc_ops() {
 	set +x
 }
 
+_install_(){
+	src=$1
+	destdir=$2
+	if (echo $src | grep -q "^third_party") && [[ -r $src ]]; then
+		install -Dm0644 $src $destdir/tensorflow/$src
+	elif [[ -r $src ]]; then
+		install -Dm0644 $src $destdir/$src
+	elif [[ -r external/com_google_absl/$src ]]; then
+		install -Dm0644 external/com_google_absl/$src $destdir/tensorflow/$src
+	elif [[ -r external/eigen3/$src ]]; then
+		install -Dm0644 external/eigen3/$src $destdir/tensorflow/$src
+	else
+		echo MISSING-HEADER $src
+	fi
+}
+
+install-headers(){
+	INCDIR=$1
+	for I in $(cat debian/buildlogs/install_headers.log); do
+		_install_ $I $INCDIR
+	done
+}
+
 case $1 in
 	configure|fake) # used in debian/rules
 		configure
@@ -116,14 +139,7 @@ case $1 in
 		;;
 	install_headers|install-headers)
 		shift
-		DESTDIR=$1
-		for I in $(cat debian/buildlogs/install_headers.log); do
-			if [[ -r $I ]]; then
-				install -Dm0644 $I $DESTDIR/$I # -v
-			else
-				echo MISSING-HEADER $I
-			fi
-		done
+		install-headers $@
 		;;
 	grep-includes)
 		rg --no-filename '.*#include' | sort | uniq
