@@ -35,14 +35,12 @@ tensorflow/core tensorflow/core/ tensorflow/core/example/example.proto tensorflo
 """.split()
 
 
-def cyan(s: str) -> str:
-    return f'\033[1;36m{s}\033[0;m'
-
-def yellow(s: str) -> str:
-    return f'\033[1;33m{s}\033[0;m'
-
-def red(s: str) -> str:
-    return f'\033[1;31m{s}\033[0;m'
+def red(s: str) -> str: return f'\033[1;31m{s}\033[0;m'
+def green(s: str) -> str: return f'\033[1;32m{s}\033[0;m'
+def yellow(s: str) -> str: return f'\033[1;33m{s}\033[0;m'
+def blue(s: str) -> str: return f'\033[1;34m{s}\033[0;m'
+def violet(s: str) -> str: return f'\033[1;35m{s}\033[0;m'
+def cyan(s: str) -> str: return f'\033[1;36m{s}\033[0;m'
 
 class FakeBazel(object):
     @staticmethod
@@ -495,6 +493,9 @@ class FakeBazel(object):
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
         print(yellow(f'  (json fore debugging stored in -> depgraph_debug.json)'))
 
+#    cursor.rule('rule_PROTOC_PYTHON', '$PROTOC --python_out . -I. $in')
+#    cursor.rule( #        'rule_PY_OP_GEN', #        f'LD_LIBRARY_PATH=. ./$in tensorflow/core/api_def/base_api,tensorflow/core/api_def/python_api 1 > $out'
+#    )
 
 if __name__ == '__main__':
     fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
@@ -504,59 +505,153 @@ if __name__ == '__main__':
     fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
             'libtensorflow_cc.ninja') # C++
 
-#    cursor.variable(
-#        'INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/' +
-#        ' -I/usr/include/gemmlowp -I/usr/include/llvm-c-7' +
-#        ' -I/usr/include/llvm-7 -Ithird_party/toolchains/preconfig/ubuntu14.04/cuda10.0-cudnn7/cuda/'
-#        + ' -I./debian/embedded/abseil/')
-#    cursor.variable(
-#        'LIBS',
-#        '-lpthread -lprotobuf -lnsync -lnsync_cpp -ldouble-conversion' +
-#        ' -ldl -lm -lz -lre2 -ljpeg -lpng -lsqlite3 -llmdb -lsnappy -lgif -lLLVM-7'
-#    )
-#    cursor.rule('rule_PROTOC_PYTHON', '$PROTOC --python_out . -I. $in')
-#    cursor.rule(
-#        'rule_PROTO_TEXT',
-#        f'$PROTO_TEXT tensorflow/core tensorflow/core tensorflow/tools/proto_text/placeholder.txt $in'
-#    )
-#    cursor.rule(
-#        'rule_CXX_OBJ',
-#        f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $SHOGUN_EXTRA -c $in -o $out')
-#    cursor.rule(
-#        'rule_CXX_EXEC',
-#        f'$CXX $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out'
-#    )
-#    cursor.rule(
-#        'rule_CXX_SHLIB',
-#        f'$CXX -shared -fPIC $CPPFLAGS $CXXFLAGS $INCLUDES $LDFLAGS $LIBS $SHOGUN_EXTRA $in -o $out'
-#    )
-#    cursor.rule(
-#        'rule_CC_OP_GEN',
-#        f'LD_LIBRARY_PATH=. ./$in $out $cc_op_gen_internal tensorflow/core/api_def/base_api'
-#    )
-#    cursor.rule(
-#        'rule_PY_OP_GEN',
-#        f'LD_LIBRARY_PATH=. ./$in tensorflow/core/api_def/base_api,tensorflow/core/api_def/python_api 1 > $out'
-#    )
-#def shogunPython(argv):
-#    '''
-#    Build python package layout
-#    '''
-#    ag = argparse.ArgumentParser()
-#    ag.add_argument('-i', type=str, required=True)
-#    ag.add_argument('-g', type=str, required=True)
-#    ag.add_argument('-o', type=str, default='pippackage.sh')
-#    ag.add_argument('-O', type=str, default='_pywrap_tensorflow_internal.so')
-#    ag.add_argument('--api', type=str, default='api_init_files_list.txt')
-#    ag = ag.parse_args(argv)
-#    print(red('Argument Dump:'))
-#    pprint(vars(ag))
-#
-#    # Glob python files
-#    srclist = bazelPreprocess([l.strip() for l in open(ag.i, 'r').readlines()])
-#    genlist = bazelPreprocess([l.strip() for l in open(ag.g, 'r').readlines()])
-#    srclist.extend(genlist)
-#    Rapi = [l.strip().replace(';', '') for l in open(ag.api, 'r').readlines()]
-#    srclist.extend(Rapi)
-#    Rpy, _ = eGrep('.*.py$', srclist)
-#    print('shogunPython: found', len(Rpy), 'python files')
+# FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL
+
+def load(*args, **kwargs):
+    for f in args:
+        print(f'BZL[{red("load")}] {f}')
+
+tf_additional_test_deps = lambda *x, **y: []
+cc_header_only_library = lambda *x, **y: []
+closure_proto_library = lambda *x, **y: []
+if_android = lambda *x, **y: []
+if_cuda = lambda *x, **y: []
+if_dynamic_kernels = lambda *x, **y: []
+if_emscripten = lambda *x, **y: []
+if_ios = lambda *x, **y: []
+if_linux_x86_64 = lambda *x, **y: []
+if_mkl = lambda *x, **y: []
+if_mobile = lambda *x, **y: []
+if_nccl = lambda *x, **y: []
+if_not_windows = lambda *x, **y: []
+if_static = lambda *x, **y: []
+if_tensorrt = lambda *x, **y: []
+if_windows = lambda *x, **y: []
+mkl_deps = lambda *x, **y: []
+tensorflow_opensource_extra_deps = lambda *x, **y: []
+tf_additional_all_protos = lambda *x, **y: []
+tf_additional_cloud_kernel_deps = lambda *x, **y: []
+tf_additional_cloud_op_deps = lambda *x, **y: []
+tf_additional_core_deps = lambda *x, **y: []
+tf_additional_cupti_wrapper_deps = lambda *x, **y: []
+tf_additional_device_tracer_cuda_deps = lambda *x, **y: []
+tf_additional_device_tracer_deps = lambda *x, **y: []
+tf_additional_device_tracer_test_flags = lambda *x, **y: []
+tf_additional_gdr_lib_defines = lambda *x, **y: []
+tf_additional_human_readable_json_deps = lambda *x, **y: []
+tf_additional_lib_defines = lambda *x, **y: []
+tf_additional_lib_deps = lambda *x, **y: []
+tf_additional_libdevice_data = lambda *x, **y: []
+tf_additional_libdevice_deps = lambda *x, **y: []
+tf_additional_minimal_lib_srcs = lambda *x, **y: []
+tf_additional_monitoring_hdrs = lambda *x, **y: []
+tf_additional_mpi_lib_defines = lambda *x, **y: []
+tf_additional_numa_copts = lambda *x, **y: []
+tf_additional_numa_deps = lambda *x, **y: []
+tf_additional_numa_lib_defines = lambda *x, **y: []
+tf_additional_test_deps = lambda *x, **y: []
+tf_additional_verbs_lib_defines = lambda *x, **y: []
+tf_android_core_proto_headers = lambda *x, **y: []
+tf_android_core_proto_sources = lambda *x, **y: []
+tf_cc_test = lambda *x, **y: []
+tf_cc_test_gpu = lambda *x, **y: []
+tf_cc_test_mkl = lambda *x, **y: []
+tf_cc_tests = lambda *x, **y: []
+tf_cc_tests_gpu = lambda *x, **y: []
+tf_copts = lambda *x, **y: []
+tf_cuda_cc_test = lambda *x, **y: []
+tf_cuda_library = lambda *x, **y: []
+tf_cuda_only_cc_test = lambda *x, **y: []
+tf_cuda_tests_tags = lambda *x, **y: []
+tf_features_nomodules_if_android = lambda *x, **y: []
+tf_features_nomodules_if_emscripten = lambda *x, **y: []
+tf_gen_op_libs = lambda *x, **y: []
+tf_generate_proto_text_sources = lambda *x, **y: []
+tf_genrule_cmd_append_to_srcs = lambda *x, **y: []
+tf_grpc_service_all = lambda *x, **y: []
+tf_jspb_proto_library = lambda *x, **y: []
+tf_kernel_tests_linkstatic = lambda *x, **y: []
+tf_lib_proto_compiler_deps = lambda *x, **y: []
+tf_lib_proto_parsing_deps = lambda *x, **y: []
+tf_openmp_copts = lambda *x, **y: []
+tf_opts_nortti_if_android = lambda *x, **y: []
+tf_opts_nortti_if_emscripten = lambda *x, **y: []
+tf_portable_proto_library = lambda *x, **y: []
+tf_proto_library = lambda *x, **y: []
+tf_proto_library_cc = lambda *x, **y: []
+tf_protos_all = lambda *x, **y: []
+tf_protos_all_impl = lambda *x, **y: []
+tf_protos_grappler = lambda *x, **y: []
+tf_protos_grappler_impl = lambda *x, **y: []
+tf_pyclif_proto_library = lambda *x, **y: []
+tf_version_info_genrule = lambda *x, **y: []
+transitive_hdrs = lambda *x, **y: []
+package = lambda *x, **y: []
+package_group = lambda *x, **y: []
+exports_files = lambda *x, **y: []
+java_proto_library = lambda *x, **y: []
+select = lambda *x, **y: []
+
+def tf_proto_library(**kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    print(f'BZL[tf_proto_library] name={name} srcs={srcs}')
+
+def proto_library(**kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    print(f'BZL[proto_library] name={name} srcs={srcs}')
+
+def filegroup(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    print(f'BZL[filegroup] name={name} srcs={srcs}')
+
+def cc_library(*args, **kwargs):
+    name = kwargs['name']
+    hdrs = kwargs['hdrs']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps']
+    print(f'BZL[{yellow("cc_library")}] name={name} srcs={srcs} deps={deps}')
+
+def tf_cc_test(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
+
+def tf_cc_tests(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[{green("tf_cc_tests")}] name={name} srcs={srcs} deps={deps}')
+
+def tf_cuda_library(*args, **kwargs):
+    name = kwargs['name']
+    hdrs = kwargs['hdrs']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[{red("tf_cuda_library")}] name={name} srcs={srcs} deps={deps}')
+
+def tf_gen_op_libs(*args, **kwargs):
+    op_lib_names = kwargs['op_lib_names']
+    deps = kwargs['deps']
+    print(f'BZL[tf_ten_op_libs] op_lib_names={op_lib_names} deps={deps}')
+
+def tf_cc_tests_gpu(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[tf_cc_tests_gpu] name={name} srcs={srcs} deps={deps}')
+
+def tf_cc_test_mkl(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[tf_cc_tests_mkl] name={name} srcs={srcs} deps={deps}')
+
+def tf_cuda_cc_test(*args, **kwargs):
+    name = kwargs['name']
+    srcs = kwargs['srcs']
+    deps = kwargs['deps']
+    print(f'BZL[tf_cuda_cc_test] name={name} srcs={srcs} deps={deps}')
