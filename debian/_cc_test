@@ -30,13 +30,24 @@ done
 
 _CXX() {
 	#$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- "${src[@]}"
-	for _s in ${src[@]}; do
-		dn=$(dirname $_s)
-		bn=$(basename $_s)
-		set -x
-		$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
-		set +x
-	done
+	if (( ${#src[@]} < 8 )); then
+		# Parallel
+		for _s in ${src[@]}; do
+			dn=$(dirname $_s)
+			bn=$(basename $_s)
+			echo $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
+			$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o &
+		done
+		wait
+	else
+		# Serial
+		for _s in ${src[@]}; do
+			dn=$(dirname $_s)
+			bn=$(basename $_s)
+			echo $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
+			$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
+		done
+	fi
 }
 
 _LD() {
