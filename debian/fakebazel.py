@@ -594,64 +594,64 @@ select = lambda *x, **y: []
 
 def tf_proto_library(**kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     print(f'BZL[tf_proto_library] name={name} srcs={srcs}')
 
 def proto_library(**kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     print(f'BZL[proto_library] name={name} srcs={srcs}')
 
 def filegroup(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     print(f'BZL[filegroup] name={name} srcs={srcs}')
 
 def cc_library(*args, **kwargs):
     name = kwargs['name']
-    hdrs = kwargs['hdrs']
+    hdrs = kwargs['hdrs'] if 'hdrs' in kwargs else []
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
-    deps = kwargs['deps']
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{yellow("cc_library")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_cc_test(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_cc_tests(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{green("tf_cc_tests")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_cuda_library(*args, **kwargs):
     name = kwargs['name']
-    hdrs = kwargs['hdrs']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    hdrs = kwargs['hdrs'] if 'hdrs' in kwargs else []
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{red("tf_cuda_library")}] name={name} srcs={srcs} deps={deps}')
 
 def tf_gen_op_libs(*args, **kwargs):
     op_lib_names = kwargs['op_lib_names']
-    deps = kwargs['deps']
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[tf_ten_op_libs] op_lib_names={op_lib_names} deps={deps}')
 
 def tf_cc_tests_gpu(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[tf_cc_tests_gpu] name={name} srcs={srcs} deps={deps}')
 
 def tf_cc_test_mkl(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[tf_cc_tests_mkl] name={name} srcs={srcs} deps={deps}')
 
 def tf_cuda_cc_test(*args, **kwargs):
     name = kwargs['name']
-    srcs = kwargs['srcs']
-    deps = kwargs['deps']
+    srcs = kwargs['srcs'] if 'srcs' in kwargs else []
+    deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[tf_cuda_cc_test] name={name} srcs={srcs} deps={deps}')

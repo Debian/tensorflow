@@ -125,6 +125,13 @@ install-headers(){
 	done
 }
 
+gentests(){
+	cp debian/*.py tensorflow/core/
+	echo "from fakebazel import *" > tensorflow/core/BUILD.py
+	cat tensorflow/core/BUILD >> tensorflow/core/BUILD.py
+	python3 tensorflow/core/BUILD.py
+}
+
 case $1 in
 	configure|fake) # used in debian/rules
 		configure
@@ -143,6 +150,9 @@ case $1 in
 		;;
 	grep-includes)
 		rg --no-filename '.*#include' | sort | uniq
+		;;
+	gentests)
+		gentests
 		;;
 	*) # used manually for develpment
 		configure
