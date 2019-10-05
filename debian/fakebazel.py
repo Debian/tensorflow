@@ -20,6 +20,7 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 import os, sys, re, argparse, shlex, json
+from glob import glob as _glob
 from ninja_syntax import Writer
 from typing import *
 
@@ -591,6 +592,8 @@ package_group = lambda *x, **y: []
 exports_files = lambda *x, **y: []
 java_proto_library = lambda *x, **y: []
 select = lambda *x, **y: []
+genrule = lambda *x, **y: []
+alias = lambda *x, **y: []
 
 def tf_proto_library(**kwargs):
     name = kwargs['name']
@@ -655,3 +658,21 @@ def tf_cuda_cc_test(*args, **kwargs):
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[tf_cuda_cc_test] name={name} srcs={srcs} deps={deps}')
+
+def glob(exprs, exclude=[]):
+    dirname = "tensorflow/core" #os.path.dirname(__file__)
+    flist = []
+    fexclude = []
+    for expr in exprs:
+        flist.extend(_glob(os.path.join(dirname, expr), recursive=True))
+    for expr in exclude:
+        fexclude.extend(_glob(os.path.join(dirname, expr), recursive=True))
+    flist = list(set(flist))
+    fexclude = set(fexclude)
+    rinsed = []
+    for i in flist:
+        if i not in fexclude:
+            rinsed.append(i)
+    print(f'BZL[{violet("glob")}] {rinsed}')
+    return rinsed
+
