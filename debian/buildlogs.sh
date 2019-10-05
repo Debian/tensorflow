@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+export LANG=C
 # reference: https://git.archlinux.org/svntogit/community.git/tree/trunk/PKGBUILD?h=packages/tensorflow
 # reference: https://github.com/gentoo/gentoo/blob/master/sci-libs/tensorflow/tensorflow-2.0.0.ebuild
 
@@ -77,7 +78,7 @@ log=$LOGDIR/install_headers.log
 if ! test -r $log; then
 	bazel clean
 	bazel build --config=v2 //tensorflow:install_headers 
-	find bazel-bin/tensorflow/include -type f > $log
+	find bazel-bin/tensorflow/include -type f | sort > $log
 fi
 
 log=$LOGDIR/pywrap_tensorflow_internal.log

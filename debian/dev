@@ -53,7 +53,8 @@ ninja -v -f libtensorflow_cc.ninja tensorflow/libtensorflow_cc.so
 }
 
 gen_cc_ops() {
-	ninja -v -f libtensorflow.ninja tensorflow/cc/ops/array_ops_gen_cc \
+	ninja -v -f libtensorflow.ninja \
+		tensorflow/cc/ops/array_ops_gen_cc \
 	    tensorflow/cc/ops/audio_ops_gen_cc \
 	    tensorflow/cc/ops/candidate_sampling_ops_gen_cc \
 	    tensorflow/cc/ops/control_flow_ops_gen_cc \
@@ -123,6 +124,9 @@ case $1 in
 				echo MISSING-HEADER $I
 			fi
 		done
+		;;
+	grep-includes)
+		rg --no-filename '.*#include' | sort | uniq
 		;;
 	*) # used manually for develpment
 		configure
