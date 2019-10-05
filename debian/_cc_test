@@ -7,12 +7,23 @@ set -ex
 # flags
 # libs
 # incs
+# tflib \in {c, cc, f}, default=f
+
+if [[ 'c' = $tflib ]]; then
+	_tflib=(-ltensorflow_framework -ltensorflow)
+elif [[ 'cc' = $tflib ]]; then
+	_tflib=(-ltensorflow_framework -ltensorflow_cc)
+elif [[ 'f' = $tflib ]]; then
+	_tflib=(-ltensorflow_framework)
+else
+	_tflib=(-ltensorflow_framework)
+fi
 
 # CXX
 xe -avj0 g++ -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
 # LD
 g++ -fPIE -pie -O2 $flags -Wl,--start-group \
-	-ltensorflow_cc -ltensorflow_framework $libs \
+	$_tflib $libs \
 	*.o \
 	-Wl,--end-group -o $elf
 
