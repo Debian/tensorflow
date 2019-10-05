@@ -679,11 +679,13 @@ def tf_cc_test(*args, **kwargs):
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
-    def refMangle(p):
+    def srcMangle(p):
         if p.startswith('//tensorflow'):
             p = re.sub('^//', '', p)
             p = re.sub(':', '/', p)
         return p
+    def depMangle(d):
+        return d
     with open(name, 'wt') as F:
         F.writelines([
             '#!/bin/bash\n',
@@ -695,7 +697,8 @@ def tf_cc_test(*args, **kwargs):
             f'elf="{name}.elf"\n'
             'src=(\n',
             ])
-        F.writelines(refMangle(x) + '\n' for x in srcs + deps)
+        F.writelines(srcMangle(x) + '\n' for x in srcs)
+        F.writelines(depMangle(x) + '\n' for x in deps)
         F.write(')\n')
         F.writelines([
             'tflib=\n',
