@@ -1,5 +1,6 @@
 #!/bin/bash
-set -ex
+set -e
+set +x
 # required variables ([*]=must)
 # src [*]
 # elf [*]
@@ -32,31 +33,44 @@ _CXX() {
 	for _s in ${src[@]}; do
 		dn=$(dirname $_s)
 		bn=$(basename $_s)
+		set -x
 		$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
+		set +x
 	done
 }
 
 _LD() {
-$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
-	${_tflib[@]} $libs \
-	${objs[@]} \
-	-Wl,--end-group -o $elf
+	echo $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
+		${_tflib[@]} $libs \
+		${objs[@]} \
+		-Wl,--end-group -o $elf
+	$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
+		${_tflib[@]} $libs \
+		${objs[@]} \
+		-Wl,--end-group -o $elf
 }
 
 _retry() {
-#$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- tensorflow/core/platform/test_main.cc
-$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs tensorflow/core/platform/test_main.cc -o tensorflow/core/platform/test_main.o
-$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
-	${_tflib[@]} $libs \
-	${objs[@]} \
-	tensorflow/core/platform/test_main.o \
-	-Wl,--end-group -o $elf
+	local xobjs=()
+	for x in ${xobjs[@]}; do
+		if [[ $x = 'tensorflow/core/platform/test_main.o' ]]; then
+			true
+		else
+			xobjs+=( $x )
+		fi
+	done
+	$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
+		${_tflib[@]} $libs \
+		${xobjs[@]} \
+		-Wl,--end-group -o $elf
 }
 
 _CXX
 _LD || _retry
 
+set -x
 ./$elf --gtest_color=yes || ./$elf
+set +x
 
 rm ${objs[@]}
 if [[ -z $_CC_NORM ]]; then
