@@ -32,8 +32,18 @@ override_dh_auto_install:
 	$(SHELL) debian/dev install-headers debian/tmp/usr/include/
 	mkdir -p $(LIBDIR)
 	-$(RM) tensorflow/*.params
-	install -vm0644 tensorflow/libtensorflow_framework.so* $(LIBDIR)
-	install -vm0644 tensorflow/libtensorflow.so* $(LIBDIR)
-	install -vm0644 tensorflow/libtensorflow_cc.so* $(LIBDIR)
+	# libtensorflow_framework.so (fundamental)
+	install -vm0644 tensorflow/libtensorflow_framework.so.2.0.0 $(LIBDIR)
+	ln -sf libtensorflow_framework.so.2.0.0 $(LIBDIR)/libtensorflow_framework.so.2
+	ln -sf libtensorflow_framework.so.2 $(LIBDIR)/libtensorflow_framework.so
+	# libtensorflow.so (C)
+	install -vm0644 tensorflow/libtensorflow.so.2.0.0 $(LIBDIR)
+	ln -sf libtensorflow.so.2.0.0 $(LIBDIR)/libtensorflow.so.2
+	ln -sf libtensorflow.so.2 $(LIBDIR)/libtensorflow.so
+	# libtensorflow_cc.so (C++)
+	install -vm0644 tensorflow/libtensorflow_cc.so.2.0.0 $(LIBDIR)
+	ln -sf libtensorflow_cc.so.2.0.0 $(LIBDIR)/libtensorflow_cc.so.2
+	ln -sf libtensorflow_cc.so.2 $(LIBDIR)/libtensorflow_cc.so
+	# pkg-config
 	install -vDm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
 	install -vDm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_pc.pc
