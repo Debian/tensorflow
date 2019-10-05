@@ -113,10 +113,15 @@ case $1 in
 	gen_cc_ops)
 		gen_cc_ops
 		;;
-	install_headers)
+	install_headers|install-headers)
+		shift
 		DESTDIR=$1
 		for I in $(cat debian/buildlogs/install_headers.log); do
-			install -vDm0644 $I $DESTDIR/$I
+			if [[ -r $I ]]; then
+				install -Dm0644 $I $DESTDIR/$I # -v
+			else
+				echo MISSING-HEADER $I
+			fi
 		done
 		;;
 	*) # used manually for develpment
