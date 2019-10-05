@@ -17,4 +17,8 @@ g++ -fPIE -pie -O2 $flags -Wl,--start-group \
 	-Wl,--end-group -o $elf
 
 ./$elf
-rm *.o $elf
+
+rm *.o
+if [[ -z $_CC_NORM ]]; then
+rm $elf
+fi
