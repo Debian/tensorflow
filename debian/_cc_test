@@ -21,7 +21,7 @@ elif [[ 'cc' = $tflib ]]; then
 fi
 
 _CXX() {
-$XE -avj0 $CXX -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
+$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- "${src[@]}"
 }
 
 _LD() {
@@ -32,7 +32,7 @@ $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 }
 
 _retry() {
-$XE -avj0 $CXX -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- tensorflow/core/platform/test_main.cc
+$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- tensorflow/core/platform/test_main.cc
 $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 	${_tflib[@]} $libs \
 	*.o \
