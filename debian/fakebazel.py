@@ -683,7 +683,8 @@ def tf_cc_test(*args, **kwargs):
     ccsrc = []
     tflib = []
     flags = ['-I.', '-I/usr/include/tensorflow']
-    libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a", '-ltensorflow_cc']
+    libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a", '-ltensorflow_cc',
+            '-lfarmhash', '-lm', '-lnsync_cpp', '-lssl']
 
     def srcProcess(p):
         if re.match('//tensorflow.*\.cc', p):
@@ -709,7 +710,6 @@ def tf_cc_test(*args, **kwargs):
             libs.append('-ltensorflow_framework')
         elif any(re.match(x, d) for x in [
                 ':test',
-                ':test_main',
                 ]):
             ccsrc.extend([
                 "tensorflow/core/util/reporter.cc",
@@ -717,6 +717,7 @@ def tf_cc_test(*args, **kwargs):
                 "tensorflow/core/platform/default/test_benchmark.cc",
                 "tensorflow/core/platform/posix/test.cc",
                 ])
+        elif re.match(':test_main', d):
             ccsrc.append("tensorflow/core/platform/test_main.cc")
         elif any(re.match(x,d) for x in [
                 '@com_google_absl.*',
