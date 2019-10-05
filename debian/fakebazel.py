@@ -496,12 +496,13 @@ class FakeBazel(object):
         print(yellow(f'  (json fore debugging stored in -> depgraph_debug.json)'))
 
 
-fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
-        'libtensorflow_framework.ninja') # fundamental
-fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
-        'libtensorflow.ninja') # C, Python
-fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
-        'libtensorflow_cc.ninja') # C++
+if __name__ == '__main__':
+    fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
+            'libtensorflow_framework.ninja') # fundamental
+    fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
+            'libtensorflow.ninja') # C, Python
+    fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
+            'libtensorflow_cc.ninja') # C++
 
 #    cursor.variable(
 #        'INCLUDES', '-I. -I./debian/embedded/eigen3 -I./third_party/eigen3/' +
