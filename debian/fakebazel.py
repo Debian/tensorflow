@@ -679,13 +679,49 @@ def tf_cc_test(*args, **kwargs):
     srcs = kwargs['srcs'] if 'srcs' in kwargs else []
     deps = kwargs['deps'] if 'deps' in kwargs else []
     print(f'BZL[{green("tf_cc_test")}] name={name} srcs={srcs} deps={deps}')
-    def srcMangle(p):
+
+    ccsrc = []
+    tflib = []
+    flags = ['-I.']
+    libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a"]
+
+    def srcProcess(p):
         if p.startswith('//tensorflow'):
             p = re.sub('^//', '', p)
             p = re.sub(':', '/', p)
-        return p
-    def depMangle(d):
-        return d
+            ccsrc.append(p)
+        else:
+            raise Exception(f"srcProcess: don't know how to understand {p}")
+
+    def depProcess(d):
+        if any(re.match(x, d) for x in [
+                ':framework',
+                ':lib',
+                ':lib_internal',
+                ]):
+            libs.append('-ltensorflow_framework')
+        elif any(re.match(x, d) for x in [
+                ':test',
+                ]):
+            ccsrc.extend([
+                "tensorflow/core/util/reporter.cc",
+                "tensorflow/core/platform/test.cc",
+                "tensorflow/core/platform/default/test_benchmark.cc",
+                "tensorflow/core/platform/posix/test.cc",
+                "tensorflow/core/platform/test_main.cc",
+                ])
+        elif re.match('@com_google_absl.*', d):
+            pass
+        else:
+            raise Exception(f"depProcess: don't know how to understand {d}")
+
+    for x in srcs:
+        srcProcess(x)
+    for x in deps:
+        depProcess(x)
+
+    ccsrc, flags, libs = list(set(ccsrc)), list(set(flags)), list(set(libs))
+
     with open(name, 'wt') as F:
         F.writelines([
             '#!/bin/bash\n',
@@ -696,14 +732,13 @@ def tf_cc_test(*args, **kwargs):
         F.writelines([
             f'elf="{name}.elf"\n'
             'src=(\n',
+            *[x + '\n' for x in ccsrc],
             ])
-        F.writelines(srcMangle(x) + '\n' for x in srcs)
-        F.writelines(depMangle(x) + '\n' for x in deps)
         F.write(')\n')
         F.writelines([
             'tflib=\n',
-            'flags="-I."\n',
-            'libs="-lpthread -lprotobuf -l:libgtest.a"\n'
+            'flags="' + ' '.join(flags) + '"\n',
+            'libs="' + ' '.join(libs) + '"\n',
             ])
         F.writelines([
             'source debian/_cc_test\n',
@@ -711,9 +746,3 @@ def tf_cc_test(*args, **kwargs):
             ])
     os.chmod(name, 0o755)
     print(f'{red("FakeBazel")}[{blue("GenTest")}] -> {green(name)}')
-
-#common=(
-#        tensorflow/core/platform/test_main.cc
-#        tensorflow/core/util/reporter.cc
-#        tensorflow/core/platform/default/test_benchmark.cc
-#        )
