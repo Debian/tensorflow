@@ -11,7 +11,7 @@ set -ex
 trap "{ rm -f *.o; }" EXIT
 
 CXX="ccache g++"
-XE=xe
+XE="xe"
 _tflib=( -ltensorflow_framework )
 
 if [[ 'c' = $tflib ]]; then
@@ -20,22 +20,36 @@ elif [[ 'cc' = $tflib ]]; then
 	_tflib+=( -ltensorflow_cc )
 fi
 
+objs=()
+for _s in ${src[@]}; do
+	dn=$(dirname $_s)
+	bn=$(basename $_s)
+	objs+=( $dn/${bn%.cc}.o )
+done
+
 _CXX() {
-$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- "${src[@]}"
+	#$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- "${src[@]}"
+	for _s in ${src[@]}; do
+		dn=$(dirname $_s)
+		bn=$(basename $_s)
+		$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs $_s -o $dn/${bn%.cc}.o
+	done
 }
 
 _LD() {
 $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 	${_tflib[@]} $libs \
-	*.o \
+	${objs[@]} \
 	-Wl,--end-group -o $elf
 }
 
 _retry() {
-$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- tensorflow/core/platform/test_main.cc
+#$XE -avj0 $CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs -- tensorflow/core/platform/test_main.cc
+$CXX -O2 -fPIC $flags -std=c++0x -c -I/usr/include/tensorflow $incs tensorflow/core/platform/test_main.cc -o tensorflow/core/platform/test_main.o
 $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 	${_tflib[@]} $libs \
-	*.o \
+	${objs[@]} \
+	tensorflow/core/platform/test_main.o \
 	-Wl,--end-group -o $elf
 }
 
@@ -44,7 +58,7 @@ _LD || _retry
 
 ./$elf 
 
-rm *.o
+rm ${objs[@]}
 if [[ -z $_CC_NORM ]]; then
 	rm $elf
 fi
