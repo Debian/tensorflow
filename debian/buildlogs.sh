@@ -4,6 +4,7 @@ set -e
 # reference: https://github.com/gentoo/gentoo/blob/master/sci-libs/tensorflow/tensorflow-2.0.0.ebuild
 
 # Dependency: bazel 0.26.1, linux, amd64
+LOGDIR=debian/buildlogs/
 
 export PYTHON_BIN_PATH=/usr/bin/python3
 export USE_DEFAULT_PYTHON_LIB_PATH=1
@@ -29,7 +30,7 @@ export TF_IGNORE_MAX_BAZEL_VERSION=1
 
 cat > .tf_configure.bazelrc <<EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
-build --action_env PYTHON_LIB_PATH="/usr/lib/python3.7/dist-packages"
+build --action_env PYTHON_LIB_PATH="/usr/lib/python3/dist-packages"
 build --python_path="/usr/bin/python3"
 build:xla --define with_xla_support=false
 build --config=xla
@@ -50,25 +51,44 @@ cat > tools/python_bin_path.sh <<EOF
 export PYTHON_BIN_PATH="/usr/bin/python3"
 EOF
 
-LOGDIR=debian/buildlogs/
-if ! test -r $LOGDIR/libtensorflow_framework.so.log; then
+# //tensorflow/tools/proto_text:gen_proto_text_functions
+
+log=$LOGDIR/libtensorflow_framework.so.log
+if ! test -r $log; then
 	bazel clean
-	bazel build --config=v2 -s //tensorflow:libtensorflow_framework.so 2>&1 | tee $LOGDIR/libtensorflow_framework.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow_framework.so 2>&1 | tee $log
 fi
-if ! test -r $LOGDIR/libtensorflow.so.log; then
+
+log=$LOGDIR/libtensorflow.so.log
+if ! test -r $log; then
 	bazel clean
-	bazel build --config=v2 -s //tensorflow:libtensorflow.so 2>&1 | tee $LOGDIR/libtensorflow.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow.so 2>&1 | tee $log
 fi
-if ! test -r $LOGDIR/libtensorflow_cc.so.log; then
+
+log=$LOGDIR/libtensorflow_cc.so.log
+if ! test -r $log; then
 	bazel clean
-	bazel build --config=v2 -s //tensorflow:libtensorflow_cc.so 2>&1 | tee $LOGDIR/libtensorflow_cc.so.log
+	bazel build --config=v2 -s //tensorflow:libtensorflow_cc.so 2>&1 | tee $log
 fi
-if ! test -r $LOGDIR/install_headers.log; then
+
+# //tensorflow/tools/lib_package:libtensorflow_test
+
+log=$LOGDIR/install_headers.log
+if ! test -r $log; then
 	bazel clean
 	bazel build --config=v2 //tensorflow:install_headers 
-	find bazel-bin/tensorflow/include -type f > $LOGDIR/install_headers.log
+	find bazel-bin/tensorflow/include -type f > $log
 fi
-if ! test -r $LOGDIR/tensorflow_tests.log; then
+
+log=$LOGDIR/pywrap_tensorflow_internal.log
+if ! test -r $log; then
 	bazel clean
-	bazel test  --config=v2 -s //tensorflow/... 2>&1 | tee $LOGDIR/tensorflow_tests.log
+	bazel build --config=v2 -s //tensorflow/python:pywrap_tensorflow_internal 2>&1 | tee $log
 fi
+
+log=$LOGDIR/build_pip_package.log
+if [[ ! -r $log ]]; then
+	bazel clean
+	bazel build --config=v2 -s //tensorflow/tools/pip_package:build_pip_package 2>&1 | tee $log
+fi
+
