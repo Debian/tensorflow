@@ -9,21 +9,21 @@ set -ex
 # incs
 # tflib \in {c, cc, f}, default=f
 
+CXX="ccache g++"
+XE=xe
+_tflib=( -ltensorflow_framework )
+
 if [[ 'c' = $tflib ]]; then
-	_tflib=(-ltensorflow_framework -ltensorflow)
+	_tflib+=( -ltensorflow )
 elif [[ 'cc' = $tflib ]]; then
-	_tflib=(-ltensorflow_framework -ltensorflow_cc)
-elif [[ 'f' = $tflib ]]; then
-	_tflib=(-ltensorflow_framework)
-else
-	_tflib=(-ltensorflow_framework)
+	_tflib+=( -ltensorflow_cc )
 fi
 
 # CXX
-xe -avj0 g++ -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
+$XE -avj0 $CXX -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
 # LD
-g++ -fPIE -pie -O2 $flags -Wl,--start-group \
-	$_tflib $libs \
+$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
+	${_tflib[@]} $libs \
 	*.o \
 	-Wl,--end-group -o $elf
 
