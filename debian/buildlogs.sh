@@ -29,7 +29,7 @@ export TF_IGNORE_MAX_BAZEL_VERSION=1
 
 cat > .tf_configure.bazelrc <<EOF
 build --action_env PYTHON_BIN_PATH="/usr/bin/python3"
-build --action_env PYTHON_LIB_PATH="/usr/lib/python3.7/dist-packages"
+build --action_env PYTHON_LIB_PATH="/usr/lib/python3/dist-packages"
 build --python_path="/usr/bin/python3"
 build:xla --define with_xla_support=false
 build --config=xla
@@ -68,7 +68,8 @@ if ! test -r $LOGDIR/install_headers.log; then
 	bazel build --config=v2 //tensorflow:install_headers 
 	find bazel-bin/tensorflow/include -type f > $LOGDIR/install_headers.log
 fi
-if ! test -r $LOGDIR/tensorflow_tests.log; then
+log=$LOGDIR/pywrap_tensorflow_internal.log
+if ! test -r $log; then
 	bazel clean
-	bazel test  --config=v2 -s //tensorflow/... 2>&1 | tee $LOGDIR/tensorflow_tests.log
+	bazel build --config=v2 -s //tensorflow/python:pywrap_tensorflow_internal 2>&1 | tee $log
 fi
