@@ -19,22 +19,13 @@ elif [[ 'cc' = $tflib ]]; then
 	_tflib+=( -ltensorflow_cc )
 fi
 
-_add_src_and_retry() {
-	$XE -avj0 $CXX -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}" tensorflow/core/platform/test_main.cc
-	$CXX -fPIE -pie -O2 $flags -Wl,--start-group \
-		${_tflib[@]} $libs \
-		*.o \
-		-Wl,--end-group \
-		-o $elf
-}
-
 # CXX
 $XE -avj0 $CXX -O2 -fPIC $flags -c -I/usr/include/tensorflow $incs -- "${src[@]}"
 # LD
 $CXX -fPIE -pie -O2 $flags -Wl,--start-group \
 	${_tflib[@]} $libs \
 	*.o \
-	-Wl,--end-group -o $elf || _add_src_and_retry
+	-Wl,--end-group -o $elf
 
 ./$elf 
 

@@ -683,7 +683,7 @@ def tf_cc_test(*args, **kwargs):
     ccsrc = []
     tflib = []
     flags = ['-I.', '-I/usr/include/tensorflow']
-    libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a"]
+    libs = ["-lpthread", "-lprotobuf", "-l:libgtest.a", '-ltensorflow_cc']
 
     def srcProcess(p):
         if re.match('//tensorflow.*\.cc', p):
