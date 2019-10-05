@@ -31,8 +31,9 @@ override_dh_auto_test:
 override_dh_auto_install:
 	$(SHELL) debian/dev install-headers debian/tmp/usr/include/
 	mkdir -p $(LIBDIR)
+	-$(RM) tensorflow/*.params
 	install -vm0644 tensorflow/libtensorflow_framework.so* $(LIBDIR)
 	install -vm0644 tensorflow/libtensorflow.so* $(LIBDIR)
 	install -vm0644 tensorflow/libtensorflow_cc.so* $(LIBDIR)
-	install -vm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
-	install -vm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_pc.pc
+	install -vDm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
+	install -vDm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_pc.pc
