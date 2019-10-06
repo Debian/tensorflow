@@ -499,12 +499,25 @@ class FakeBazel(object):
 #    )
 
 if __name__ == '__main__':
-    fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
-            'libtensorflow_framework.ninja') # fundamental
-    fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
-            'libtensorflow.ninja') # C, Python
-    fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
-            'libtensorflow_cc.ninja') # C++
+
+    # argument parser
+    ag = argparse.Argumentparser()
+    ag.add_argument('action', type=str, default='parselog')
+    ag = ag.parse_args(sys.argv[1:])
+
+    if ag.action == 'parselog':
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
+                'libtensorflow_framework.ninja') # fundamental
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
+                'libtensorflow.ninja') # C, Python
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
+                'libtensorflow_cc.ninja') # C++
+    elif ag.action == 'scanserver':
+        # Next-gen
+        pass
+    elif ag.action == 'scanclient':
+        # Next-gen
+        pass
 
 # FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL FAKE BAZEL
 

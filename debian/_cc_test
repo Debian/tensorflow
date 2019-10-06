@@ -79,9 +79,12 @@ _retry() {
 _CXX
 _LD || _retry
 
-set -x
-./$elf --gtest_color=yes || ./$elf
-set +x
+if (echo $flags | grep -q "-shared"); then
+	true
+else
+	echo ./$elf --gtest_color=yes || ./$elf
+	./$elf --gtest_color=yes || ./$elf
+fi
 
 rm ${objs[@]}
 if [[ -z $_CC_NORM ]]; then
