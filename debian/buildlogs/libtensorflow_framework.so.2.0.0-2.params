@@ -498,9 +498,6 @@ tensorflow/core/platform/cloud/ram_file_block_cache/ram_file_block_cache.pic.o
 tensorflow/core/platform/cloud/retrying_utils/retrying_utils.pic.o
 tensorflow/core/platform/cloud/time_util/time_util.pic.o
 tensorflow/core/platform/hadoop/hadoop_file_system/hadoop_file_system.pic.o
-tensorflow/core/platform/s3/aws_crypto/aws_crypto.pic.o
-tensorflow/core/platform/s3/aws_logging/aws_logging.pic.o
-tensorflow/core/platform/s3/s3_file_system/s3_file_system.pic.o
 tensorflow/core/profiler/internal/traceme_recorder/traceme_recorder.pic.o
 tensorflow/core/profiler/lib/traceme/traceme.pic.o
 tensorflow/core/util/tensor_bundle/naming/naming.pic.o
