@@ -501,8 +501,8 @@ class FakeBazel(object):
 if __name__ == '__main__':
 
     # argument parser
-    ag = argparse.Argumentparser()
-    ag.add_argument('action', type=str, default='parselog')
+    ag = argparse.ArgumentParser()
+    ag.add_argument('action', type=str, nargs='?', default='parselog')
     ag = ag.parse_args(sys.argv[1:])
 
     if ag.action == 'parselog':
