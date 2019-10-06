@@ -509,9 +509,11 @@ if __name__ == '__main__':
         fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
                 'libtensorflow_framework.ninja') # fundamental
         fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
-                'libtensorflow.ninja') # C, Python
+                'libtensorflow.ninja') # C
         fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
                 'libtensorflow_cc.ninja') # C++
+        fakeb = FakeBazel('debian/buildlogs/pywrap_tensorflow_internal.log',
+                'pywrap_tensorflow_internal.ninja')
     elif ag.action == 'scanserver':
         # Next-gen
         pass
