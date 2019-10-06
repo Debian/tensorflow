@@ -58,6 +58,7 @@ log=$LOGDIR/libtensorflow_framework.so.log
 if ! test -r $log; then
 	bazel clean
 	bazel build --config=v2 -s //tensorflow:libtensorflow_framework.so 2>&1 | tee $log
+	cp -v bazel-tensorflow/bazel-out/k8-opt/bin/tensorflow/libtensorflow_framework.so.2.0.0-2.params $LOGDIR/
 fi
 
 log=$LOGDIR/libtensorflow.so.log
