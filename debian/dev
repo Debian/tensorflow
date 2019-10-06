@@ -132,6 +132,13 @@ gentests(){
 	python3 tensorflow/core/BUILD.py
 }
 
+pyverify(){
+	mv -v /usr/local/lib/python3.7/dist-packages/tensorflow_core/libtensorflow_framework.so.2 \
+		/usr/local/lib/python3.7/dist-packages/tensorflow_core/libtensorflow_framework.so.2.back
+	cp -v /usr/lib/x86_64-linux-gnu/libtensorflow_framework.so.2 \
+		/usr/local/lib/python3.7/dist-packages/tensorflow_core/libtensorflow_framework.so.2
+}
+
 case $1 in
 	configure|fake) # used in debian/rules
 		configure
@@ -154,8 +161,11 @@ case $1 in
 	gentests)
 		gentests
 		;;
-	*) # used manually for develpment
+	"") # used manually for develpment
 		configure
 		build
+		;;
+	*)
+		$1
 		;;
 esac
