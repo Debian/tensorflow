@@ -60,10 +60,11 @@ class FilterLog(object):
         return cmdlines
     @staticmethod
     def dirMangle(path: str):
+        path = path.replace('bazel-out/k8-opt/bin/', '')
         path = path.replace('bazel-out/k8-opt/bin', './')
+        path = path.replace('bazel-out/host/bin/', '')
         path = path.replace('bazel-out/host/bin', './')
         path = path.replace('/_objs/', '/')
-        path = path.replace('.//external/com_google_protobuf/protoc', './external/com_google_protobuf/protoc')
         return path
     @staticmethod
     def cleanCmdlines(cmdlines: list) -> List[str]:
@@ -88,7 +89,7 @@ class FilterLog(object):
             if any(line.startswith(x) for x in [
                 '/usr/lib/ccache/gcc',
                 '/bin/bash',
-                './external/com_google_protobuf/protoc',
+                'external/com_google_protobuf/protoc',
                 ]):
                 pass
             else:

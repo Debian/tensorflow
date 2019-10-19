@@ -181,7 +181,7 @@ class FakeBazel(object):
             elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
                 # we don't need this assember
                 continue
-            elif cmd.startswith('bazel-out/host/bin/external/com_google_protobuf/protoc'):
+            elif cmd.startswith('./external/com_google_protobuf/protoc'):
                 # it's a protobuf compiler command
                 target = {'type': 'PROTOC', 'proto': [], 'flags': []}
                 tokens = shlex.split(cmd)
