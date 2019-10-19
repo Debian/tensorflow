@@ -329,7 +329,7 @@ class FakeBazel(object):
                 G.append(t)
         return G
     @staticmethod
-    def generateNinja(depgraph: str, dest: str):
+    def generateNinja(depgraph: str, dest: str, default: str):
         '''
         Generate the NINJA file from the given depgraph
         '''
@@ -477,8 +477,11 @@ class FakeBazel(object):
                     print('MISSING', t)
             else:
                 print('MISSING', t)
+        if default is not None:
+            F.default(default)
         F.close()
-    def __init__(self, path: str, dest: str = 'build.ninja'):
+    def __init__(self, path: str, dest: str = 'build.ninja',
+            default: str = None):
         print(cyan(f'* Parsing {path} ...'))
         sys.stdout.flush()
         cmdlines = self.parseBuildlog(path)
@@ -489,7 +492,7 @@ class FakeBazel(object):
         print(f'  -> {len(depgraph)} rinsed targets')
         depgraph = self.dedupGraph(depgraph)
         print(f'  -> {len(depgraph)} deduped targets')
-        self.generateNinja(depgraph, dest)
+        self.generateNinja(depgraph, dest, default)
         print(f'  -> Generated Ninja file {dest}')
         json.dump(depgraph, open('depgraph_debug.json', 'wt'), indent=4)
         print(yellow(f'  (json fore debugging stored in -> depgraph_debug.json)'))
@@ -507,11 +510,14 @@ if __name__ == '__main__':
 
     if ag.action == 'parselog':
         fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
-                'libtensorflow_framework.ninja') # fundamental
+                'libtensorflow_framework.ninja',
+                'libtensorflow_framework.so.2') # fundamental
         fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
-                'libtensorflow.ninja') # C
+                'libtensorflow.ninja',
+                'libtensorflow.so.2') # C
         fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
-                'libtensorflow_cc.ninja') # C++
+                'libtensorflow_cc.ninja',
+                'libtensorflow_cc.so.2') # C++
         fakeb = FakeBazel('debian/buildlogs/pywrap_tensorflow_internal.log',
                 'pywrap_tensorflow_internal.ninja')
     elif ag.action == 'scanserver':
