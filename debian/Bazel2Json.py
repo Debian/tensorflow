@@ -1,5 +1,5 @@
 #!/usr/bin/pypy3
-# FilterLog
+# Bazel2Json
 # Copyright (C) 2019 Mo Zhou <lumin@debian.org>
 #License: Expat
 # Permission is hereby granted, free of charge, to any person obtaining a

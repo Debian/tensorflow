@@ -20,8 +20,24 @@ Differences between this build and upstream's standard bazel build
 4. aws sdk or amazon s3 related stuff are excluded from the build.
 EOF
 
-_filter(){
+_bazel2json(){
 	$PY debian/Bazel2Json.py -i ${1} -o ${1%.log}.json
+}
+_json2ninja(){
+	i="$1"
+	if test "$i" = 'debian/buildlogs/libtensorflow_framework.so.json'; then
+		o='libtensorflow_framework.ninja'
+		d='libtensorflow_framework.so.2'
+	elif test "$i" = 'debian/buildlogs/libtensorflow.so.json'; then
+		o='libtensorflow.ninja'
+		d='libtensorflow.so.2'
+	elif test "$i" = 'debian/buildlogs/libtensorflow_cc.so.json'; then
+		o='libtensorflow_cc.ninja'
+		d='libtensorflow_cc.so.2'
+	else
+		echo ???????????
+	fi
+	$PY debian/Json2Ninja.py -i $i -o $o -d $d
 }
 
 configure() {
@@ -47,10 +63,14 @@ configure() {
 			$I
 		cp $I tensorflow/cc/ops
 	done
-	echo [[[ Bazel2Json ]]]
-	_filter debian/buildlogs/libtensorflow_cc.so.log
-	_filter debian/buildlogs/libtensorflow_framework.so.log
-	_filter debian/buildlogs/libtensorflow.so.log
+	_bazel2json debian/buildlogs/libtensorflow_framework.so.log
+	_json2ninja debian/buildlogs/libtensorflow_framework.so.json
+
+	_bazel2json debian/buildlogs/libtensorflow.so.log
+	_json2ninja debian/buildlogs/libtensorflow.so.json
+
+	_bazel2json debian/buildlogs/libtensorflow_cc.so.log
+	_json2ninja debian/buildlogs/libtensorflow_cc.so.json
 }
 
 # trigger build
