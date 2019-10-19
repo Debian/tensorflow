@@ -45,40 +45,6 @@ def cyan(s: str) -> str: return f'\033[1;36m{s}\033[0;m'
 
 class FakeBazel(object):
     @staticmethod
-    def dirMangle(path: str):
-        path = path.replace('bazel-out/k8-opt/bin/', '')
-        path = path.replace('bazel-out/k8-opt/bin', './')
-        path = path.replace('bazel-out/host/bin/', '')
-        path = path.replace('bazel-out/host/bin', './')
-        path = path.replace('/_objs/', '/')
-        return path
-    @staticmethod
-    def parseBuildlog(path: str) -> List[str]:
-        '''
-        Read the Bazel buildlog (bazel build -s //tensorflow:xxx 2>&1 | tee log),
-        collect all the command lines inside it and return the cmdline list.
-        '''
-        cmdlines = []
-        lines = open(path, 'rt').readlines()
-        states = [0, 0] # (anther SUBCOMMAND, bracket balance)
-        for line in lines:
-            if line.startswith('#') and line.endswith(')'): continue
-            if line.startswith('WARNING:'): continue
-            line = line.strip()
-            if line.startswith('SUBCOMMAND'):
-                if states[0] == 1:
-                    states[0] = 0
-            if line.endswith(')') and not line.endswith('__)') and \
-                    not line.startswith('#') and not line.endswith('configured)'):
-                if 'EOF' in line:
-                    states[0] = 1
-                elif states[0] == 0:
-                    cmdlines.append(re.sub('\)$', '', line))
-                    states[0] = 1
-                else:
-                    pass
-        return cmdlines
-    @staticmethod
     def understandCmdlines(cmdlines: List[str]) -> (List):
         '''
         Understand the command lines and rebuild the dependency graph.
@@ -174,7 +140,7 @@ class FakeBazel(object):
                             #target['flags'].extend([t, '-DENABLE_MKLDNN_V1'])
                             pass
                         else:
-                            target['flags'].append(FakeBazel.dirMangle(t))
+                            target['flags'].append(t)
                     elif re.match('-iquote', t) or re.match('-iquote', tokens[i-1]):
                         pass
                     elif re.match('-isystem', t) or re.match('-isystem', tokens[i-1]):
@@ -191,11 +157,11 @@ class FakeBazel(object):
                     elif re.match('.*\.d$', t):
                         pass
                     elif re.match('.*\.c[cp]?p?$', t):
-                        target['src'].append(FakeBazel.dirMangle(t))
+                        target['src'].append(t)
                     elif re.match('.*\.S$', t):
-                        target['src'].append(FakeBazel.dirMangle(t))
+                        target['src'].append(t)
                     elif re.match('-o', tokens[i-1]):
-                        target['obj'].append(FakeBazel.dirMangle(t))
+                        target['obj'].append(t)
                     else:
                         raise Exception(f'what is {t}? prev={tokens[i-1]} next={tokens[i+1]} full={tokens}')
                 if DEBUG: print(target)
@@ -223,11 +189,11 @@ class FakeBazel(object):
                     if re.match('-I.*', t):
                         pass
                     elif re.match('--cpp_out=.*', t):
-                        target['flags'].append(FakeBazel.dirMangle(t))
+                        target['flags'].append(t)
                     elif re.match('--grpc_out=.*', t):
-                        target['flags'].append(FakeBazel.dirMangle(t))
+                        target['flags'].append(t)
                     elif re.match('.*\.proto$', t):
-                        target['proto'].append(FakeBazel.dirMangle(t))
+                        target['proto'].append(t)
                     elif re.match('--plugin=protoc-gen-grpc=\S*', t):
                         target['flags'].append('--plugin=protoc-gen-grpc=/usr/bin/grpc_cpp_plugin')
                     else:
@@ -460,10 +426,10 @@ class FakeBazel(object):
                 elif all(x in t['cmd'] for x in ['libtensorflow_framework.so', 'ln -sf']):
                     pass
                 else:
-                    print('MISSING', FakeBazel.dirMangle(t['cmd']))
+                    print('MISSING', t['cmd'])
             elif t['type'] == 'SHELL':
                 # sh
-                sh = FakeBazel.dirMangle(t['sh'])
+                sh = t['sh']
                 if re.match('.*tensorflow/cc.*rule.genrule_script\.sh$', sh):
                     depexe = re.sub('tensorflow/cc/(.*?)_genrule.genrule_script.sh$',
                             'tensorflow/cc/ops/\\1_gen_cc', sh)
@@ -484,7 +450,7 @@ class FakeBazel(object):
             default: str = None):
         print(cyan(f'* Parsing {path} ...'))
         sys.stdout.flush()
-        cmdlines = self.parseBuildlog(path)
+        cmdlines = json.load(open(path, 'rt'))
         depgraph = self.understandCmdlines(cmdlines)
         print(f'  -> {len(cmdlines)} command lines -> {len(depgraph)} targets')
         sys.stdout.flush()
@@ -509,17 +475,17 @@ if __name__ == '__main__':
     ag = ag.parse_args(sys.argv[1:])
 
     if ag.action == 'parselog':
-        fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.log',
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow_framework.so.json',
                 'libtensorflow_framework.ninja',
                 'libtensorflow_framework.so.2') # fundamental
-        fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.log',
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow.so.json',
                 'libtensorflow.ninja',
                 'libtensorflow.so.2') # C
-        fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.log',
+        fakeb = FakeBazel('debian/buildlogs/libtensorflow_cc.so.json',
                 'libtensorflow_cc.ninja',
                 'libtensorflow_cc.so.2') # C++
-        fakeb = FakeBazel('debian/buildlogs/pywrap_tensorflow_internal.log',
-                'pywrap_tensorflow_internal.ninja')
+        #fakeb = FakeBazel('debian/buildlogs/pywrap_tensorflow_internal.json',
+        #        'pywrap_tensorflow_internal.ninja')
     elif ag.action == 'scanserver':
         # Next-gen
         pass

@@ -98,7 +98,13 @@ class FilterLog(object):
         cmdlines = self.cleanCmdlines(cmdlines)
         self.sanityTest(cmdlines)
         json.dump(cmdlines, open(dest, 'wt'), indent=4)
+        print(green(f'Bazel2Json: {path} -> {dest}'))
 
 if __name__ == '__main__':
 
-    FilterLog(sys.argv[1], sys.argv[2])
+    ag = argparse.ArgumentParser()
+    ag.add_argument('-i', '--input', type=str, required=True)
+    ag.add_argument('-o', '--output', type=str, required=True)
+    ag = ag.parse_args(sys.argv[1:])
+
+    FilterLog(ag.input, ag.output)
