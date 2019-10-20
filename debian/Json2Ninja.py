@@ -405,7 +405,7 @@ class FakeBazel(object):
                 src = '' if len(src)<1 else src[0]
                 obj = obj[0]
                 if re.match('.*\.c$', src) and obj.endswith('.o'):
-                    F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protoc_all_cc'])
+                    F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                 elif re.match('.*\.cc$', src) and obj.endswith('.o'):
                     if os.path.exists(src):
                         ccdeps = FakeBazel.ccDeps(src)
