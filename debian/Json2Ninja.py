@@ -147,6 +147,9 @@ class FakeBazel(object):
                         '-Wl,-rpath,.*',
                         ]):
                         pass
+                    elif re.match('-Wl,--version-script', t) or re.match('-Wl,--version-script', tokens[i-1]):
+                        if t != '-Wl,--version-script':
+                            target['flags'].extend(['-Wl,--version-script', t])
                     elif any(re.match(r, t) for r in [
                         '-D\S+', '-pthread', '-fPIC', '-std=.*', '-Wl.*',
                         '-pass-exit-codes', '-shared',
@@ -174,6 +177,8 @@ class FakeBazel(object):
                     elif re.match('.*\.d$', t):
                         pass
                     elif re.match('.*\.c[cp]?p?$', t):
+                        target['src'].append(t)
+                    elif re.match('.*\.cxx$', t):
                         target['src'].append(t)
                     elif re.match('.*\.S$', t):
                         target['src'].append(t)
@@ -222,14 +227,24 @@ class FakeBazel(object):
                 target = {'type': 'SWIG', 'src': [], 'dest': [], 'flags': []}
                 tokens = shlex.split(cmd)
                 for (i, token) in enumerate(tokens[1:]):
-                    if any(token == '-c++', token == '-python'):
+                    if any((token == '-c++', token == '-python')):
                         target['flags'].append(token)
+                    elif any((token=='-module', token=='-o', token=='-outdir')):
+                        pass
                     elif tokens[i] == '-module':
                         target['flags'].extend(['-module', token])
                     elif tokens[i] == '-o':
                         target['dest'] = token
+                    elif tokens[i] == '-outdir':
+                        target['flags'].extend(['-outdir', token])
+                    elif re.match('-ltensorflow.*', token):
+                        target['flags'].append(token)
+                    elif re.match('-I.*', token):
+                        target['flags'].append(token)
+                    elif re.match('.*\.i$', token):
+                        target['src'] = token
                     else:
-                        raise Exception(f'SWIG: what is {token}?')
+                        raise Exception(f'SWIG: what is {token}? CMD: {cmd}')
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
@@ -288,6 +303,7 @@ class FakeBazel(object):
                         'external/png_archive.*',
                         'external/org_sqlite.*',
                         'third_party/icu.*',
+                        'external/swig.*',
                         ]):
                     continue
                 elif any(re.match(r, t['src'][0]) for r in [
