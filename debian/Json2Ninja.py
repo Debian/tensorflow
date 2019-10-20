@@ -147,7 +147,7 @@ class FakeBazel(object):
                         '-Wl,-rpath,.*',
                         ]):
                         pass
-                    elif re.match('-Wl,--version-script', t) or re.match('-Wl,--version-script', tokens[i-1]):
+                    elif re.match('^-Wl,--version-script$', t) or re.match('^-Wl,--version-script$', tokens[i-1]):
                         if t != '-Wl,--version-script':
                             target['flags'].extend(['-Wl,--version-script', t])
                     elif any(re.match(r, t) for r in [
