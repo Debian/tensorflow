@@ -107,7 +107,7 @@ class FakeBazel(object):
                         '-m.*', '-U_FORTIFY_SOURCE.*',
                         "-D__TIME__=.*?", "-D__TIMESTAMP__=.*?",
                         "-D__DATE__=.*?", '-Iexternal/.*', '-I.',
-                        '-B.*', '-Lbazel-out.*',
+                        '-B.*', '-Lbazel-out.*', '-L.*',
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
@@ -226,8 +226,10 @@ class FakeBazel(object):
         read cxx file and extract dependency information
         '''
         deps = []
-        for line in open(cc, 'rt').readlines():
+        f = open(cc, 'rt')
+        for line in f.readlines():
             deps.extend(re.findall('#include\s+"(tensorflow/\S+)"', line))
+        f.close()
         return deps
     @staticmethod
     def rinseGraph(depgraph: List[str]) -> List[str]:
