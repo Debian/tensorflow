@@ -21,6 +21,7 @@ Differences between this build and upstream's standard bazel build
 EOF
 
 _bazel2json(){
+	echo $PY debian/Bazel2Json.py -i ${1} -o ${1%.log}.json
 	$PY debian/Bazel2Json.py -i ${1} -o ${1%.log}.json
 }
 _json2ninja(){
@@ -34,9 +35,13 @@ _json2ninja(){
 	elif test "$i" = 'debian/buildlogs/libtensorflow_cc.so.json'; then
 		o='libtensorflow_cc.ninja'
 		d='libtensorflow_cc.so.2'
+	elif test "$i" = 'debian/buildlogs/pywrap_tensorflow_internal.json'; then
+		o='pywrap.ninja'
+		d='_pywrap_tensorflow_internal.so'
 	else
 		echo ???????????
 	fi
+	echo $PY debian/Json2Ninja.py -i $i -o $o -d $d
 	$PY debian/Json2Ninja.py -i $i -o $o -d $d
 }
 
