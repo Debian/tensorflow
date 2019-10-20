@@ -310,12 +310,14 @@ class FakeBazel(object):
                     '.*tensorflow/core/platform/s3/.*',
                         ]):
                     continue
-            if 'CMD' == t['type']:
+            elif 'CMD' == t['type']:
                 if 'external/jpeg' in t['cmd']: continue
                 if 'external/snappy' in t['cmd']: continue
                 if 'external/com_google_protobuf' in t['cmd']: continue
                 if 'external/nasm' in t['cmd']: continue
                 if 'external/png_archive/scripts/pnglibconf.h.prebuilt' in t['cmd']: continue
+            else:
+                pass
             G.append(t)
         for t in G:
             if t['type'] == 'CXX':
