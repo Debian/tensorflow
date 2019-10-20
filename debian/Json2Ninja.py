@@ -515,7 +515,7 @@ class FakeBazel(object):
                     print('MISSING', t)
             elif t['type'] == 'SWIG':
                 # swig
-                F.build(t['dest'], 'SWIG', t['src'], variables={'flags': flags})
+                F.build(t['dest'], 'SWIG', t['src'], variables={'flags': t['flags']})
             else:
                 print('MISSING', t)
         if default is not None:
