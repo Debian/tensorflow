@@ -245,6 +245,7 @@ class FakeBazel(object):
                         target['src'] = token
                     else:
                         raise Exception(f'SWIG: what is {token}? CMD: {cmd}')
+                depgraph.append(target)
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
@@ -372,6 +373,7 @@ class FakeBazel(object):
         F.comment(f'rules')
         F.rule('PROTOC', 'protoc -I. $in $flags')
         F.rule('CXX', CCACHE+'$CXX $CPPFLAGS $CXXFLAGS -I. -Iexternal -Iexternal/eigen3 -Ithird_party/eigen3 -Iexternal/com_google_absl -I/usr/include/gemmlowp -O2 -fPIC $flags -c -o $out $in')
+        F.rule('SWIG', 'swig -I. $flags $in -o $out')
         F.rule('CXXEXEC', CCACHE+'$CXX $LDFLAGS -I. -Ltensorflow -O2 -fPIE -pie $flags -o $out $in')
         F.rule('CXXSO', CCACHE+'$CXX $LDFLAGS -shared -fPIC -Ltensorflow $flags -o $out $in')
         F.rule('MKDIR', 'mkdir -p $out')
@@ -511,6 +513,9 @@ class FakeBazel(object):
                     pass
                 else:
                     print('MISSING', t)
+            elif t['type'] == 'SWIG':
+                # swig
+                F.build(t['dest'], 'SWIG', t['src'], variables={'flags': flags})
             else:
                 print('MISSING', t)
         if default is not None:
