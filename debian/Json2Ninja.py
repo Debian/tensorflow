@@ -35,6 +35,51 @@ inputs2_proto_text = """
 tensorflow/core tensorflow/core/ tensorflow/core/example/example.proto tensorflow/core/example/feature.proto tensorflow/core/framework/allocation_description.proto tensorflow/core/framework/api_def.proto tensorflow/core/framework/attr_value.proto tensorflow/core/framework/cost_graph.proto tensorflow/core/framework/device_attributes.proto tensorflow/core/framework/function.proto tensorflow/core/framework/graph.proto tensorflow/core/framework/graph_transfer_info.proto tensorflow/core/framework/kernel_def.proto tensorflow/core/framework/log_memory.proto tensorflow/core/framework/node_def.proto tensorflow/core/framework/op_def.proto tensorflow/core/framework/reader_base.proto tensorflow/core/framework/remote_fused_graph_execute_info.proto tensorflow/core/framework/resource_handle.proto tensorflow/core/framework/step_stats.proto tensorflow/core/framework/summary.proto tensorflow/core/framework/tensor.proto tensorflow/core/framework/tensor_description.proto tensorflow/core/framework/tensor_shape.proto tensorflow/core/framework/tensor_slice.proto tensorflow/core/framework/types.proto tensorflow/core/framework/variable.proto tensorflow/core/framework/versions.proto tensorflow/core/protobuf/config.proto tensorflow/core/protobuf/cluster.proto tensorflow/core/protobuf/debug.proto tensorflow/core/protobuf/device_properties.proto tensorflow/core/protobuf/graph_debug_info.proto tensorflow/core/protobuf/queue_runner.proto tensorflow/core/protobuf/rewriter_config.proto tensorflow/core/protobuf/tensor_bundle.proto tensorflow/core/protobuf/saver.proto tensorflow/core/protobuf/verifier_config.proto tensorflow/core/protobuf/trace_events.proto tensorflow/core/util/event.proto tensorflow/core/util/memmapped_file_system.proto tensorflow/core/util/saved_tensor_slice.proto tensorflow/core/lib/core/error_codes.proto tensorflow/tools/proto_text/placeholder.txt
 """.split()
 
+proto_text_h = """
+tensorflow/core/example/example.pb_text.h
+tensorflow/core/example/feature.pb_text.h
+tensorflow/core/framework/allocation_description.pb_text.h
+tensorflow/core/framework/api_def.pb_text.h
+tensorflow/core/framework/attr_value.pb_text.h
+tensorflow/core/framework/cost_graph.pb_text.h
+tensorflow/core/framework/device_attributes.pb_text.h
+tensorflow/core/framework/function.pb_text.h
+tensorflow/core/framework/graph.pb_text.h
+tensorflow/core/framework/graph_transfer_info.pb_text.h
+tensorflow/core/framework/kernel_def.pb_text.h
+tensorflow/core/framework/log_memory.pb_text.h
+tensorflow/core/framework/node_def.pb_text.h
+tensorflow/core/framework/op_def.pb_text.h
+tensorflow/core/framework/reader_base.pb_text.h
+tensorflow/core/framework/remote_fused_graph_execute_info.pb_text.h
+tensorflow/core/framework/resource_handle.pb_text.h
+tensorflow/core/framework/step_stats.pb_text.h
+tensorflow/core/framework/summary.pb_text.h
+tensorflow/core/framework/tensor.pb_text.h
+tensorflow/core/framework/tensor_description.pb_text.h
+tensorflow/core/framework/tensor_shape.pb_text.h
+tensorflow/core/framework/tensor_slice.pb_text.h
+tensorflow/core/framework/types.pb_text.h
+tensorflow/core/framework/variable.pb_text.h
+tensorflow/core/framework/versions.pb_text.h
+tensorflow/core/lib/core/error_codes.pb_text.h
+tensorflow/core/protobuf/cluster.pb_text.h
+tensorflow/core/protobuf/config.pb_text.h
+tensorflow/core/protobuf/debug.pb_text.h
+tensorflow/core/protobuf/device_properties.pb_text.h
+tensorflow/core/protobuf/graph_debug_info.pb_text.h
+tensorflow/core/protobuf/queue_runner.pb_text.h
+tensorflow/core/protobuf/rewriter_config.pb_text.h
+tensorflow/core/protobuf/saver.pb_text.h
+tensorflow/core/protobuf/tensor_bundle.pb_text.h
+tensorflow/core/protobuf/trace_events.pb_text.h
+tensorflow/core/protobuf/verifier_config.pb_text.h
+tensorflow/core/util/event.pb_text.h
+tensorflow/core/util/memmapped_file_system.pb_text.h
+tensorflow/core/util/saved_tensor_slice.pb_text.h
+""".split()
+proto_text_cc = [re.sub('\.h$', '.cc', x) for x in proto_text_h]
+
 
 def red(s: str) -> str: return f'\033[1;31m{s}\033[0;m'
 def green(s: str) -> str: return f'\033[1;32m{s}\033[0;m'
@@ -58,22 +103,11 @@ class FakeBazel(object):
                 tokens = shlex.split(cmd)
                 for (i,t) in enumerate(tokens[1:], 1):
                     if any(re.match(r, t) for r in [
-                        '-g\d',
-                        '-c',
-                        '-o',
-                        '-O\d',
-                        '-Os',
-                        '-M\w',
-                        '-m.*',
-                        '-U_FORTIFY_SOURCE',
-                        "-D__TIME__=.*?",
-                        "-D__TIMESTAMP__=.*?",
-                        "-D__DATE__=.*?",
-                        '-D_FORTIFY_SOURCE=1',
-                        '-Iexternal/.*',
-                        '-I.',
-                        '-B.*',
-                        '-Lbazel-out.*',
+                        '-g\d', '-c', '-o', '-O\d', '-Os', '-M\w',
+                        '-m.*', '-U_FORTIFY_SOURCE.*',
+                        "-D__TIME__=.*?", "-D__TIMESTAMP__=.*?",
+                        "-D__DATE__=.*?", '-Iexternal/.*', '-I.',
+                        '-B.*', '-Lbazel-out.*',
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
@@ -91,48 +125,31 @@ class FakeBazel(object):
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
-                        '-Wall',
-                        '-Woverloaded-virtual',
+                        '-Wall', '-Woverloaded-virtual',
                         '-Wunused-but-set-parameter',
                         '-Wno-free-nonheap-object',
                         '-Wno-shift-negative-value',
                         '-Wno-builtin-macro-redefined',
-                        '-Wno-sign-compare',
-                        '-Wno-unused-function',
-                        '-Wno-write-strings',
-                        '-Wextra',
-                        '-Wcast-qual',
+                        '-Wno-sign-compare', '-Wno-unused-function',
+                        '-Wno-write-strings', '-Wextra', '-Wcast-qual',
                         '-Wconversion-null',
                         '-Wmissing-declarations',
                         '-Woverlength-strings',
                         '-Wpointer-arith',
                         '-Wunused-local-typedefs',
-                        '-Wunused-result',
-                        '-Wvarargs',
-                        '-Wvla',
+                        '-Wunused-result', '-Wvarargs', '-Wvla',
                         '-Wwrite-strings',
                         '-Wno-missing-field-initializers',
-                        '-Wa,--noexecstack',
-                        '-Werror',
-                        '-Wformat=.*',
-                        '-Wsign-compare',
-                        '-Wmissing.*',
-                        '-Wshadow.*',
-                        '-Wold-st.*',
-                        '-Wstrict.*',
-                        '-Wno.*',
+                        '-Wa,--noexecstack', '-Werror', '-Wformat=.*',
+                        '-Wsign-compare', '-Wmissing.*', '-Wshadow.*',
+                        '-Wold-st.*', '-Wstrict.*', '-Wno.*',
                         '-w', # Inhibit all warning messages. https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#Warning-Options
                         '-Wl,-rpath,.*',
                         ]):
                         pass
                     elif any(re.match(r, t) for r in [
-                        '-D\S+',
-                        '-pthread',
-                        '-fPIC',
-                        '-std=.*',
-                        '-Wl.*',
-                        '-pass-exit-codes',
-                        '-shared',
+                        '-D\S+', '-pthread', '-fPIC', '-std=.*', '-Wl.*',
+                        '-pass-exit-codes', '-shared',
                         ]):
                         if '-DTENSORFLOW_USE_MKLDNN_CONTRACTION_KERNEL' in t:
                             # we have mkldnn 1.X, but the reference build use 0.X
@@ -178,7 +195,7 @@ class FakeBazel(object):
                 target['sh'] = shlex.split(cmd)[-1]
                 if DEBUG: print(target)
                 depgraph.append(target)
-            elif cmd.startswith('bazel-out/host/bin/external/nasm/nasm'):
+            elif cmd.startswith('external/nasm/nasm'):
                 # we don't need this assember
                 continue
             elif cmd.startswith('external/com_google_protobuf/protoc'):
@@ -203,6 +220,15 @@ class FakeBazel(object):
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
+    @staticmethod
+    def ccDeps(cc: str) -> List[str]:
+        '''
+        read cxx file and extract dependency information
+        '''
+        deps = []
+        for line in open(cc, 'rt').readlines():
+            deps.extend(re.findall('#include\s+"(tensorflow/\S+)"', line))
+        return deps
     @staticmethod
     def rinseGraph(depgraph: List[str]) -> List[str]:
         '''
@@ -332,6 +358,7 @@ class FakeBazel(object):
         F.build('inputs2_proto_text', 'PROTO_TEXT', inputs2_proto_text,
                 implicit='gen_proto_text_functions')
         F.build('proto_text_all_cc', 'phony', ['inputs1_proto_text', 'inputs2_proto_text'])
+        F.build(proto_text_h + proto_text_cc, 'phony', 'proto_text_all_cc')
         # small targets
         for t in depgraph:
             if t['type'] == 'CXX':
@@ -345,13 +372,17 @@ class FakeBazel(object):
                 if re.match('.*\.c$', src) and obj.endswith('.o'):
                     F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protoc_all_cc'])
                 elif re.match('.*\.cc$', src) and obj.endswith('.o'):
-                    if re.match('.*\.pb\.cc$', src):
-                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc', src])
-                    elif re.match('.*\.pb_text\.cc', src):
-                        F.build(src, 'phony', 'proto_text_all_cc', implicit=['protos_all_cc'])
-                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
+                    if os.path.exists(src):
+                        ccdeps = FakeBazel.ccDeps(src)
                     else:
-                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
+                        ccdeps = []
+                    if re.match('.*\.pb\.cc$', src):
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc', src, *ccdeps])
+                    elif re.match('.*\.pb_text\.cc', src):
+                        #F.build(src, 'phony', 'proto_text_all_cc', implicit=['protos_all_cc'])
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc', *ccdeps])
+                    else:
+                        F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc', *ccdeps])
                 elif re.match('.*\.cpp$', src) and obj.endswith('.o'):
                     F.build(obj, 'CXX', src, variables={'flags': flags}, implicit=['protos_all_cc'])
                 elif re.match('.*gen_proto_text_functions.*', obj):
@@ -426,7 +457,7 @@ class FakeBazel(object):
                 elif all(x in t['cmd'] for x in ['libtensorflow_framework.so', 'ln -sf']):
                     pass
                 else:
-                    print('MISSING', t['cmd'])
+                    print('MISSING', t)
             elif t['type'] == 'SHELL':
                 # sh
                 sh = t['sh']
@@ -449,10 +480,13 @@ class FakeBazel(object):
     def __init__(self, path: str, dest: str, default: str = None):
         sys.stdout.flush()
         cmdlines = json.load(open(path, 'rt'))
+        print(f'{__file__}: (understand)')
         depgraph = self.understandCmdlines(cmdlines)
         sys.stdout.flush()
+        print(f'{__file__}: (rinse)')
         depgraph = self.rinseGraph(depgraph)
         depgraph = self.dedupGraph(depgraph)
+        print(f'{__file__}: (generate)')
         self.generateNinja(depgraph, dest, default)
         print(green(f'Json2Ninja: {path} -> {dest} [{default}]'))
 
