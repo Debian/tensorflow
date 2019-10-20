@@ -76,6 +76,7 @@ class FilterLog(object):
             if DEBUG: print(line)
             if "EOF'" in line: continue
             if "done'" in line: continue
+            if "'" == line: continue
             line = ' '.join(shlex.split(line))
             line = FilterLog.dirMangle(line)
             lines.append(line)
@@ -90,6 +91,7 @@ class FilterLog(object):
                 '/usr/lib/ccache/gcc',
                 '/bin/bash',
                 'external/com_google_protobuf/protoc',
+                'external/swig/swig',
                 ]):
                 pass
             else:

@@ -71,6 +71,9 @@ configure() {
 
 	_bazel2json debian/buildlogs/libtensorflow_cc.so.log
 	_json2ninja debian/buildlogs/libtensorflow_cc.so.json
+
+	DEBUG=1 _bazel2json debian/buildlogs/pywrap_tensorflow_internal.log
+	_json2ninja debian/buildlogs/pywrap_tensorflow_internal.json
 }
 
 # trigger build

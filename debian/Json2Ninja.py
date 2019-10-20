@@ -217,6 +217,19 @@ class FakeBazel(object):
                         raise Exception(f'what is {t} in {cmd}?')
                 if DEBUG: print(target)
                 depgraph.append(target)
+            elif cmd.startswith('external/swig/swig'):
+                # it's a swig command
+                target = {'type': 'SWIG', 'src': [], 'dest': [], 'flags': []}
+                tokens = shlex.split(cmd)
+                for (i, token) in enumerate(tokens[1:]):
+                    if any(token == '-c++', token == '-python'):
+                        target['flags'].append(token)
+                    elif tokens[i] == '-module':
+                        target['flags'].extend(['-module', token])
+                    elif tokens[i] == '-o':
+                        target['dest'] = token
+                    else:
+                        raise Exception(f'SWIG: what is {token}?')
             else:
                 raise Exception(f"cannot understand: {cmd}")
         return depgraph
