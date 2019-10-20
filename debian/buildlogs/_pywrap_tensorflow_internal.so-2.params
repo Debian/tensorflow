@@ -141,7 +141,6 @@ tensorflow/cc/math_ops_internal/math_ops_internal.pic.o
 tensorflow/cc/nn_grad/nn_grad.pic.o
 tensorflow/cc/ops/ops.pic.o
 tensorflow/cc/queue_runner/queue_runner.pic.o
-tensorflow/cc/remote_fused_graph_ops/remote_fused_graph_ops.pic.o
 tensorflow/cc/scope/scope.pic.o
 tensorflow/cc/while_loop/while_loop.pic.o
 tensorflow/compiler/jit/flags/flags.pic.o
