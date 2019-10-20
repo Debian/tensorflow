@@ -305,7 +305,6 @@ class FakeBazel(object):
                         'external/org_sqlite.*',
                         'third_party/icu.*',
                         'external/swig.*',
-                        'tensorflow/lite/.*',
                         ]):
                     continue
                 elif any(re.match(r, t['src'][0]) for r in [
