@@ -11,5 +11,5 @@ tensorflow/cc/framework/cc_op_gen.cc
 elf=tf_core_test.elf
 flags=
 
-source debian/_cc_test
+source debian/tests/_cc_test
 exit 0

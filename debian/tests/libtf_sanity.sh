@@ -8,5 +8,5 @@ elf=libtensorflow_test.elf
 flags=
 tflib=c
 
-source debian/_cc_test
+source debian/tests/_cc_test
 exit 0

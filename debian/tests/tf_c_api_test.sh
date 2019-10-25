@@ -15,5 +15,5 @@ tensorflow/core/platform/default/test_benchmark.cc
 elf=tf_c_api_test.elf
 flags=
 
-source debian/_c_test
+source debian/tests/_cc_test
 exit 0

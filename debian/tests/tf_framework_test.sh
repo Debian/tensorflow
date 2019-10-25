@@ -11,5 +11,5 @@ tensorflow/core/util/reporter.cc
 elf=tf_framework_test.elf
 flags=
 
-source debian/_framework_test
+source debian/_cc_test
 exit 0
