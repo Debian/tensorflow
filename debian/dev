@@ -20,6 +20,11 @@ Differences between this build and upstream's standard bazel build
 4. aws sdk or amazon s3 related stuff are excluded from the build.
 EOF
 
+export CFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+export CPPFLAGS="-Wdate-time -D_FORTIFY_SOURCE=2"
+export CXXFLAGS="-g -O2 -fstack-protector-strong -Wformat -Werror=format-security"
+export LDFLAGS="-Wl,-z,relro"
+
 _bazel2json(){
 	echo $PY debian/Bazel2Json.py -i ${1} -o ${1%.log}.json
 	$PY debian/Bazel2Json.py -i ${1} -o ${1%.log}.json

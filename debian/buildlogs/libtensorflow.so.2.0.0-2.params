@@ -1,5 +1,6 @@
 -l:libtensorflow_framework.so.2
--whole-archive
+--allow-multiple-definition
+--whole-archive
 
 external/com_google_absl/absl/base/base/cycleclock.pic.o
 external/com_google_absl/absl/base/base/log_severity.pic.o
@@ -1066,7 +1067,7 @@ tensorflow/stream_executor/temporary_device_memory/temporary_device_memory.pic.o
 tensorflow/stream_executor/temporary_memory_manager/temporary_memory_manager.pic.o
 tensorflow/stream_executor/timer/timer.pic.o
 
--no-whole-archive
+--no-whole-archive
 
 -lcrypto
 -lcurl

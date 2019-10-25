@@ -24,6 +24,8 @@ from glob import glob as _glob
 from ninja_syntax import Writer
 from typing import *
 
+from tqdm import tqdm
+
 DEBUG=os.getenv('DEBUG', False)
 
 
@@ -44,7 +46,7 @@ class FilterLog(object):
         cmdlines = []
         lines = open(path, 'rt').readlines()
         states = {'bracket': 0, 'cmd': False}
-        for (i, line) in enumerate(lines):
+        for (i, line) in tqdm(enumerate(lines)):
             line = line.strip()
             if line.startswith('(') and lines[i-1].startswith('SUBCOMMAND'):
                 #cmdlines.append(line)

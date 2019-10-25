@@ -24,6 +24,8 @@ from glob import glob as _glob
 from ninja_syntax import Writer
 from typing import *
 
+from tqdm import tqdm
+
 DEBUG=os.getenv('DEBUG', False)
 
 
@@ -96,7 +98,7 @@ class FakeBazel(object):
         paths must be mangled.
         '''
         depgraph = []
-        for cmd in cmdlines:
+        for cmd in tqdm(cmdlines):
             if cmd.startswith('/usr/lib/ccache/gcc'):
                 # it's a CXX/LD command
                 target = {'type': 'CXX', 'src': [], 'obj': [], 'flags': []}
@@ -368,7 +370,7 @@ class FakeBazel(object):
         F.variable('CXX', str(os.getenv('CXX','g++')))
         F.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + str(os.getenv('CPPFLAGS', '')))
         F.variable('CXXFLAGS', '-O2 -w -gsplit-dwarf -DNDEBUG ' + str(os.getenv('CXXFLAGS', '')))
-        F.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now ' + str(os.getenv('LDFLAGS', '')))
+        F.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now -Wl,-no-as-needed' + str(os.getenv('LDFLAGS', '')))
         F.newline()
         F.comment(f'rules')
         F.rule('PROTOC', 'protoc -I. $in $flags')
@@ -395,7 +397,7 @@ class FakeBazel(object):
         F.build('proto_text_all_cc', 'phony', ['inputs1_proto_text', 'inputs2_proto_text'])
         F.build(proto_text_h + proto_text_cc, 'phony', 'proto_text_all_cc')
         # small targets
-        for t in depgraph:
+        for t in tqdm(depgraph):
             if t['type'] == 'CXX':
                 # src obj flags
                 src, obj, flags = t['src'], t['obj'], t['flags']

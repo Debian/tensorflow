@@ -1,4 +1,5 @@
--whole-archive
+--allow-multiple-definition
+--whole-archive
 
 external/com_google_absl/absl/base/base/cycleclock.pic.o
 external/com_google_absl/absl/base/base/log_severity.pic.o
@@ -535,7 +536,7 @@ tensorflow/stream_executor/platform/default/dso_loader/dlopen_checker.pic.o
 tensorflow/stream_executor/platform/default/dso_loader/dso_loader.pic.o
 tensorflow/stream_executor/rocm/rocm_platform_id/rocm_platform_id.pic.o
 
--no-whole-archive
+--no-whole-archive
 
 -ldl
 -lm
