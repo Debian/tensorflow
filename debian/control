@@ -21,6 +21,7 @@ Build-Depends:
  libgtest-dev,
  libhighwayhash-dev,
  libhwloc-dev,
+ libicu-dev,
  libjpeg-dev,
  libjsoncpp-dev,
  liblmdb-dev,
