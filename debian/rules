@@ -4,6 +4,7 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 # mandatorily colorized output reduces burden to human eyes
 # NOTE: there is an intentional trailing space
 export NINJA_STATUS=[38;5;198m[%es (%p) %f/%t][0;m 
+export CCACHE_DIR=/tmp/ccache/
 
 LIBDIR=debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
 SHELL=/bin/bash
