@@ -1,12 +1,8 @@
 #!/bin/sh
 set -xe
+export _CC_NORM=1
 
-export CXXFLAGS=" -I. -Idebian/embedded/eigen3 -I/usr/include/tensorflow/eigen3"
-export CXXFLAGS=" $CXXFLAGS -L. -ltensorflow_cc -lpthread -lprotobuf -I/usr/include/gemmlowp"
-cxx="g++"
-cxxflags=$CXXFLAGS
-
-lib="
+src_common=(
 tensorflow/tools/graph_transforms/add_default_attributes.cc
 tensorflow/tools/graph_transforms/backports.cc
 tensorflow/tools/graph_transforms/file_utils.cc
@@ -33,33 +29,33 @@ tensorflow/tools/graph_transforms/sparsify_gather.cc
 tensorflow/tools/graph_transforms/strip_unused_nodes.cc
 tensorflow/tools/graph_transforms/transform_graph.cc
 tensorflow/tools/graph_transforms/transform_utils.cc
-"
-objs=$(echo $lib | sed -e 's#\.cc#.o#g')
+)
 
-# compile lib objects
-./debian/parallel $lib
+src=(
+${src_common[@]}
+tensorflow/tools/graph_transforms/compare_graphs.cc
+)
+elf=tf_compare_graphs.elf
+flags="-I. -I/usr/include/gemmlowp"
+libs="-lprotobuf"
+source debian/tests/_cc_test
 
-$cxx $cppflags $cxxflags $ldflags $incdir $libs \
-	$objs \
-	tensorflow/tools/graph_transforms/compare_graphs.cc \
-	-o tf_compare_graphs
+src=(
+${src_common[@]}
+tensorflow/tools/graph_transforms/summarize_graph_main.cc
+)
+elf=tf_summarize_graph.elf
+source debian/tests/_cc_test
 
-$cxx $cppflags $cxxflags $ldflags $incdir $libs \
-	$objs \
-	tensorflow/tools/graph_transforms/summarize_graph_main.cc \
-	-o tf_summarize_graph
+src=(
+${src_common[@]}
+tensorflow/tools/graph_transforms/transform_graph_main.cc
+)
+elf=tf_transform_graph.elf
+source debian/tests/_cc_test
 
-$cxx $cppflags $cxxflags $ldflags $incdir $libs \
-	$objs \
-	tensorflow/tools/graph_transforms/transform_graph_main.cc \
-	-o tf_transform_graph
-
-if ! test -r libtensorflow_cc.so.2.0; then
-	ln -sr libtensorflow_cc.so libtensorflow_cc.so.2.0 || true
-fi
-
-LD_LIBRARY_PATH=. ./tf_compare_graphs --help || true
-LD_LIBRARY_PATH=. ./tf_summarize_graph --help || true
-LD_LIBRARY_PATH=. ./tf_transform_graph --help || true
+LD_LIBRARY_PATH=. ./tf_compare_graphs.elf --help || true
+LD_LIBRARY_PATH=. ./tf_summarize_graph.elf --help || true
+LD_LIBRARY_PATH=. ./tf_transform_graph.elf --help || true
 
 exit 0
