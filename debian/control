@@ -45,6 +45,7 @@ Build-Depends:
  python3-numpy,
  python3-setuptools,
  python3-wheel,
+ python3-tqdm,
  swig,
  zlib1g-dev,
 
