@@ -13,12 +13,16 @@ trap "{ rm -f *.o; }" EXIT
 
 CXX="ccache g++"
 XE="xe"
-_tflib=( -ltensorflow_framework )
+_tflib=( )
 
 if [[ 'c' = $tflib ]]; then
 	_tflib+=( -ltensorflow )
 elif [[ 'cc' = $tflib ]]; then
 	_tflib+=( -ltensorflow_cc )
+elif [[ 'f' = $tflib ]]; then
+	_tflib+=( -ltensorflow_framework )
+else
+	_tflib+=( -ltensorflow_framework )
 fi
 
 objs=()
