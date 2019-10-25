@@ -370,7 +370,7 @@ class FakeBazel(object):
         F.variable('CXX', str(os.getenv('CXX','g++')))
         F.variable('CPPFLAGS', '-D_FORTIFY_SOURCE=2 ' + str(os.getenv('CPPFLAGS', '')))
         F.variable('CXXFLAGS', '-O2 -w -gsplit-dwarf -DNDEBUG ' + str(os.getenv('CXXFLAGS', '')))
-        F.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now -Wl,-no-as-needed' + str(os.getenv('LDFLAGS', '')))
+        F.variable('LDFLAGS', '-Wl,-z,relro -Wl,-z,now -Wl,-no-as-needed ' + str(os.getenv('LDFLAGS', '')))
         F.newline()
         F.comment(f'rules')
         F.rule('PROTOC', 'protoc -I. $in $flags')
