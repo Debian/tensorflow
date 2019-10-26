@@ -9,7 +9,7 @@ Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.
 Uploaders: Mo Zhou <cdluminate@gmail.com>
 Build-Depends:
  ccache,
- debhelper-compat (= 11),
+ debhelper-compat (= 12),
  dh-python,
  libcurl4-gnutls-dev,
  libdouble-conversion-dev,
