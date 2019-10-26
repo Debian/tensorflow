@@ -1,4 +1,4 @@
-tensorflow (2.0.0-1) UNRELEASED; urgency=medium
+tensorflow (2.0.0-1) experimental; urgency=medium
 
   * New upstream version 2.0.0 (Oct 2019).
   * Rewrite the buildsystem, which reconstructs the dependency graph
@@ -14,7 +14,7 @@ tensorflow (2.0.0-1) UNRELEASED; urgency=medium
     + libtensorflow.so.2            (C interface)
     + libtensorflow_cc.so.2         (C++ interface)
 
- -- Mo Zhou <cdluminate@gmail.com>  Sat, 26 Oct 2019 11:09:30 +0800
+ -- Mo Zhou <cdluminate@gmail.com>  Sat, 26 Oct 2019 11:10:28 +0800
 
 tensorflow (1.10.1+dfsg-A2) experimental; urgency=medium
 
