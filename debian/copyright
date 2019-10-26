@@ -8,11 +8,30 @@ Files-Excluded:
 
 Files:     *
            tensorflow/*
-Copyright: 2016-2018 The TensorFlow Authors
-           2015-2018 Google Inc.
-           2015-2018 Yuan Tang <terrytangyuan@gmail.com>
+           debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz
+Copyright: 2016-2019 TensorFlow Authors.
+           2015-2019 Google Inc.
+           2015-2019 Yuan Tang <terrytangyuan@gmail.com>
 License:   Apache-2.0
-Comment:   Google and TensorFlow authors are nearly the same group of people.
+Comment:
+ * TensorFlow And Google authors are basically the same group of people.
+ * Tarball debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz
+   is a convenient copy of abseil-cpp, it is not quite suitable for packaging
+   for Debian. So using it like this may be the best way.
+ * third_party/sycl/sycl/LICENSE.text is merely a license text not covering
+   any other file. it's used for the sycl library downloaded at runtime
+   (which is already stripped from debian build).
+ * third_party/fft2d/LICENSE is a bare license copy stored in upstream repo.
+   It does not cover any file. The fft2d will be downloaded using the Bazel
+   build. (already stripped from debian build).
+ * third_party/mkl_dnn/LICENSE
+   third_party/ngraph/NGRAPH_LICENSE
+   third_party/nccl/LICENSE
+   As you see, they are merely license texts of the software
+   to-be-downloaded. That download process does not exist in the debian
+   build at all. And we don't ship any source tarball with them --
+   we either completely disable that feature, or just use the one already
+   provided in the archive.
 
 Files:     tensorflow/contrib/lite/java/*
 Copyright: 2014 The Android Open Source Project
@@ -29,25 +48,40 @@ Copyright: 2016 The Android Open Source Project
            2015 The TensorFlow Authors
 License:   Apache-2.0
 
+Files:     third_party/mlir/*
+Copyright: 2019-     MLIR Authors.
+License:   Apache-2.0
+Comment:
+ * MLIR is a compiler project of TensorFlow
+
 Files:     third_party/eigen3/*
 Copyright: 2014-2015, Benoit Steiner <benoit.steiner.goog@gmail.com>
            2015 Benoit Jacob <benoitjacob@google.com>
            2015 Ke Yang <yangke@gmail.com>
            2015 Matthew Sarett <msarett@google.com>
            2015 Jianwei Cui <thucjw@gmail.com>
+           2016 Nishant Patil <nishantpatil@google.com>
 License:   MPL-2.0
+
+Files:     third_party/icu/data/LICENSE
+Copyright: © 1991-2018 Unicode, Inc. All rights reserved.
+License:   ICU58p
 
 Files:     third_party/examples/eager/spinn/*
 Copyright: 2017 jekbradbury
 License:   BSD-3-Clause
 
-Files:     third_party/hadoop/hdfs.h
+Files:     third_party/hadoop/*
 Copyright: 2018 Apache Software Foundation
 License:   Apache-2.0
 
+Files:     third_party/toolchains/preconfig/*
+Copyright: 2019 The Bazel Authors. All rights reserved. 
+License:   Apache-2.0
+
 Files:     debian/*
-Copyright: 2018 Mo Zhou <lumin@debian.org>
-           2018 Mo Zhou <cdluminate@gmail.com>
+Copyright: 2018-2019 Mo Zhou <lumin@debian.org>
+           2018-2019 Mo Zhou <cdluminate@gmail.com>
 License:   Expat
 
 Files:     debian/ninja_syntax.py
@@ -58,7 +92,7 @@ License:   Apache-2.0
 # This is an embedded copy of Eigen3 source code.
 # Without this embedded source code TensorFlow will FTBFS.
 # The copyright information is copied from /usr/share/doc/libeigen3-dev
-Files:     debian/embedded/fd6845384b86.tar.gz
+Files:     debian/embedded/049af2f56331.tar.gz
 Copyright: 2006-2013 Benoit Jacob <jacob@math.jussieu.fr>
            2008-2013 Gael Guennebaud <g.gael@free.fr>
            2007 Michael Olbrich <michael.olbrich@gmx.net>
@@ -74,26 +108,6 @@ Comment:   Exceptions copied from /usr/share/doc/libeigen3-dev/copyright
  Files: Eigen/src/Cholesky/LLT_LAPACKE.h Eigen/src/QR/HouseholderQR_LAPACKE.h Eigen/src/QR/ColPivHouseholderQR_LAPACKE.h Eigen/src/LU/arch/Inverse_SSE.h Eigen/src/LU/PartialPivLU_LAPACKE.h Eigen/src/Eigenvalues/ComplexSchur_LAPACKE.h Eigen/src/Eigenvalues/SelfAdjointEigenSolver_LAPACKE.h Eigen/src/Eigenvalues/RealSchur_LAPACKE.h Eigen/src/PardisoSupport/PardisoSupport.h Eigen/src/misc/lapacke.h Eigen/src/SVD/JacobiSVD_LAPACKE.h Eigen/src/Core/Assign_MKL.h Eigen/src/Core/products/GeneralMatrixMatrixTriangular_BLAS.h Eigen/src/Core/products/TriangularMatrixMatrix_BLAS.h Eigen/src/Core/products/TriangularMatrixVector_BLAS.h Eigen/src/Core/products/SelfadjointMatrixVector_BLAS.h Eigen/src/Core/products/TriangularSolverMatrix_BLAS.h Eigen/src/Core/products/GeneralMatrixVector_BLAS.h Eigen/src/Core/products/GeneralMatrixMatrix_BLAS.h Eigen/src/Core/products/SelfadjointMatrixMatrix_BLAS.h Eigen/src/Core/util/MKL_support.h doc/UsingBlasLapackBackends.dox doc/UsingIntelMKL.dox
  Copyright: 2011 Intel Corporation
  License: BSD-3-Clause
-
-# This is an very tiny Fast Fourier Transform library which has not
-# been updated for more than 10 years. I chose to embed it instead
-# of packaging it.
-Files:     debian/embedded/fft.tgz
-Copyright: 1997,2001 Takuya OOURA <ooura@mmm.t.u-tokyo.ac.jp>
-License:   FFT2D-special-license
-    You may use, copy, modify this code for any purpose and 
-    without fee. You may distribute this ORIGINAL package.
-Comment:
- Upstream homepage
- http://momonga.t.u-tokyo.ac.jp/~ooura/fft.html
- .
- Discussion about whether this is a free license:
- https://lists.debian.org/debian-legal/2018/08/msg00005.html                    
- .
- Upstrea issue:
- https://github.com/tensorflow/tensorflow/issues/21724  
-
-
 
 
 License: Apache-2.0
@@ -558,3 +572,39 @@ License: MPL-2.0
  .
     This Source Code Form is "Incompatible With Secondary Licenses", as
     defined by the Mozilla Public License, v. 2.0.
+
+License: ICU58p
+ COPYRIGHT AND PERMISSION NOTICE (ICU 58 and later)
+ .
+ Copyright © 1991-2018 Unicode, Inc. All rights reserved.
+ Distributed under the Terms of Use in http://www.unicode.org/copyright.html.
+ .
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of the Unicode data files and any associated documentation
+ (the "Data Files") or Unicode software and any associated documentation
+ (the "Software") to deal in the Data Files or Software
+ without restriction, including without limitation the rights to use,
+ copy, modify, merge, publish, distribute, and/or sell copies of
+ the Data Files or Software, and to permit persons to whom the Data Files
+ or Software are furnished to do so, provided that either
+ (a) this copyright and permission notice appear with all copies
+ of the Data Files or Software, or
+ (b) this copyright and permission notice appear in associated
+ Documentation.
+ .
+ THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF
+ ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT OF THIRD PARTY RIGHTS.
+ IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS
+ NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL
+ DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE,
+ DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ PERFORMANCE OF THE DATA FILES OR SOFTWARE.
+ .
+ Except as contained in this notice, the name of a copyright holder
+ shall not be used in advertising or otherwise to promote the sale,
+ use or other dealings in these Data Files or Software without prior
+ written authorization of the copyright holder.
+
