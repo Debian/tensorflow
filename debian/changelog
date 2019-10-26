@@ -4,8 +4,17 @@ tensorflow (2.0.0-1) UNRELEASED; urgency=medium
   * Rewrite the buildsystem, which reconstructs the dependency graph
     by parsing the Bazel buildlog, and subsequently generates a Ninja
     build to approximate the original build sequence.
+    + Bazel2Json.py: reads build command sequence from raw buildlog
+      of bazel, and stores result into a json file.
+    + Json2Ninja.py: read build sequence from json file, understand
+      each command line and rebuild the dependency graph. It also
+      scans the C++ header includes to avoid surprising FTBFS.
+  * Build the following 3 shared objects (standard tensorflow v2):
+    + libtensorflow_framework.so.2  (foundamental lib)
+    + libtensorflow.so.2            (C interface)
+    + libtensorflow_cc.so.2         (C++ interface)
 
- -- Mo Zhou <cdluminate@gmail.com>  Sat, 05 Oct 2019 15:46:46 +0800
+ -- Mo Zhou <cdluminate@gmail.com>  Sat, 26 Oct 2019 11:09:30 +0800
 
 tensorflow (1.10.1+dfsg-A2) experimental; urgency=medium
 
