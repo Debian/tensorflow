@@ -39,6 +39,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/notification.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/lib/strings/strcat.h"
+#include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/public/session_options.h"
 #include "tensorflow/core/public/version.h"
@@ -80,20 +81,18 @@ class NcclTestBase : public ::testing::Test {
   class DeviceInstance;
 
   NcclTestBase(CollectiveType collective_type, const string& collective_name)
-      : collective_type_(collective_type), collective_name_(collective_name) {}
+      : collective_type_(collective_type),
+        collective_name_(collective_name),
+        col_exec_(nullptr) {}
+
   ~NcclTestBase() override {
     if (col_exec_) col_exec_->Unref();
   }
 
-  void InitGPUDevices() {
+  void SetUp() {
     std::vector<std::unique_ptr<Device>> all_devices;
-    SessionOptions session_options;
-    session_options.config.mutable_gpu_options()
-        ->set_per_process_gpu_memory_fraction(0.1);
-    session_options.env = Env::Default();
-    Status s = DeviceFactory::GetFactory(DEVICE_GPU)
-                   ->AddDevices(session_options, "", &all_devices);
-    TF_CHECK_OK(s);
+    TF_CHECK_OK(DeviceFactory::GetFactory(DEVICE_GPU)
+                    ->AddDevices(SessionOptions(), "", &all_devices));
     for (std::unique_ptr<Device>& d : all_devices) {
       if (d->device_type() == "GPU") {
         gpus_.emplace_back(std::move(d));
@@ -104,20 +103,19 @@ class NcclTestBase : public ::testing::Test {
   void Init(const int num_ranks, const int instance_key) {
     setenv("NCCL_DEBUG", "INFO", 1 /* replace */);
     setenv("NCCL_LAUNCH_MODE", "PARALLEL", 1 /* replace */);
-    InitGPUDevices();
     std::vector<std::unique_ptr<Device>> local_devices;
     std::vector<string> device_names;
+    CHECK_LE(num_ranks, gpus_.size());
     for (int rank = 0; rank < num_ranks; ++rank) {
-      if (rank < gpus_.size()) {
-        local_devices.emplace_back(std::move(gpus_[rank]));
-      }
+      local_devices.emplace_back(std::move(gpus_[rank]));
     }
     int num_gpus = local_devices.size();
     for (const auto& device : local_devices) {
       device_names.push_back(device->name());
       VLOG(2) << device->name();
     }
-    if (!dev_mgr_) dev_mgr_.reset(new DeviceMgr(std::move(local_devices)));
+    if (!dev_mgr_)
+      dev_mgr_ = absl::make_unique<StaticDeviceMgr>(std::move(local_devices));
     col_exec_ = new BaseCollectiveExecutor(
         &col_exec_mgr_, /*remote_access=*/nullptr, kStepId, dev_mgr_.get(),
         /*gpu_ring_order=*/nullptr);
@@ -178,6 +176,11 @@ class NcclTestBase : public ::testing::Test {
   }
 
   void RunTest(int num_ranks, int input_length, int instance_key) {
+    if (num_ranks > gpus_.size()) {
+      LOG(WARNING) << "Skipping test because required " << num_ranks
+                   << " GPUs but found " << gpus_.size();
+      return;
+    }
     Init(num_ranks, instance_key);
     std::vector<float> expected;
     InitExpected(&expected, input_length, num_ranks);
@@ -302,9 +305,6 @@ class NcclTestBase : public ::testing::Test {
       gtl::InlinedVector<AllocatorAttributes, 4> input_aa(
           {AllocatorAttributes()});
       op_params.input_alloc_attrs = &input_aa;
-      gtl::InlinedVector<DeviceContext*, 4> input_dc;
-      input_dc.push_back(op_params.op_device_context);
-      op_params.input_device_contexts = &input_dc;
       int forward_from = 0;
       op_params.forward_from_array = &forward_from;
       AllocatorAttributes generic_alloc_attr;
@@ -428,7 +428,7 @@ class NcclTestBase : public ::testing::Test {
   std::vector<std::unique_ptr<DeviceInstance>> instances_;
   CollectiveParams col_params_;
   mutex mu_;
-  int32 op_counter_ GUARDED_BY(mu_) = 0;
+  int32 op_counter_ TF_GUARDED_BY(mu_) = 0;
 };
 
 class NcclReducerTest : public NcclTestBase {

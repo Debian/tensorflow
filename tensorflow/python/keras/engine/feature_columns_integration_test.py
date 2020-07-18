@@ -26,6 +26,7 @@ from tensorflow.python.feature_column import feature_column_lib as fc
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import metrics as metrics_module
 from tensorflow.python.keras import testing_utils
+from tensorflow.python.keras.utils import np_utils
 from tensorflow.python.platform import test
 
 
@@ -59,12 +60,11 @@ class FeatureColumnsIntegrationTest(keras_parameterized.TestCase):
         optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['accuracy'],
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
 
     x = {'a': np.random.random((10, 1))}
     y = np.random.randint(20, size=(10, 1))
-    y = keras.utils.to_categorical(y, num_classes=20)
+    y = np_utils.to_categorical(y, num_classes=20)
     model.fit(x, y, epochs=1, batch_size=5)
     model.fit(x, y, epochs=1, batch_size=5)
     model.evaluate(x, y, batch_size=5)
@@ -82,11 +82,10 @@ class FeatureColumnsIntegrationTest(keras_parameterized.TestCase):
         optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['accuracy'],
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
 
     y = np.random.randint(20, size=(100, 1))
-    y = keras.utils.to_categorical(y, num_classes=20)
+    y = np_utils.to_categorical(y, num_classes=20)
     x = {'a': np.random.random((100, 1))}
     ds1 = dataset_ops.Dataset.from_tensor_slices(x)
     ds2 = dataset_ops.Dataset.from_tensor_slices(y)
@@ -146,12 +145,11 @@ class FeatureColumnsIntegrationTest(keras_parameterized.TestCase):
         optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['accuracy'],
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
 
     x = {'a': np.random.random((10, 1)), 'b': np.random.random((10, 1))}
     y = np.random.randint(20, size=(10, 1))
-    y = keras.utils.to_categorical(y, num_classes=20)
+    y = np_utils.to_categorical(y, num_classes=20)
     dnn_model.fit(x=x, y=y, epochs=1, batch_size=5)
     dnn_model.fit(x=x, y=y, epochs=1, batch_size=5)
     dnn_model.evaluate(x=x, y=y, batch_size=5)
@@ -168,11 +166,10 @@ class FeatureColumnsIntegrationTest(keras_parameterized.TestCase):
         optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['accuracy'],
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
 
     y = np.random.randint(20, size=(100, 1))
-    y = keras.utils.to_categorical(y, num_classes=20)
+    y = np_utils.to_categorical(y, num_classes=20)
     x = {'a': np.random.random((100, 1)), 'b': np.random.random((100, 1))}
     ds1 = dataset_ops.Dataset.from_tensor_slices(x)
     ds2 = dataset_ops.Dataset.from_tensor_slices(y)

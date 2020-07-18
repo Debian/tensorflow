@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import threading
 
 import numpy as np
@@ -37,6 +38,7 @@ from tensorflow.python.keras.optimizer_v2 import gradient_descent as gradient_de
 from tensorflow.python.keras.optimizer_v2 import nadam as nadam_v2
 from tensorflow.python.keras.optimizer_v2 import rmsprop as rmsprop_v2
 from tensorflow.python.util import tf_contextlib
+from tensorflow.python.util import tf_decorator
 from tensorflow.python.util import tf_inspect
 
 
@@ -69,7 +71,7 @@ def get_test_data(train_samples,
           (x[train_samples:], y[train_samples:]))
 
 
-@test_util.use_deterministic_cudnn
+@test_util.disable_cudnn_autotune
 def layer_test(layer_cls, kwargs=None, input_shape=None, input_dtype=None,
                input_data=None, expected_output=None,
                expected_output_dtype=None, expected_output_shape=None,
@@ -226,6 +228,7 @@ def layer_test(layer_cls, kwargs=None, input_shape=None, input_dtype=None,
     layer.adapt(adapt_data)
 
   model = keras.models.Sequential()
+  model.add(keras.layers.Input(shape=input_shape[1:], dtype=input_dtype))
   model.add(layer)
   actual_output = model.predict(input_data)
   actual_output_shape = actual_output.shape
@@ -263,6 +266,7 @@ _thread_local_data = threading.local()
 _thread_local_data.model_type = None
 _thread_local_data.run_eagerly = None
 _thread_local_data.experimental_run_tf_function = None
+_thread_local_data.saved_model_format = None
 
 
 @tf_contextlib.contextmanager
@@ -352,6 +356,37 @@ def should_run_tf_function():
           context.executing_eagerly())
 
 
+@tf_contextlib.contextmanager
+def saved_model_format_scope(value):
+  """Provides a scope within which the savde model format to test is `value`.
+
+  The saved model format gets restored to its original value upon exiting the
+  scope.
+
+  Arguments:
+     value: saved model format value
+
+  Yields:
+    The provided value.
+  """
+  previous_value = _thread_local_data.saved_model_format
+  try:
+    _thread_local_data.saved_model_format = value
+    yield value
+  finally:
+    # Restore saved model format to initial value.
+    _thread_local_data.saved_model_format = previous_value
+
+
+def get_save_format():
+  if _thread_local_data.saved_model_format is None:
+    raise ValueError(
+        'Cannot call `get_save_format()` outside of a '
+        '`saved_model_format_scope()` or `run_with_all_saved_model_formats` '
+        'decorator.')
+  return _thread_local_data.saved_model_format
+
+
 def get_model_type():
   """Gets the model type that should be tested."""
   if _thread_local_data.model_type is None:
@@ -382,17 +417,28 @@ def get_small_functional_mlp(num_hidden, num_classes, input_dim):
   return keras.Model(inputs, outputs)
 
 
-class _SmallSubclassMLP(keras.Model):
+class SmallSubclassMLP(keras.Model):
   """A subclass model based small MLP."""
 
-  def __init__(self, num_hidden, num_classes):
-    super(_SmallSubclassMLP, self).__init__()
+  def __init__(self, num_hidden, num_classes, use_bn=False, use_dp=False):
+    super(SmallSubclassMLP, self).__init__(name='test_model')
+    self.use_bn = use_bn
+    self.use_dp = use_dp
+
     self.layer_a = keras.layers.Dense(num_hidden, activation='relu')
     activation = 'sigmoid' if num_classes == 1 else 'softmax'
     self.layer_b = keras.layers.Dense(num_classes, activation=activation)
+    if self.use_dp:
+      self.dp = keras.layers.Dropout(0.5)
+    if self.use_bn:
+      self.bn = keras.layers.BatchNormalization(axis=-1)
 
   def call(self, inputs, **kwargs):
     x = self.layer_a(inputs)
+    if self.use_dp:
+      x = self.dp(x)
+    if self.use_bn:
+      x = self.bn(x)
     return self.layer_b(x)
 
 
@@ -417,7 +463,7 @@ class _SmallSubclassMLPCustomBuild(keras.Model):
 
 
 def get_small_subclass_mlp(num_hidden, num_classes):
-  return _SmallSubclassMLP(num_hidden, num_classes)
+  return SmallSubclassMLP(num_hidden, num_classes)
 
 
 def get_small_subclass_mlp_with_custom_build(num_hidden, num_classes):
@@ -441,14 +487,27 @@ def get_small_mlp(num_hidden, num_classes, input_dim):
 class _SubclassModel(keras.Model):
   """A Keras subclass model."""
 
-  def __init__(self, layers):
-    super(_SubclassModel, self).__init__()
+  def __init__(self, layers, *args, **kwargs):
+    """Instantiate a model.
+
+    Args:
+      layers: a list of layers to be added to the model.
+      *args: Model's args
+      **kwargs: Model's keyword args, at most one of
+        input_tensor -> the input tensor required for ragged/sparse input.
+    """
+
+    inputs = kwargs.pop('input_tensor', None)
+    super(_SubclassModel, self).__init__(*args, **kwargs)
     # Note that clone and build doesn't support lists of layers in subclassed
     # models. Adding each layer directly here.
     for i, layer in enumerate(layers):
       setattr(self, self._layer_name_for_i(i), layer)
 
     self.num_layers = len(layers)
+
+    if inputs is not None:
+      self._set_inputs(inputs)
 
   def _layer_name_for_i(self, i):
     return 'layer{}'.format(i)
@@ -464,8 +523,8 @@ class _SubclassModel(keras.Model):
 class _SubclassModelCustomBuild(keras.Model):
   """A Keras subclass model that uses a custom build method."""
 
-  def __init__(self, layer_generating_func):
-    super(_SubclassModelCustomBuild, self).__init__()
+  def __init__(self, layer_generating_func, *args, **kwargs):
+    super(_SubclassModelCustomBuild, self).__init__(*args, **kwargs)
     self.all_layers = None
     self._layer_generating_func = layer_generating_func
 
@@ -482,21 +541,50 @@ class _SubclassModelCustomBuild(keras.Model):
     return x
 
 
-def get_model_from_layers(layers, input_shape=None, input_dtype=None):
-  """Builds a model from a sequence of layers."""
+def get_model_from_layers(layers,
+                          input_shape=None,
+                          input_dtype=None,
+                          name=None,
+                          input_ragged=None,
+                          input_sparse=None):
+  """Builds a model from a sequence of layers.
+
+  Args:
+    layers: The layers used to build the network.
+    input_shape: Shape tuple of the input or 'TensorShape' instance.
+    input_dtype: Datatype of the input.
+    name: Name for the model.
+    input_ragged: Boolean, whether the input data is a ragged tensor.
+    input_sparse: Boolean, whether the input data is a sparse tensor.
+
+  Returns:
+    A Keras model.
+  """
+
   model_type = get_model_type()
   if model_type == 'subclass':
-    return _SubclassModel(layers)
+    inputs = None
+    if input_ragged or input_sparse:
+      inputs = keras.Input(
+          shape=input_shape,
+          dtype=input_dtype,
+          ragged=input_ragged,
+          sparse=input_sparse)
+    return _SubclassModel(layers, name=name, input_tensor=inputs)
 
   if model_type == 'subclass_custom_build':
     layer_generating_func = lambda: layers
-    return _SubclassModelCustomBuild(layer_generating_func)
+    return _SubclassModelCustomBuild(layer_generating_func, name=name)
 
   if model_type == 'sequential':
-    model = keras.models.Sequential()
+    model = keras.models.Sequential(name=name)
     if input_shape:
-      model.add(keras.layers.InputLayer(input_shape=input_shape,
-                                        dtype=input_dtype))
+      model.add(
+          keras.layers.InputLayer(
+              input_shape=input_shape,
+              dtype=input_dtype,
+              ragged=input_ragged,
+              sparse=input_sparse))
     for layer in layers:
       model.add(layer)
     return model
@@ -505,21 +593,34 @@ def get_model_from_layers(layers, input_shape=None, input_dtype=None):
     if not input_shape:
       raise ValueError('Cannot create a functional model from layers with no '
                        'input shape.')
-    inputs = keras.Input(shape=input_shape, dtype=input_dtype)
+    inputs = keras.Input(
+        shape=input_shape,
+        dtype=input_dtype,
+        ragged=input_ragged,
+        sparse=input_sparse)
     outputs = inputs
     for layer in layers:
       outputs = layer(outputs)
-    return keras.Model(inputs, outputs)
+    return keras.Model(inputs, outputs, name=name)
 
   raise ValueError('Unknown model type {}'.format(model_type))
+
+
+class Bias(keras.layers.Layer):
+
+  def build(self, input_shape):
+    self.bias = self.add_variable('bias', (1,), initializer='zeros')
+
+  def call(self, inputs):
+    return inputs + self.bias
 
 
 class _MultiIOSubclassModel(keras.Model):
   """Multi IO Keras subclass model."""
 
   def __init__(self, branch_a, branch_b, shared_input_branch=None,
-               shared_output_branch=None):
-    super(_MultiIOSubclassModel, self).__init__()
+               shared_output_branch=None, name=None):
+    super(_MultiIOSubclassModel, self).__init__(name=name)
     self._shared_input_branch = shared_input_branch
     self._branch_a = branch_a
     self._branch_b = branch_b
@@ -531,6 +632,9 @@ class _MultiIOSubclassModel(keras.Model):
         inputs = layer(inputs)
       a = inputs
       b = inputs
+    elif isinstance(inputs, dict):
+      a = inputs['input_1']
+      b = inputs['input_2']
     else:
       a, b = inputs
 
@@ -783,6 +887,7 @@ def disable_v2_dtype_behavior(fn):
 
 def _set_v2_dtype_behavior(fn, enabled):
   """Returns version of 'fn' that runs with v2 dtype behavior on or off."""
+  @functools.wraps(fn)
   def wrapper(*args, **kwargs):
     v2_dtype_behavior = base_layer_utils.V2_DTYPE_BEHAVIOR
     base_layer_utils.V2_DTYPE_BEHAVIOR = enabled
@@ -791,4 +896,4 @@ def _set_v2_dtype_behavior(fn, enabled):
     finally:
       base_layer_utils.V2_DTYPE_BEHAVIOR = v2_dtype_behavior
 
-  return wrapper
+  return tf_decorator.make_decorator(fn, wrapper)

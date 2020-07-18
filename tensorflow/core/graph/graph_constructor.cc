@@ -56,7 +56,8 @@ namespace {
 static constexpr const bool kDoNotCheckDuplicates = true;
 
 inline bool IsMerge(const NodeDef& node_def) {
-  return node_def.op() == "Merge" || node_def.op() == "RefMerge";
+  return node_def.op() == "Merge" || node_def.op() == "RefMerge" ||
+         node_def.op() == "_XlaMerge";
 }
 
 inline bool IsNextIteration(const NodeDef& node_def) {
@@ -92,7 +93,9 @@ class GraphConstructor {
         : allow_internal_ops(in.allow_internal_ops),
           expect_device_spec(in.expect_device_spec),
           importing(false),
-          validate_colocation_constraints(false) {}
+          validate_nodes(in.validate_nodes),
+          validate_colocation_constraints(false),
+          add_default_attributes(in.add_default_attributes) {}
     Options(const ImportGraphDefOptions& in)  // NOLINT(runtime/explicit)
         : allow_internal_ops(false),
           expect_device_spec(false),
@@ -107,6 +110,7 @@ class GraphConstructor {
           return_tensors(in.return_tensors.begin(), in.return_tensors.end()),
           return_nodes(in.return_nodes),
           importing(true),
+          validate_nodes(true),
           validate_colocation_constraints(in.validate_colocation_constraints),
           validate_shape(in.validate_shape),
           default_device(in.default_device) {}
@@ -132,8 +136,16 @@ class GraphConstructor {
     // applicable to ConvertGraphDefToGraph as well, so make an attempt to
     // remove this.
     bool importing;
+    // If true, validates that nodes being converted have all expected attrs
+    // set and no unknown attrs set by calling ValidateNodeDef().
+    // `validate_nodes` is always true when `importing` is set.
+    bool validate_nodes;
     bool validate_colocation_constraints;
     bool validate_shape = true;
+
+    // If true, GraphConstructor will add attributes with their default
+    // value to the Node when they are missing from the NodeDef.
+    bool add_default_attributes = true;
 
     string default_device;
   };
@@ -741,7 +753,7 @@ Status GraphConstructor::ValidateShape(Node* node) {
   // For nodes with the _output_shapes attribute, override the shape.
   std::vector<const TensorShapeProto*> shape_attrs;
   const char* kAttrName = "_output_shapes";
-  if (!GetNodeAttrSimple(node->attrs(), kAttrName, &shape_attrs)) {
+  if (!TryGetNodeAttr(node->attrs(), kAttrName, &shape_attrs)) {
     // No _output_shapes attribute, the AddNode call above was sufficient.
     return Status::OK();
   }
@@ -1001,7 +1013,7 @@ void GraphConstructor::UpdateUniquifiedColocationNames() {
     Node* node = pair.second.node;
     if (node == nullptr) continue;
     std::vector<string> coloc_values;
-    if (!GetNodeAttrSimple(node->attrs(), kColocationAttrName, &coloc_values))
+    if (!TryGetNodeAttr(node->attrs(), kColocationAttrName, &coloc_values))
       continue;
     bool updated = false;
     for (size_t i = 0; i < coloc_values.size(); ++i) {
@@ -1225,8 +1237,22 @@ Status GraphConstructor::Convert() {
       if (opts_.uniquify_names && (prefix_.empty() || !opts_.uniquify_prefix)) {
         UniquifyNames(input_already_exists, &node_def);
       }
-      TF_RETURN_IF_ERROR(ModifyNodeDefForImport(&node_def));
     }
+
+    if (opts_.importing) {
+      TF_RETURN_IF_ERROR(ModifyNodeDefForImport(&node_def));
+    } else {
+      const OpDef* op_def;
+      TF_RETURN_IF_ERROR(
+          g_->op_registry()->LookUpOpDef(node_def.op(), &op_def));
+      if (opts_.add_default_attributes) {
+        AddDefaultsToNodeDef(*op_def, &node_def);
+      }
+      if (opts_.validate_nodes) {
+        TF_RETURN_IF_ERROR(ValidateNodeDef(node_def, *op_def));
+      }
+    }
+
     TF_RETURN_IF_ERROR(MakeNode(std::move(node_def), &node));
 
     if (opts_.importing) {

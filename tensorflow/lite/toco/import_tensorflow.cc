@@ -533,7 +533,8 @@ string CreateConstArray(Model* model, string const& name,
   string array_name = toco::AvailableArrayName(*model, name);
   auto& array = model->GetOrCreateArray(array_name);
   array.data_type = T;
-  array.mutable_shape()->mutable_dims()->emplace_back(data.size());
+  array.mutable_shape()->mutable_dims()->emplace_back(
+      static_cast<int>(data.size()));
   array.GetMutableBuffer<T>().data = data;
   return array_name;
 }
@@ -951,7 +952,14 @@ tensorflow::Status ConvertDepthToSpaceOperator(
   CHECK_EQ(node.op(), "DepthToSpace");
   TF_QCHECK_OK(CheckInputsCount(node, tf_import_flags, 1));
 
-  CHECK_EQ(GetDataTypeAttr(node, "T"), DT_FLOAT);
+  tensorflow::DataType dtype = GetDataTypeAttr(node, "T");
+  if (dtype != DT_FLOAT && dtype != DT_UINT8 && dtype != DT_INT32 &&
+      dtype != DT_INT64) {
+    const auto* enum_descriptor = tensorflow::DataType_descriptor();
+    LOG(FATAL) << "TFLite does not support DepthToSpace with type T:"
+               << enum_descriptor->FindValueByNumber(dtype)->name() << ". "
+               << "T must be one of {DT_FLOAT, DT_UINT8, DT_INT32, DT_INT64}.";
+  }
   auto* op = new DepthToSpaceOperator;
   op->inputs.push_back(node.input(0));
   op->outputs.push_back(node.name());
@@ -973,7 +981,7 @@ tensorflow::Status ConvertSpaceToDepthOperator(
     const auto* enum_descriptor = tensorflow::DataType_descriptor();
     LOG(FATAL) << "TFLite does not support SpaceToDepth with type T:"
                << enum_descriptor->FindValueByNumber(dtype)->name() << ". "
-               << "T must be one of {DT_FLOAT, DT_INT8, DT_INT32, DT_INT64}.";
+               << "T must be one of {DT_FLOAT, DT_UINT8, DT_INT32, DT_INT64}.";
   }
   auto* op = new SpaceToDepthOperator;
   op->inputs.push_back(node.input(0));
@@ -1024,15 +1032,7 @@ tensorflow::Status ConvertIdentityOperator(
     const ModelFlags& model_flags, Model* model) {
   CHECK(node.op() == "Identity" || node.op() == "CheckNumerics" ||
         node.op() == "PlaceholderWithDefault" || node.op() == "StopGradient" ||
-        node.op() == "Snapshot" || node.op() == "IdentityN");
-
-  if (node.op() == "IdentityN" && node.input_size() != 1) {
-    // When IdentityN doesn't have exactly 1 input, convert it as an unsupported
-    // op so it's still possible to run with Flex runtime.
-    return ConvertUnsupportedOperator(node, tf_import_flags, model_flags,
-                                      model);
-  }
-
+        node.op() == "Snapshot");
   auto* op = new TensorFlowIdentityOperator;
   // Amazingly, some TensorFlow graphs (at least rajeev_lstm.pb) have
   // identity nodes with multiple inputs, but the other inputs seem
@@ -1047,6 +1047,24 @@ tensorflow::Status ConvertIdentityOperator(
   op->inputs.push_back(input_name);
   op->outputs.push_back(node.name());
   model->operators.emplace_back(op);
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status ConvertIdentityNOperator(
+    const NodeDef& node, const TensorFlowImportFlags& tf_import_flags,
+    const ModelFlags& model_flags, Model* model) {
+  CHECK_EQ(node.op(), "IdentityN");
+  for (int i = 0; i < node.input_size(); ++i) {
+    auto* op = new TensorFlowIdentityOperator;
+    const auto& input_name = node.input(i);
+    string output_name = node.name();
+    if (i > 0) {
+      output_name = output_name + ":" + std::to_string(i);
+    }
+    op->inputs.push_back(input_name);
+    op->outputs.push_back(output_name);
+    model->operators.emplace_back(op);
+  }
   return tensorflow::Status::OK();
 }
 
@@ -1177,7 +1195,11 @@ tensorflow::Status ConvertSoftmaxOperator(
   softmax->outputs.push_back(node.name());
   // TensorFlow's Softmax doesn't seem to admit a 'beta' parameter.
   CHECK(!node.attr().count("beta"));  // Stab in the dark, just in case.
-  softmax->beta = 1.f;
+  if (node.attr().count("_softmax_beta")) {
+    softmax->beta = GetFloatAttr(node, "_softmax_beta");
+  } else {
+    softmax->beta = 1.f;
+  }
   model->operators.emplace_back(softmax);
   return tensorflow::Status::OK();
 }
@@ -1686,8 +1708,12 @@ tensorflow::Status ConvertResizeBilinearOperator(
   auto* op = new ResizeBilinearOperator;
 
   op->align_corners = false;
+  op->half_pixel_centers = false;
   if (HasAttr(node, "align_corners")) {
     op->align_corners = GetBoolAttr(node, "align_corners");
+  }
+  if (HasAttr(node, "half_pixel_centers")) {
+    op->half_pixel_centers = GetBoolAttr(node, "half_pixel_centers");
   }
 
   op->inputs.push_back(node.input(0));
@@ -1869,23 +1895,25 @@ tensorflow::Status ConvertReduceOperator(
   return tensorflow::Status::OK();
 }
 
+// TODO(b/139320642): Add test when fused op is supported.
 tensorflow::Status ConvertSvdfOperator(
     const NodeDef& node, const TensorFlowImportFlags& tf_import_flags,
     const ModelFlags& model_flags, Model* model) {
   CHECK_EQ(node.op(), "Svdf");
   const int input_size = GetInputsCount(node, tf_import_flags);
-  QCHECK(input_size == 3 || input_size == 4)
+  QCHECK(input_size == 4 || input_size == 5)
       << "Svdf node expects 3 or 4 inputs other than control dependencies: "
       << node.DebugString();
-  bool has_bias = (input_size == 4);
+  bool has_bias = (input_size == 5);
   auto* op = new SvdfOperator;
-  op->inputs.push_back(node.input(0));
-  op->inputs.push_back(node.input(1));
-  op->inputs.push_back(node.input(2));
+  int index = 0;
+  op->inputs.push_back(node.input(index++));
+  op->inputs.push_back(node.input(index++));
+  op->inputs.push_back(node.input(index++));
   if (has_bias) {
-    op->inputs.push_back(node.input(3));
+    op->inputs.push_back(node.input(index++));
   }
-  op->outputs.push_back(node.name() + "_state");
+  op->inputs.push_back(node.input(index));
   op->outputs.push_back(node.name());
   if (node.attr().at("ActivationFunction").s() == "Relu") {
     op->fused_activation_function = FusedActivationFunctionType::kRelu;
@@ -2215,11 +2243,11 @@ bool InlineAllFunctions(GraphDef* graphdef) {
 
   tensorflow::FunctionLibraryDefinition fld(tensorflow::OpRegistry::Global(),
                                             graphdef_copy.library());
-  tensorflow::DeviceMgr device_mgr(std::move(devices));
-  tensorflow::OptimizerOptions o_opts;
+  tensorflow::StaticDeviceMgr device_mgr(std::move(devices));
   tensorflow::ProcessFunctionLibraryRuntime pflr(
-      &device_mgr, tensorflow::Env::Default(), TF_GRAPH_DEF_VERSION, &fld,
-      o_opts, nullptr);
+      &device_mgr, tensorflow::Env::Default(), &options.config,
+      TF_GRAPH_DEF_VERSION, &fld,
+      options.config.graph_options().optimizer_options(), nullptr);
   tensorflow::FunctionLibraryRuntime* flr;
   flr = pflr.GetFLR("/job:localhost/replica:0/task:0/cpu:0");
 
@@ -2383,9 +2411,6 @@ tensorflow::Status ConvertUnidirectionalSequenceLstm(
   DCHECK_EQ(node.op(), "UnidirectionalSequenceLstm");
 
   const auto& indices = GetListAttr(node, "_tflite_input_indices");
-  if (indices.i_size() != node.input().size()) {
-    return tensorflow::errors::InvalidArgument("Input size does not match.");
-  }
 
   auto* op = new UnidirectionalSequenceLstmOperator();
 
@@ -2394,20 +2419,38 @@ tensorflow::Status ConvertUnidirectionalSequenceLstm(
   const int kInputsSize = 20;
 
   op->inputs.resize(kInputsSize);
-  std::vector<bool> done(kInputsSize);
-  int idx = 0;
-  for (const string& input : node.input()) {
-    int real_index = indices.i(idx);
-    op->inputs[real_index] = (input);
-    done[real_index] = true;
-    idx++;
-  }
 
-  for (int idx = 0; idx < done.size(); idx++) {
-    if (!done[idx]) {
-      string optional_name = node.name() + "_" + std::to_string(idx);
-      model->CreateOptionalArray(optional_name);
-      op->inputs[idx] = optional_name;
+  if (indices.i_size() != node.input().size()) {
+    // New version, the optional inputs are filled with constant nodes.
+    int count = 0;
+    for (int idx = 0; idx < kInputsSize; ++idx) {
+      if (count < indices.i_size() && indices.i(count) == idx) {
+        // Specified input.
+        op->inputs[idx] = node.input(idx);
+        count++;
+      } else {
+        // Optional input.
+        string optional_name = node.name() + "_" + std::to_string(idx);
+        model->CreateOptionalArray(optional_name);
+        op->inputs[idx] = optional_name;
+      }
+    }
+  } else {  // Legacy version.
+    std::vector<bool> done(kInputsSize);
+    int idx = 0;
+    for (const string& input : node.input()) {
+      int real_index = indices.i(idx);
+      op->inputs[real_index] = (input);
+      done[real_index] = true;
+      idx++;
+    }
+
+    for (int idx = 0; idx < done.size(); idx++) {
+      if (!done[idx]) {
+        string optional_name = node.name() + "_" + std::to_string(idx);
+        model->CreateOptionalArray(optional_name);
+        op->inputs[idx] = optional_name;
+      }
     }
   }
 
@@ -2526,7 +2569,7 @@ ConverterMapType GetTensorFlowNodeConverterMap() {
       {"GreaterEqual",
        ConvertSimpleOperator<TensorFlowGreaterEqualOperator, 2, 1>},
       {"Identity", ConvertIdentityOperator},
-      {"IdentityN", ConvertIdentityOperator},
+      {"IdentityN", ConvertIdentityNOperator},
       {"LRN", ConvertLRNOperator},
       {"LeakyRelu", ConvertLeakyReluOperator},
       {"LegacyFedInput", ConvertPlaceholderOperator},
@@ -2540,8 +2583,16 @@ ConverterMapType GetTensorFlowNodeConverterMap() {
       {"MatMul", ConvertMatMulOperator},
       {"MatrixDiag", ConvertSimpleOperator<MatrixDiagOperator, 1, 1>},
       {"MatrixDiagV2", ConvertSimpleOperator<MatrixDiagV2Operator, 5, 1>},
+      // `MatrixDiagV3` has an `align` attribute. However, Toco only converts
+      // `MatrixDiagV3` to `MatrixDiag` with default `k, num_rows, num_cols,
+      // padding_value` inputs. In this case, `align` can be ignored.
+      {"MatrixDiagV3", ConvertSimpleOperator<MatrixDiagV3Operator, 5, 1>},
       {"MatrixSetDiag", ConvertSimpleOperator<MatrixSetDiagOperator, 2, 1>},
       {"MatrixSetDiagV2", ConvertSimpleOperator<MatrixSetDiagV2Operator, 3, 1>},
+      // `MatrixSetDiagV3` has an `align` attribute. However, Toco only converts
+      // `MatrixSetDiagV3` to `MatrixSetDiag` with default `k` inputs. In this
+      // case, `align` can be ignored.
+      {"MatrixSetDiagV3", ConvertSimpleOperator<MatrixSetDiagV3Operator, 3, 1>},
       {"Max", ConvertReduceOperator<TensorFlowMaxOperator>},
       {"MaxPool", ConvertMaxPoolOperator},
       {"Maximum", ConvertSimpleOperator<TensorFlowMaximumOperator, 2, 1>},
@@ -2577,6 +2628,7 @@ ConverterMapType GetTensorFlowNodeConverterMap() {
       {"ReverseV2", ConvertSimpleOperator<ReverseV2Operator, 2, 1>},
       {"Round", ConvertRoundOperator},
       {"Rsqrt", ConvertSimpleOperator<TensorFlowRsqrtOperator, 1, 1>},
+      {"SegmentSum", ConvertSimpleOperator<SegmentSumOperator, 2, 1>},
       {"Select", ConvertSimpleOperator<SelectOperator, 3, 1>},
       {"SelectV2", ConvertSimpleOperator<SelectOperator, 3, 1>},
       {"Shape", ConvertShapeOperator},

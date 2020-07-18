@@ -38,7 +38,7 @@ class LMDBDatasetOp : public DatasetOpKernel {
     std::vector<string> filenames;
     filenames.reserve(filenames_tensor->NumElements());
     for (int i = 0; i < filenames_tensor->NumElements(); ++i) {
-      filenames.push_back(filenames_tensor->flat<string>()(i));
+      filenames.push_back(filenames_tensor->flat<tstring>()(i));
     }
 
     *output = new Dataset(ctx, filenames);
@@ -70,6 +70,8 @@ class LMDBDatasetOp : public DatasetOpKernel {
 
     string DebugString() const override { return "LMDBDatasetOp::Dataset"; }
 
+    Status CheckExternalState() const override { return Status::OK(); }
+
    protected:
     Status AsGraphDefInternal(SerializationContext* ctx,
                               DatasetGraphDefBuilder* b,
@@ -95,13 +97,13 @@ class LMDBDatasetOp : public DatasetOpKernel {
             out_tensors->emplace_back(ctx->allocator({}), DT_STRING,
                                       TensorShape({}));
             Tensor& key_tensor = out_tensors->back();
-            key_tensor.scalar<string>()() = string(
+            key_tensor.scalar<tstring>()() = string(
                 static_cast<const char*>(mdb_key_.mv_data), mdb_key_.mv_size);
 
             out_tensors->emplace_back(ctx->allocator({}), DT_STRING,
                                       TensorShape({}));
             Tensor& value_tensor = out_tensors->back();
-            value_tensor.scalar<string>()() =
+            value_tensor.scalar<tstring>()() =
                 string(static_cast<const char*>(mdb_value_.mv_data),
                        mdb_value_.mv_size);
 
@@ -144,7 +146,7 @@ class LMDBDatasetOp : public DatasetOpKernel {
       }
 
      private:
-      Status SetupStreamsLocked(Env* env) EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+      Status SetupStreamsLocked(Env* env) TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
         if (current_file_index_ >= dataset()->filenames_.size()) {
           return errors::InvalidArgument(
               "current_file_index_:", current_file_index_,
@@ -188,7 +190,7 @@ class LMDBDatasetOp : public DatasetOpKernel {
         }
         return Status::OK();
       }
-      void ResetStreamsLocked() EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+      void ResetStreamsLocked() TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
         if (mdb_env_ != nullptr) {
           if (mdb_cursor_) {
             mdb_cursor_close(mdb_cursor_);
@@ -203,14 +205,14 @@ class LMDBDatasetOp : public DatasetOpKernel {
         }
       }
       mutex mu_;
-      size_t current_file_index_ GUARDED_BY(mu_) = 0;
-      MDB_env* mdb_env_ GUARDED_BY(mu_) = nullptr;
-      MDB_txn* mdb_txn_ GUARDED_BY(mu_) = nullptr;
-      MDB_dbi mdb_dbi_ GUARDED_BY(mu_) = 0;
-      MDB_cursor* mdb_cursor_ GUARDED_BY(mu_) = nullptr;
+      size_t current_file_index_ TF_GUARDED_BY(mu_) = 0;
+      MDB_env* mdb_env_ TF_GUARDED_BY(mu_) = nullptr;
+      MDB_txn* mdb_txn_ TF_GUARDED_BY(mu_) = nullptr;
+      MDB_dbi mdb_dbi_ TF_GUARDED_BY(mu_) = 0;
+      MDB_cursor* mdb_cursor_ TF_GUARDED_BY(mu_) = nullptr;
 
-      MDB_val mdb_key_ GUARDED_BY(mu_);
-      MDB_val mdb_value_ GUARDED_BY(mu_);
+      MDB_val mdb_key_ TF_GUARDED_BY(mu_);
+      MDB_val mdb_value_ TF_GUARDED_BY(mu_);
     };
 
     const std::vector<string> filenames_;

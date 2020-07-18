@@ -29,7 +29,6 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variables as variables_module
-from tensorflow.python.ops.linalg import linalg_impl as linalg
 
 
 ################################################################################
@@ -91,11 +90,11 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None, name=None):
   tf.is_tensor(y)
   # ==> True
 
-  x = tfp.util.DeferredTensor(lambda x: x, 13.37)
+  x = tfp.util.DeferredTensor(13.37, lambda x: x)
   y = convert_nonref_to_tensor(x)
   x is y
   # ==> True
-  tf.is_tensor
+  tf.is_tensor(y)
   # ==> False
   tf.equal(y, 13.37)
   # ==> True
@@ -239,7 +238,7 @@ def assert_compatible_matrix_dimensions(operator, x):
 
 def assert_is_batch_matrix(tensor):
   """Static assert that `tensor` has rank `2` or higher."""
-  sh = tensor.get_shape()
+  sh = tensor.shape
   if sh.ndims is not None and sh.ndims < 2:
     raise ValueError(
         "Expected [batch] matrix to have at least two dimensions.  Found: "
@@ -302,7 +301,7 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     name:  A string name to prepend to created ops.
 
   Returns:
-    bcast_matrices: List of `Tensor`s, with `bcast_matricies[i]` containing
+    bcast_matrices: List of `Tensor`s, with `bcast_matrices[i]` containing
       the values from `batch_matrices[i]`, with possibly broadcast batch dims.
 
   Raises:
@@ -327,14 +326,14 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     # x.shape =    [2, j, k]  (batch shape =    [2])
     # y.shape = [3, 1, l, m]  (batch shape = [3, 1])
     # ==> bcast_batch_shape = [3, 2]
-    bcast_batch_shape = batch_matrices[0].get_shape()[:-2]
+    bcast_batch_shape = batch_matrices[0].shape[:-2]
     for mat in batch_matrices[1:]:
       bcast_batch_shape = array_ops.broadcast_static_shape(
           bcast_batch_shape,
-          mat.get_shape()[:-2])
+          mat.shape[:-2])
     if bcast_batch_shape.is_fully_defined():
       for i, mat in enumerate(batch_matrices):
-        if mat.get_shape()[:-2] != bcast_batch_shape:
+        if mat.shape[:-2] != bcast_batch_shape:
           bcast_shape = array_ops.concat(
               [bcast_batch_shape.as_list(), array_ops.shape(mat)[-2:]], axis=0)
           batch_matrices[i] = array_ops.broadcast_to(mat, bcast_shape)
@@ -355,13 +354,6 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     return batch_matrices
 
 
-def cholesky_solve_with_broadcast(chol, rhs, name=None):
-  """Solve systems of linear equations."""
-  with ops.name_scope(name, "CholeskySolveWithBroadcast", [chol, rhs]):
-    chol, rhs = broadcast_matrix_batch_dims([chol, rhs])
-    return linalg_ops.cholesky_solve(chol, rhs)
-
-
 def matrix_solve_with_broadcast(matrix, rhs, adjoint=False, name=None):
   """Solve systems of linear equations."""
   with ops.name_scope(name, "MatrixSolveWithBroadcast", [matrix, rhs]):
@@ -377,57 +369,6 @@ def matrix_solve_with_broadcast(matrix, rhs, adjoint=False, name=None):
 
     solution = linalg_ops.matrix_solve(
         matrix, rhs, adjoint=adjoint and still_need_to_transpose)
-
-    return reshape_inv(solution)
-
-
-def matrix_triangular_solve_with_broadcast(matrix,
-                                           rhs,
-                                           lower=True,
-                                           adjoint=False,
-                                           name=None):
-  """Solves triangular systems of linear equations with by backsubstitution.
-
-  Works identically to `tf.linalg.triangular_solve`, but broadcasts batch dims
-  of `matrix` and `rhs` (by replicating) if they are determined statically to be
-  different, or if static shapes are not fully defined.  Thus, this may result
-  in an inefficient replication of data.
-
-  Args:
-    matrix: A Tensor. Must be one of the following types:
-      `float64`, `float32`, `complex64`, `complex128`. Shape is `[..., M, M]`.
-    rhs: A `Tensor`. Must have the same `dtype` as `matrix`.
-      Shape is `[..., M, K]`.
-    lower: An optional `bool`. Defaults to `True`. Indicates whether the
-      innermost matrices in `matrix` are lower or upper triangular.
-    adjoint: An optional `bool`. Defaults to `False`. Indicates whether to solve
-      with matrix or its (block-wise) adjoint.
-    name: A name for the operation (optional).
-
-  Returns:
-    `Tensor` with same `dtype` as `matrix` and shape `[..., M, K]`.
-  """
-  with ops.name_scope(name, "MatrixTriangularSolve", [matrix, rhs]):
-    matrix = ops.convert_to_tensor(matrix, name="matrix")
-    rhs = ops.convert_to_tensor(rhs, name="rhs", dtype=matrix.dtype)
-
-    # If either matrix/rhs has extra dims, we can reshape to get rid of them.
-    matrix, rhs, reshape_inv, still_need_to_transpose = _reshape_for_efficiency(
-        matrix, rhs, adjoint_a=adjoint)
-
-    # lower indicates whether the matrix is lower triangular. If we have
-    # manually taken adjoint inside _reshape_for_efficiency, it is now upper tri
-    if not still_need_to_transpose and adjoint:
-      lower = not lower
-
-    # This will broadcast by brute force if we still need to.
-    matrix, rhs = broadcast_matrix_batch_dims([matrix, rhs])
-
-    solution = linalg_ops.matrix_triangular_solve(
-        matrix,
-        rhs,
-        lower=lower,
-        adjoint=adjoint and still_need_to_transpose)
 
     return reshape_inv(solution)
 
@@ -489,13 +430,13 @@ def _reshape_for_efficiency(a,
   # Any transposes/adjoints will happen here explicitly, rather than in calling
   # code.  Why?  To avoid having to write separate complex code for each case.
   if adjoint_a:
-    a = linalg.adjoint(a)
+    a = array_ops.matrix_transpose(a, conjugate=True)
   elif transpose_a:
-    a = linalg.transpose(a)
+    a = array_ops.matrix_transpose(a, conjugate=False)
   if adjoint_b:
-    b = linalg.adjoint(b)
-  elif transpose_b:
-    b = linalg.transpose(b)
+    b = array_ops.matrix_transpose(b, conjugate=True)
+  elif transpose_a:
+    b = array_ops.matrix_transpose(b, conjugate=False)
   still_need_to_transpose = False
 
   # Recompute shapes, since the transpose/adjoint may have changed them.

@@ -74,17 +74,18 @@ class GeneratorDatasetOp::Dataset : public DatasetBase {
     return name_utils::DatasetDebugString(kDatasetType);
   }
 
-  bool IsStateful() const override {
-    return init_func_->IsStateful() || next_func_->IsStateful() ||
-           finalize_func_->IsStateful();
+  Status CheckExternalState() const override {
+    TF_RETURN_IF_ERROR(init_func_->CheckExternalState());
+    TF_RETURN_IF_ERROR(next_func_->CheckExternalState());
+    return finalize_func_->CheckExternalState();
   }
 
  protected:
   Status AsGraphDefInternal(SerializationContext* ctx,
                             DatasetGraphDefBuilder* b,
                             Node** output) const override {
-    return errors::Unimplemented("%s does not support serialization",
-                                 DebugString());
+    return errors::Unimplemented(DebugString(),
+                                 " does not support serialization");
   }
 
  private:
@@ -142,11 +143,10 @@ class GeneratorDatasetOp::Dataset : public DatasetBase {
         s = Status::OK();
         *end_of_sequence = true;
 
-        // NOTE(mrry): We ignore any tensors returned by the
-        // finalize function.
+        // NOTE(mrry): We ignore any tensors returned by the finalize function.
         std::vector<Tensor> ignored;
-        TF_RETURN_IF_ERROR(
-            instantiated_finalize_func_->RunInstantiated(state_, &ignored));
+        TF_RETURN_IF_ERROR(instantiated_finalize_func_->RunWithBorrowedArgs(
+            ctx, state_, &ignored));
         finalized_ = true;
       }
       return s;
@@ -160,9 +160,9 @@ class GeneratorDatasetOp::Dataset : public DatasetBase {
 
    private:
     mutex mu_;
-    bool initialized_ GUARDED_BY(mu_) = false;
-    bool finalized_ GUARDED_BY(mu_) = false;
-    std::vector<Tensor> state_ GUARDED_BY(mu_);
+    bool initialized_ TF_GUARDED_BY(mu_) = false;
+    bool finalized_ TF_GUARDED_BY(mu_) = false;
+    std::vector<Tensor> state_ TF_GUARDED_BY(mu_);
     std::unique_ptr<InstantiatedCapturedFunction> instantiated_init_func_;
     std::unique_ptr<InstantiatedCapturedFunction> instantiated_next_func_;
     std::unique_ptr<InstantiatedCapturedFunction> instantiated_finalize_func_;

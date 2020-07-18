@@ -416,9 +416,21 @@ TEST_F(OperatorTest, BuiltinMul) {
 TEST_F(OperatorTest, ResizeBilinear) {
   ResizeBilinearOperator op;
   op.align_corners = true;
+  op.half_pixel_centers = false;
   auto output_toco_op = SerializeAndDeserialize(
       GetOperator("RESIZE_BILINEAR", OperatorType::kResizeBilinear), op);
   EXPECT_EQ(op.align_corners, output_toco_op->align_corners);
+  EXPECT_EQ(op.half_pixel_centers, output_toco_op->half_pixel_centers);
+}
+
+TEST_F(OperatorTest, ResizeBilinear_HalfPixelCenters) {
+  ResizeBilinearOperator op;
+  op.align_corners = true;
+  op.half_pixel_centers = true;
+  auto output_toco_op = SerializeAndDeserialize(
+      GetOperator("RESIZE_BILINEAR", OperatorType::kResizeBilinear), op);
+  EXPECT_EQ(op.align_corners, output_toco_op->align_corners);
+  EXPECT_EQ(op.half_pixel_centers, output_toco_op->half_pixel_centers);
 }
 
 TEST_F(OperatorTest, ResizeNearestNeighbor) {
@@ -727,6 +739,13 @@ TEST_F(OperatorTest, BuiltinUnique) {
   EXPECT_EQ(output_toco_op->idx_out_type, op.idx_out_type);
 }
 
+TEST_F(OperatorTest, BuiltinSegmentSum) {
+  SegmentSumOperator op;
+  auto output_toco_op = SerializeAndDeserialize(
+      GetOperator("SEGMENT_SUM", OperatorType::kSegmentSum), op);
+  ASSERT_NE(nullptr, output_toco_op.get());
+}
+
 TEST_F(OperatorTest, BuiltinReverseSequence) {
   ReverseSequenceOperator op;
   op.seq_dim = 3;
@@ -985,7 +1004,7 @@ TEST_F(OperatorTest, VersioningFullyConnectedTest) {
   output_uint8_array.data_type = ArrayDataType::kUint8;
   OperatorSignature uint8_signature = {.op = &fully_connected_op,
                                        .model = &uint8_model};
-  EXPECT_EQ(op->GetVersion(uint8_signature), 1);
+  EXPECT_EQ(op->GetVersion(uint8_signature), 6);
 
   Model int8_model;
   Array& input_int8_array =
@@ -999,7 +1018,7 @@ TEST_F(OperatorTest, VersioningFullyConnectedTest) {
   output_int8_array.data_type = ArrayDataType::kInt8;
   OperatorSignature int8_signature = {.op = &fully_connected_op,
                                       .model = &int8_model};
-  EXPECT_EQ(op->GetVersion(int8_signature), 4);
+  EXPECT_EQ(op->GetVersion(int8_signature), 6);
 }
 
 TEST_F(OperatorTest, VersioningDequantizeTest) {

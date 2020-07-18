@@ -1,3 +1,4 @@
+# Lint as: python2, python3
 # Copyright 2017 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,9 +19,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import warnings
 import enum
-from six import PY3
+import warnings
+
+from absl import logging
+import six
+from six import PY2
 
 from google.protobuf import text_format as _text_format
 from google.protobuf.message import DecodeError
@@ -42,9 +46,11 @@ from tensorflow.lite.python.convert_saved_model import freeze_saved_model as _fr
 from tensorflow.lite.python.interpreter import Interpreter  # pylint: disable=unused-import
 from tensorflow.lite.python.interpreter import load_delegate  # pylint: disable=unused-import
 from tensorflow.lite.python.op_hint import convert_op_hints_to_stubs  # pylint: disable=unused-import
+from tensorflow.lite.python.op_hint import is_ophint_converted as _is_ophint_converted
 from tensorflow.lite.python.op_hint import OpHint  # pylint: disable=unused-import
 from tensorflow.lite.python.optimize import calibrator as _calibrator
 from tensorflow.lite.python.util import build_debug_info_func as _build_debug_info_func
+from tensorflow.lite.python.util import convert_debug_info_func as _convert_debug_info_func
 from tensorflow.lite.python.util import freeze_graph as _freeze_graph
 from tensorflow.lite.python.util import get_debug_info as _get_debug_info
 from tensorflow.lite.python.util import get_grappler_config as _get_grappler_config
@@ -70,6 +76,10 @@ from tensorflow.python.saved_model import tag_constants as _tag_constants
 from tensorflow.python.saved_model.load import load as _load
 from tensorflow.python.util import deprecation as _deprecation
 from tensorflow.python.util.tf_export import tf_export as _tf_export
+
+
+# The default value of `experimental_new_converter`.
+_USE_EXPERIMENTAL_NEW_CONVERTER = True
 
 
 @_tf_export("lite.Optimize")
@@ -142,8 +152,8 @@ class TargetSpec(object):
       supported by the device. (default set([OpsSet.TFLITE_BUILTINS]))
     supported_types: List of types for constant values on the target device.
       Supported values are types exported by lite.constants. Frequently, an
-      optimization choice is driven by the most compact (i.e. smallest)
-      type in this list (default [constants.FLOAT])
+      optimization choice is driven by the most compact (i.e. smallest) type in
+      this list (default [constants.FLOAT])
   """
 
   def __init__(self, supported_ops=None, supported_types=None):
@@ -163,13 +173,28 @@ class TFLiteConverterBase(object):
     self.target_spec = TargetSpec()
     self.optimizations = []
     self.representative_dataset = None
-    self.experimental_enable_mlir_converter = False
+    self.experimental_new_converter = _USE_EXPERIMENTAL_NEW_CONVERTER
+    self._experimental_new_quantizer = False
+    self._experimental_calibrate_only = False
+    # The 'GraphDebugInfo'  contains the stack traces of all the original nodes
+    # in the `GraphDef` to the converter.
     self._debug_info = None
 
-  def _grappler_config(self):
+  def _grappler_config(self, optimizers=None):
+    """Creates a tf.compat.v1.ConfigProto for configuring Grappler.
+
+    Args:
+      optimizers: List of strings that represents the list of optimizers.
+
+    Returns:
+      tf.ConfigProto.
+    """
+    if not optimizers:
+      optimizers = []
+    optimizers.append("constfold")
+
     is_only_flex_enabled = (
         set([OpsSet.SELECT_TF_OPS]) == set(self.target_spec.supported_ops))
-    optimizers = ["constfold"]
     if is_only_flex_enabled:
       # The layout optimizer turns NHCW to NCHW. This provides performance
       # optimizations when Flex mode is enabled. However, this is not compatible
@@ -234,9 +259,24 @@ class TFLiteConverterBase(object):
                                 inference_output_type):
     allow_float = not self._is_int8_target_required()
     calibrate_quantize = _calibrator.Calibrator(result)
-    return calibrate_quantize.calibrate_and_quantize(
-        self.representative_dataset.input_gen, inference_input_type,
-        inference_output_type, allow_float)
+    if self._experimental_calibrate_only:
+      return calibrate_quantize.calibrate(self.representative_dataset.input_gen)
+    else:
+      return calibrate_quantize.calibrate_and_quantize(
+          self.representative_dataset.input_gen, inference_input_type,
+          inference_output_type, allow_float, self._experimental_new_quantizer)
+
+  def _is_unknown_shapes_allowed(self):
+    # TODO(b/128319310): Investigate which quantization methods work.
+    if self._any_optimization_enabled():
+      return False
+
+    # Unknown dimensions are only allowed with the new converter.
+    if not self.experimental_new_converter:
+      return False
+
+    # TODO(b/150489014): Disable functionality for now.
+    return False
 
   def _get_base_converter_args(self):
     """Returns the base converter args.
@@ -253,7 +293,7 @@ class TFLiteConverterBase(object):
         "quantize_to_float16": float16_quantize,
         "debug_info": self._debug_info,
         "target_ops": self.target_spec.supported_ops,
-        "enable_mlir_converter": self.experimental_enable_mlir_converter,
+        "enable_mlir_converter": self.experimental_new_converter,
     }
     return args
 
@@ -271,13 +311,12 @@ class TFLiteConverterV2(TFLiteConverterBase):
     target_spec: Experimental flag, subject to change. Specification of target
       device.
     optimizations: Experimental flag, subject to change. A list of optimizations
-      to apply when converting the model. E.g. `[Optimize.DEFAULT]
+      to apply when converting the model. E.g. `[Optimize.DEFAULT]`
     representative_dataset: A representative dataset that can be used to
       generate input and output samples for the model. The converter can use the
       dataset to evaluate different optimizations.
-    experimental_enable_mlir_converter: Experimental flag, subject to change.
-      Enables the MLIR converter instead of the TOCO converter.
-
+    experimental_new_converter: Experimental flag, subject to change.
+      Enables MLIR-based conversion instead of TOCO conversion.
   Example usage:
 
     ```python
@@ -317,7 +356,8 @@ class TFLiteConverterV2(TFLiteConverterBase):
 
     Args:
       funcs: List of TensorFlow ConcreteFunctions. The list should not contain
-        duplicate elements.
+        duplicate elements. Currently converter can only convert a single
+        ConcreteFunction. Converting multiple functions is under development.
 
     Returns:
       TFLiteConverter object.
@@ -379,7 +419,19 @@ class TFLiteConverterV2(TFLiteConverterBase):
     Returns:
       TFLiteConverter object.
     """
-    func = _saving_utils.trace_model_call(model)
+    input_signature = None
+    # If the model's call is not a `tf.function`, then we need to first get its
+    # input signature from `model_input_signature` method. We can't directly
+    # call `trace_model_call` because otherwise the batch dimension is set
+    # to None.
+    # Once we have better support for dynamic shapes, we can remove this.
+    if not isinstance(model.call, _def_function.Function):
+      # Pass `keep_original_batch_size=True` will ensure that we get an input
+      # signature including the batch dimension specified by the user.
+      input_signature = _saving_utils.model_input_signature(
+          model, keep_original_batch_size=True)
+
+    func = _saving_utils.trace_model_call(model, input_signature)
     concrete_func = func.get_concrete_function()
     return cls([concrete_func])
 
@@ -401,8 +453,10 @@ class TFLiteConverterV2(TFLiteConverterBase):
                        "ConcreteFunction. Converting multiple functions is "
                        "under development.")
 
-    frozen_func = _convert_to_constants.convert_variables_to_constants_v2(
-        self._funcs[0], lower_control_flow=False)
+    # graph_def is used here to preserve the node bug information
+    frozen_func, graph_def = (
+        _convert_to_constants.convert_variables_to_constants_v2_as_graph(
+            self._funcs[0], lower_control_flow=False))
     input_tensors = [
         tensor for tensor in frozen_func.inputs
         if tensor.dtype != _dtypes.resource
@@ -410,7 +464,6 @@ class TFLiteConverterV2(TFLiteConverterBase):
     output_tensors = frozen_func.outputs
 
     # Run a Grappler pass.
-    graph_def = frozen_func.graph.as_graph_def()
     graph_def = _run_graph_optimizations(
         graph_def,
         input_tensors,
@@ -418,25 +471,44 @@ class TFLiteConverterV2(TFLiteConverterBase):
         config=self._grappler_config(),
         graph=frozen_func.graph)
 
-    # Checks dimensions in input tensor.
-    for tensor in input_tensors:
-      # Note that shape_list might be empty for scalar shapes.
-      shape_list = tensor.shape.as_list()
-      if None in shape_list[1:]:
-        raise ValueError(
-            "None is only supported in the 1st dimension. Tensor '{0}' has "
-            "invalid shape '{1}'.".format(_get_tensor_name(tensor), shape_list))
-      elif shape_list and shape_list[0] is None:
-        # Set the batch size to 1 if undefined.
-        shape = tensor.shape.as_list()
-        shape[0] = 1
-        tensor.set_shape(shape)
+    if not self._is_unknown_shapes_allowed():
+      # Checks dimensions in input tensor.
+      for tensor in input_tensors:
+        # Note that shape_list might be empty for scalar shapes.
+        shape_list = tensor.shape.as_list()
+        if None in shape_list[1:]:
+          raise ValueError(
+              "None is only supported in the 1st dimension. Tensor '{0}' has "
+              "invalid shape '{1}'.".format(
+                  _get_tensor_name(tensor), shape_list))
+        elif shape_list and shape_list[0] is None:
+          # Set the batch size to 1 if undefined.
+          shape = tensor.shape.as_list()
+          shape[0] = 1
+          tensor.set_shape(shape)
 
     self._validate_quantization()
     self._validate_representative_dataset()
-    self._debug_info = _get_debug_info(
-        _build_debug_info_func(self._funcs[0].graph), graph_def)
+    if self._trackable_obj is None:
+      self._debug_info = _get_debug_info(
+          _build_debug_info_func(self._funcs[0].graph), graph_def)
+    else:
+      self._debug_info = _get_debug_info(
+          _convert_debug_info_func(self._trackable_obj.graph_debug_info),
+          graph_def)
+
     converter_kwargs = self._get_base_converter_args()
+
+    if not self.experimental_new_converter:
+      logging.warning(
+          "Please consider switching to use new converter by setting "
+          "experimental_new_converter to true. "
+          "Old converter (TOCO) is deprecated and flow will be switched on "
+          "by default to use new converter soon.")
+    else:
+      logging.info("Using experimental converter: If you encountered a problem "
+                   "please file a bug. You can opt-out "
+                   "by setting experimental_new_converter=False")
 
     # Converts model.
     result = _toco_convert_impl(
@@ -446,8 +518,8 @@ class TFLiteConverterV2(TFLiteConverterBase):
         **converter_kwargs)
 
     if self._is_calibration_quantize():
-      result = self._calibrate_quantize_model(result, constants.FLOAT,
-                                              constants.FLOAT)
+      result = self._calibrate_quantize_model(
+          result, constants.FLOAT, constants.FLOAT)
 
     return result
 
@@ -518,6 +590,8 @@ class TFLiteConverter(TFLiteConverterBase):
       output file. (default None)
     dump_graphviz_video: Boolean indicating whether to dump the graph after
       every graph transformation. (default False)
+    conversion_summary_dir: A string indicating the path to the generated
+      conversion logs.
     target_ops: Deprecated. Please specify `target_spec.supported_ops` instead.
       Set of OpsSet options indicating which converter to use.
       (default set([OpsSet.TFLITE_BUILTINS]))
@@ -528,9 +602,8 @@ class TFLiteConverter(TFLiteConverterBase):
     representative_dataset: A representative dataset that can be used to
       generate input and output samples for the model. The converter can use
       the dataset to evaluate different optimizations.
-    experimental_enable_mlir_converter: Experimental flag, subject to change.
-      Enables the MLIR converter instead of the TOCO converter.
-
+    experimental_new_converter: Experimental flag, subject to change.
+      Enables MLIR-based conversion instead of TOCO conversion.
   Example usage:
 
     ```python
@@ -601,7 +674,9 @@ class TFLiteConverter(TFLiteConverterBase):
     self._post_training_quantize = False
     self.dump_graphviz_dir = None
     self.dump_graphviz_video = False
+    self.conversion_summary_dir = None
     self._debug_info_func = experimental_debug_info_func
+    self._custom_opdefs = None
 
     # Attributes are used by models that cannot be loaded into TensorFlow.
     if not self._has_valid_tensors():
@@ -677,10 +752,10 @@ class TFLiteConverter(TFLiteConverterBase):
             print("Ignore 'tcmalloc: large alloc' warnings.")
 
             if not isinstance(file_content, str):
-              if PY3:
-                file_content = file_content.decode("utf-8")
+              if PY2:
+                file_content = six.ensure_binary(file_content, "utf-8")
               else:
-                file_content = file_content.encode("utf-8")
+                file_content = six.ensure_text(file_content, "utf-8")
             graph_def = _graph_pb2.GraphDef()
             _text_format.Merge(file_content, graph_def)
           except (_text_format.ParseError, DecodeError):
@@ -881,7 +956,7 @@ class TFLiteConverter(TFLiteConverterBase):
         None value for dimension in input_tensor.
     """
     # Checks dimensions in input tensor.
-    if self._has_valid_tensors():
+    if not self._is_unknown_shapes_allowed() and self._has_valid_tensors():
       for tensor in self._input_tensors:
         shape = tensor.shape
         if not shape:
@@ -948,13 +1023,26 @@ class TFLiteConverter(TFLiteConverterBase):
           "are not enabled.")
 
     optimized_graph = self._graph_def
-    if self.inference_type != constants.QUANTIZED_UINT8:
+    # if it is not uint8 or int8 with post-training quantization, it is not
+    # quantization aware training, then graph optimization is applied.
+    # Graph optimization is disabled for quantization aware training.
+    if (self.inference_type != constants.QUANTIZED_UINT8 or
+        (self.inference_type == constants.INT8 and
+         (post_training_optimize or weight_only_quantize))):
       try:
+        # TODO(b/150163103): Merge `disabling lower using switch merge' calls.
+        # Grappler will also try to lower while loop into switch merge
+        # representation which is undesired for Ophints, so we simply remove
+        # those attributes to prevent Grappler from doing so.
+        graph_def = _convert_to_constants.disable_lower_using_switch_merge(
+            optimized_graph)
+        # Run function inlining optimization to ensure any models generated
+        # through the from_frozen_graph path have been inlined.
         optimized_graph = _run_graph_optimizations(
-            self._graph_def,
+            graph_def,
             self._input_tensors,
             self._output_tensors,
-            config=self._grappler_config())
+            config=self._grappler_config(["function"]))
       except Exception:
         optimized_graph = self._graph_def
 
@@ -971,8 +1059,21 @@ class TFLiteConverter(TFLiteConverterBase):
         "reorder_across_fake_quant": self.reorder_across_fake_quant,
         "change_concat_input_ranges": self.change_concat_input_ranges,
         "dump_graphviz_dir": self.dump_graphviz_dir,
-        "dump_graphviz_video": self.dump_graphviz_video
+        "dump_graphviz_video": self.dump_graphviz_video,
+        "conversion_summary_dir": self.conversion_summary_dir,
+        "custom_opdefs": self._custom_opdefs,
     })
+
+    if not self.experimental_new_converter:
+      logging.warning(
+          "Please consider switching to use new converter by setting "
+          "experimental_new_converter to true. "
+          "Old converter (TOCO) is deprecated and flow will be switched on "
+          "by default to use new converter soon.")
+    else:
+      logging.info("Using experimental converter: If you encountered a problem "
+                   "please file a bug. You can opt-out "
+                   "by setting experimental_new_converter=False")
 
     # Converts model.
     if self._has_valid_tensors():
@@ -989,8 +1090,8 @@ class TFLiteConverter(TFLiteConverterBase):
           **converter_kwargs)
 
     if self._is_calibration_quantize():
-      result = self._calibrate_quantize_model(result, inference_input_type,
-                                              inference_output_type)
+      result = self._calibrate_quantize_model(
+          result, inference_input_type, inference_output_type)
 
     return result
 
@@ -1029,8 +1130,27 @@ class TFLiteConverter(TFLiteConverterBase):
 
     for tensor in self._input_tensors:
       shape = tensor.shape.as_list()
-      shape[0] = batch_size
-      tensor.set_shape(shape)
+      if shape[0] is None:
+        shape[0] = batch_size
+        tensor.set_shape(shape)
+
+  def _is_unknown_shapes_allowed(self):
+    # Ophint Converted nodes will need the shapes to be known.
+    if _is_ophint_converted(self._graph_def):
+      return False
+
+    if not super(TFLiteConverter, self)._is_unknown_shapes_allowed():
+      return False
+
+    # `conversion_summary_dir` calls TOCO. Unknown shapes are only supported by
+    # the MLIR converter.
+    if self.conversion_summary_dir:
+      logging.warning(
+          "`conversion_summary_dir` does not work with unknown shapes. "
+          "Graphs with unknown shapes might be different than when this flag "
+          "is disabled.")
+      return False
+    return True
 
 
 @_tf_export(v1=["lite.TocoConverter"])
