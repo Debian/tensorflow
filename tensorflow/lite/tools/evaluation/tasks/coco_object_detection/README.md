@@ -197,10 +197,8 @@ for configuring NDK and SDK.
 
 ```
 bazel build -c opt \
-  --config=android_arm \
-  --cxxopt='--std=c++11' \
-  --copt=-D__ANDROID_TYPES_FULL__ \
-  --copt=-DSUPPORT_SELECTIVE_REGISTRATION \
+  --config=android_arm64 \
+  --cxxopt='--std=c++17' \
   //tensorflow/lite/tools/evaluation/tasks/coco_object_detection:run_eval
 ```
 
@@ -208,7 +206,7 @@ bazel build -c opt \
 directory if required):
 
 ```
-adb push bazel-bin/tensorflow/lite/tools/evaluation/tasks/coco_object_detection/run_eval /data/local/tmp
+adb push bazel-bin/third_party/tensorflow/lite/tools/evaluation/tasks/coco_object_detection/run_eval /data/local/tmp
 ```
 
 (3) Make the binary executable.
@@ -258,7 +256,6 @@ Optionally, you could also pass in the `--num_interpreter_threads` &
 
 ```
 bazel run -c opt \
-  --cxxopt='--std=c++11' \
   -- \
   //tensorflow/lite/tools/evaluation/tasks/coco_object_detection:run_eval \
   --model_file=/path/to/ssd_mobilenet_v1_float.tflite \

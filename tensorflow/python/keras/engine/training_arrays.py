@@ -140,7 +140,7 @@ def model_iteration(model,
     if steps_per_epoch is None:
       reset_dataset_after_each_epoch = True
       steps_per_epoch = training_utils.infer_steps_for_dataset(
-          inputs, steps_per_epoch, epochs=epochs, steps_name=steps_name)
+          model, inputs, steps_per_epoch, epochs=epochs, steps_name=steps_name)
     input_iterator = _get_iterator(inputs, model._distribution_strategy)
 
   # Enter tf.distribute.Strategy scope.
@@ -198,6 +198,7 @@ def model_iteration(model,
       # that determines the number of steps required. To avoid this issue,
       # set validation_steps here if validation_steps is None.
       validation_steps = training_utils.infer_steps_for_dataset(
+          model,
           val_inputs,
           validation_steps,
           epochs=epochs,
@@ -225,12 +226,9 @@ def model_iteration(model,
       epochs=epochs,
       steps_per_epoch=steps_per_epoch,
       samples=num_samples_or_steps,
-      verbose=0,  # Handle ProgBarLogger separately in this loop.
+      count_mode=count_mode,
+      verbose=verbose,
       mode=mode)
-  # TODO(omalleyt): Handle ProgBar as part of Callbacks once hooks are ready.
-  progbar = training_utils.get_progbar(model, count_mode)
-  progbar.params = callbacks.params
-  progbar.params['verbose'] = verbose
 
   # Find beforehand arrays that need sparse-to-dense conversion.
   if issparse is not None and not use_steps:
@@ -257,7 +255,6 @@ def model_iteration(model,
 
   callbacks.model.stop_training = False
   callbacks._call_begin_hook(mode)
-  progbar.on_train_begin()
 
   initial_epoch = model._maybe_load_initial_epoch_from_ckpt(initial_epoch, mode)
 
@@ -267,10 +264,12 @@ def model_iteration(model,
 
     # Setup work for each epoch
     epoch_logs = {}
-    model.reset_metrics()
+    if mode != ModeKeys.PREDICT:
+      # Collecting and resetting metrics has non-zero cost and will needlessly
+      # slow down model.predict.
+      model.reset_metrics()
     if mode == ModeKeys.TRAIN:
       callbacks.on_epoch_begin(epoch, epoch_logs)
-    progbar.on_epoch_begin(epoch, epoch_logs)
 
     if use_steps:
       # Step-wise loop.
@@ -285,7 +284,6 @@ def model_iteration(model,
       while step < target_steps:
         batch_logs = {'batch': step, 'size': 1}
         callbacks._call_batch_hook(mode, 'begin', step, batch_logs)
-        progbar.on_batch_begin(step, batch_logs)
 
         # Get outputs.
         try:
@@ -315,9 +313,6 @@ def model_iteration(model,
             elif step > 0:
               steps_per_epoch = step
               aggregator.steps = steps_per_epoch
-              if mode == ModeKeys.TRAIN:
-                progbar.params['steps'] = steps_per_epoch
-                progbar.progbar.target = steps_per_epoch
           else:
             # We ran out of batches while the user passed an iterator (legacy).
             callbacks.model.stop_training = True
@@ -345,7 +340,6 @@ def model_iteration(model,
         # Callbacks batch end.
         batch_logs = cbks.make_logs(model, batch_logs, batch_outs, mode)
         callbacks._call_batch_hook(mode, 'end', step, batch_logs)
-        progbar.on_batch_end(step, batch_logs)
         step += 1
 
         if callbacks.model.stop_training:
@@ -387,7 +381,6 @@ def model_iteration(model,
         # Callbacks batch_begin.
         batch_logs = {'batch': batch_index, 'size': len(batch_ids)}
         callbacks._call_batch_hook(mode, 'begin', batch_index, batch_logs)
-        progbar.on_batch_begin(batch_index, batch_logs)
 
         # Get outputs.
         batch_outs = f(ins_batch)
@@ -402,7 +395,6 @@ def model_iteration(model,
         # Callbacks batch end.
         batch_logs = cbks.make_logs(model, batch_logs, batch_outs, mode)
         callbacks._call_batch_hook(mode, 'end', batch_index, batch_logs)
-        progbar.on_batch_end(batch_index, batch_logs)
 
         if callbacks.model.stop_training:
           break
@@ -447,12 +439,12 @@ def model_iteration(model,
     if mode == ModeKeys.TRAIN:
       # Epochs only apply to `fit`.
       callbacks.on_epoch_end(epoch, epoch_logs)
-    progbar.on_epoch_end(epoch, epoch_logs)
 
     # Reinitialize dataset iterator for the next epoch.
     if reset_dataset_after_each_epoch and epoch < epochs - 1:
       _reinitialize_iterator(input_iterator, model._distribution_strategy)
 
+  model._successful_loop_finish = True
   callbacks._call_end_hook(mode)
 
   if model._distribution_strategy:
@@ -520,7 +512,7 @@ def _prepare_feed_values(model, inputs, targets, sample_weights, mode):
     # in Distribution Strategy case as it follows the same code path for both
     # eager and graph modes.
     # TODO(priyag,omalleyt): Either we should move the training DS with
-    # IteratorV2 to use training_generator code path, or figure out how to
+    # OwnedIterator to use training_generator code path, or figure out how to
     # set a symbolic Iterator out of a Dataset when in eager mode.
     if context.executing_eagerly():
       return get_distributed_inputs
@@ -534,8 +526,8 @@ def _prepare_feed_values(model, inputs, targets, sample_weights, mode):
         extract_tensors_from_dataset=True)
 
   inputs = training_utils.ModelInputs(inputs).as_list()
-  targets = targets or []
-  sample_weights = sample_weights or []
+  targets = list(targets or [])
+  sample_weights = list(sample_weights or [])
   ins = inputs + targets + sample_weights
   if mode == ModeKeys.TRAIN and not isinstance(K.symbolic_learning_phase(),
                                                int):

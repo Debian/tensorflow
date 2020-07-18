@@ -104,7 +104,12 @@ SliceIndex HandleCopiesBatched(OpKernelContext* ctx,
             slice_bytes);
       } else {
         // For non-"simple" types (e.g. strings).
-        out.template chip<2>(indices_idx) = params.template chip<2>(index);
+        out.template chip<0>(batch_idx)
+            .template chip<0>(outer_idx)
+            .template chip<0>(indices_idx) =
+            params.template chip<0>(batch_idx)
+                .template chip<0>(outer_idx)
+                .template chip<0>(static_cast<SliceIndex>(index));
       }
 
       indices_idx = i_next;
@@ -150,7 +155,7 @@ struct GatherFunctorBatchedCPU {
   } while (0)
 
     // TODO(rmlarsen): Investigate whether these specializations are still
-    // needed and, if yes, whether the slice sizes are apropriate.
+    // needed and, if yes, whether the slice sizes are appropriate.
     if (slice_size == 10)
       CALL(10);
     else if (slice_size == 20)

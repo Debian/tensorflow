@@ -24,15 +24,8 @@ import pkgutil
 import tensorflow as tf
 
 from tensorflow.python import tf2
+from tensorflow.python.keras import layers
 from tensorflow.python.platform import test
-
-# pylint: disable=g-import-not-at-top,unused-import
-_TENSORBOARD_AVAILABLE = True
-try:
-  import tensorboard as _tb
-except ImportError:
-  _TENSORBOARD_AVAILABLE = False
-# pylint: enable=g-import-not-at-top,unused-import
 
 
 class ModuleTest(test.TestCase):
@@ -77,19 +70,24 @@ class ModuleTest(test.TestCase):
     # pylint: enable=pointless-statement
 
   def testSummaryMerged(self):
-    # TODO(annarev): Make sure all our builds have tensorboard pip package
-    # installed and remove this condition.
-    if not _TENSORBOARD_AVAILABLE:
-      return
     # pylint: disable=pointless-statement
     tf.summary.image
     # If we use v2 API, check for create_file_writer,
     # otherwise check for FileWriter.
-    if '._api.v2' in tf.bitwise.__name__:
+    if hasattr(tf, '_major_api_version') and tf._major_api_version == 2:
       tf.summary.create_file_writer
     else:
       tf.summary.FileWriter
     # pylint: enable=pointless-statement
+
+  def testInternalKerasImport(self):
+    normalization_parent = layers.BatchNormalization.__module__.split('.')[-1]
+    if tf._major_api_version == 2:
+      self.assertEqual('normalization_v2', normalization_parent)
+      self.assertTrue(layers.BatchNormalization._USE_V2_BEHAVIOR)
+    else:
+      self.assertEqual('normalization', normalization_parent)
+      self.assertFalse(layers.BatchNormalization._USE_V2_BEHAVIOR)
 
 
 if __name__ == '__main__':

@@ -31,6 +31,7 @@ import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 
 from tensorflow.core.protobuf import config_pb2
+from tensorflow.python import tf2
 from tensorflow.python.client import device_lib
 from tensorflow.python.client import session
 from tensorflow.python.eager import context
@@ -120,14 +121,14 @@ def all_feedables():
   return feedable_tensors
 
 
-def opt_cfg():
+def opt_cfg(do_constant_folding=True):
   return config_pb2.ConfigProto(
       allow_soft_placement=True,
       graph_options=config_pb2.GraphOptions(
           optimizer_options=config_pb2.OptimizerOptions(
               opt_level=config_pb2.OptimizerOptions.L1,
               do_function_inlining=True,
-              do_constant_folding=True)))
+              do_constant_folding=do_constant_folding)))
 
 
 def isum(s, maximum_iterations=None):
@@ -148,6 +149,14 @@ def filter_test_messages(s):
   """Returns a list of messages printed by enqueue_print_op."""
   prefix = "ControlFlowOpsTest: "
   return [l[len(prefix):] for l in s.split("\n") if l.startswith(prefix)]
+
+
+def tf_function_in_tf2(f):
+  if tf2.enabled():
+    # In TF1 do not wrap with tf.function so that we can test the v1 control
+    # flow code path.
+    return def_function.function(f)
+  return f
 
 
 @test_util.with_control_flow_v2
@@ -600,7 +609,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       result = self.evaluate(r)
     self.assertAllEqual(12, result)
 
-  @test_util.disable_xla("b/128638446")
   @test_util.run_in_graph_and_eager_modes
   def testCondPruning(self):
     v1 = variables.Variable(7)
@@ -933,10 +941,9 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       r = control_flow_ops.cond(constant_op.constant(False), true_fn, false_fn)
       self.assertAllEqual([2.0], self.evaluate(r))
 
-  @test_util.disable_control_flow_v2("b/79881896 (placeholder)")
   @test_util.run_v1_only("b/120545219")
   def testCondWithControl(self):
-    with self.cached_session():
+    with self.cached_session() as sess:
       control_holder = array_ops.placeholder(dtypes.float32, shape=())
       a = constant_op.constant(3)
 
@@ -948,7 +955,8 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       r = control_flow_ops.cond(
           constant_op.constant(True), true_branch,
           lambda: constant_op.constant(1))
-      self.assertEqual(5, self.evaluate(r))
+      result = sess.run(r, feed_dict={control_holder: 5.})
+      self.assertEqual(5, result)
 
   @test_util.run_v1_only("b/120545219")
   def testUninitializedRefIdentity(self):
@@ -1004,6 +1012,47 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
       r = control_flow_ops.cond(pred, fn1, fn2)
       self.evaluate(r)
+
+  @test_util.run_deprecated_v1
+  @test_util.enable_control_flow_v2
+  def testDisableLoweringSwitchMerge(self):
+    if test_util.is_gpu_available():
+      self.skipTest(
+          "Single threaded executor doesn't support partitioned graphs.  "
+          "Skipping GPU test.")
+    # Make pred feedable to ensure we don't constant-fold it out.
+    run_opts = config_pb2.RunOptions(
+        trace_level=config_pb2.RunOptions.FULL_TRACE)
+    run_metadata_no_lowering = config_pb2.RunMetadata()
+    run_metadata_with_lowering = config_pb2.RunMetadata()
+
+    config = opt_cfg(do_constant_folding=False)
+
+    pred = array_ops.placeholder_with_default(
+        constant_op.constant(True), shape=())
+    r = control_flow_ops.cond(pred, lambda: True, lambda: False)
+
+    with session.Session(config=config) as sess:
+      r_value = sess.run(
+          r, options=run_opts, run_metadata=run_metadata_with_lowering)
+      self.assertEqual(r_value, True)
+
+    # Use the single threaded executor, which disables control flow lowering.
+    config.experimental.executor_type = "SINGLE_THREADED_EXECUTOR"
+    with session.Session(config=config) as sess:
+      r_value = sess.run(
+          r, options=run_opts, run_metadata=run_metadata_no_lowering)
+      self.assertEqual(r_value, True)
+
+    self.assertTrue(  # pylint: disable=g-complex-comprehension
+        any("switch" in ns.node_name
+            for dev_stat in run_metadata_with_lowering.step_stats.dev_stats
+            for ns in dev_stat.node_stats))
+
+    self.assertTrue(  # pylint: disable=g-complex-comprehension
+        all("switch" not in ns.node_name
+            for dev_stat in run_metadata_no_lowering.step_stats.dev_stats
+            for ns in dev_stat.node_stats))
 
   @test_util.run_v1_only("b/120545219")
   def testCondGrad_1(self):
@@ -1215,7 +1264,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
                                                                   [1., 1.],
                                                                   [0., 0.]])
 
-  @test_util.disable_xla("b/128643464")
   def testCondGrad_MultiGather(self):
     # NOTE(skyewm): this test is interesting because the array_ops.gather and
     # ResourceVariable.sparse_read gradient functions returns IndexedSlices.
@@ -1292,7 +1340,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertAllEqual(0.0, sess.run(result, feed_dict={predicate: True}))
       self.assertAllEqual(0.0, sess.run(result))
 
-  @test_util.disable_xla("b/128644469 PrintV2")
   @test_util.run_in_graph_and_eager_modes
   def testCondAutoControlDeps(self):
     if test_util.is_gpu_available():
@@ -1365,7 +1412,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(["C"], filter_test_messages(printed.contents()))
 
 
-  @test_util.disable_xla("b/128643646 PrintV2")
   @test_util.run_in_graph_and_eager_modes
   def testWhileAutoControlDeps(self):
     # Legacy while_loop fails this test because it produces deprecation notices
@@ -3170,31 +3216,37 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(gradient_checker_v2._to_numpy(var2_grad_val),
                         [3., 0., 0.])
 
-  @test_util.run_deprecated_v1
   def testWhileGrad_Gather(self):
     # NOTE(skyewm): this test is interesting because the gather gradient
     # function returns an IndexedSlices.
-    x = constant_op.constant([1., 1., 1., 1., 1.])
-    y = control_flow_ops.while_loop(
-        lambda i, _: i < 3,
-        lambda i, x: (i + 1, x + array_ops.gather(x, [0])),
-        [0, x[:1]])[1]
-    z = y * 3.0
-    grad = gradients_impl.gradients(z, x)[0]
+    @tf_function_in_tf2
+    def fn():
+      x = constant_op.constant([1., 1., 1., 1., 1.])
+      y = control_flow_ops.while_loop(
+          lambda i, _: i < 3,
+          lambda i, x: (i + 1, x + array_ops.gather(x, [0])),
+          [0, x[:1]])[1]
+      z = y * 3.0
+      grad = gradients_impl.gradients(z, x)[0]
+      return y, grad
+    y, grad = fn()
     self.assertEqual(self.evaluate(y), 8.)
     self.assertAllEqual(self.evaluate(grad), [24., 0., 0., 0., 0.])
 
-  @test_util.run_deprecated_v1
   def testWhileGrad_GatherNoFanOut(self):
     # NOTE(skyewm): this test is interesting because the gather gradient
     # function returns an IndexedSlices.
-    x = constant_op.constant([1., 1., 1., 1., 1.])
-    y = control_flow_ops.while_loop(
-        lambda i, _: i < 3,
-        lambda i, x: (i + 1, array_ops.gather(x, [0])),
-        [0, x[:1]])[1]
-    z = y * 3.0
-    grad = gradients_impl.gradients(z, x)[0]
+    @tf_function_in_tf2
+    def fn():
+      x = constant_op.constant([1., 1., 1., 1., 1.])
+      y = control_flow_ops.while_loop(
+          lambda i, _: i < 3,
+          lambda i, x: (i + 1, array_ops.gather(x, [0])),
+          [0, x[:1]])[1]
+      z = y * 3.0
+      grad = gradients_impl.gradients(z, x)[0]
+      return y, grad
+    y, grad = fn()
     self.assertEqual(self.evaluate(y), 1.)
     self.assertAllEqual(self.evaluate(grad), [3., 0., 0., 0., 0.])
 
@@ -3419,7 +3471,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       r = gradients_impl.gradients([rx], x)
       self.assertAllClose(1024.0, r[0])
 
-  @test_util.disable_control_flow_v2("b/116355153 (back_prop flag)")
   @test_util.run_v1_only("b/120545219")
   def testWhileGrad_NoGradient(self):
     with self.cached_session():
@@ -3882,7 +3933,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertEqual(32.0, self.evaluate(r))
 
   @test_util.run_deprecated_v1
-  @test_util.disable_control_flow_v2("b/118712257")
   def testWhileGrad_StopGradInside(self):
     with self.cached_session():
       x = constant_op.constant(3.0, name="x")
@@ -3903,7 +3953,6 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertAllClose(156.0, self.evaluate(r))
 
   @test_util.run_deprecated_v1
-  @test_util.disable_control_flow_v2("b/118712257")
   def testWhileGrad_StopGradInsideNoShape(self):
     with self.cached_session() as sess:
       x = array_ops.placeholder(dtypes.float32)
@@ -3918,11 +3967,11 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
       rx, _ = control_flow_ops.while_loop(c, b, [x, y])
 
-      r = gradients_impl.gradients(rx, y)[0]
+      grad_y = gradients_impl.gradients(rx, y)[0]
+      grad_x = gradients_impl.gradients(rx, x)[0]
       feed_dict = {x: [3.0, 4.0], y: [2.0, 3.0]}
-      self.assertAllClose([0.0, 0.0], sess.run(r, feed_dict=feed_dict))
-      r = gradients_impl.gradients(rx, x)[0]
-      self.assertAllClose([156.0, 400.0], sess.run(r, feed_dict=feed_dict))
+      self.assertAllClose([0.0, 0.0], sess.run(grad_y, feed_dict=feed_dict))
+      self.assertAllClose([156.0, 400.0], sess.run(grad_x, feed_dict=feed_dict))
       name = "gradients/while/stopped_grad"
       all_ops = x.graph.get_operations()
       self.assertFalse(any(name in op.name for op in all_ops))

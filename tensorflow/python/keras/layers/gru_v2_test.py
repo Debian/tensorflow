@@ -32,16 +32,19 @@ from tensorflow.python.eager import backprop
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import ops
 from tensorflow.python.framework import random_seed
 from tensorflow.python.framework import test_util
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.keras.layers import recurrent as rnn_v1
 from tensorflow.python.keras.layers import recurrent_v2 as rnn
+from tensorflow.python.keras.utils import np_utils
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import gen_math_ops
 from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import nn
 from tensorflow.python.ops import random_ops
 from tensorflow.python.platform import test
 from tensorflow.python.training import gradient_descent
@@ -76,7 +79,15 @@ class GRUV2Test(keras_parameterized.TestCase):
                     unroll=unroll,
                     use_bias=use_bias,
                     reset_after=reset_after)
-    self.assertFalse(layer.could_use_cudnn)
+    self.assertFalse(layer._could_use_gpu_kernel)
+
+  @test_util.run_v2_only
+  def test_use_on_default_activation_with_gpu_kernel(self):
+    layer = rnn.GRU(1, activation=nn.tanh)
+    self.assertTrue(layer._could_use_gpu_kernel)
+
+    layer = rnn.GRU(1, recurrent_activation=nn.sigmoid)
+    self.assertTrue(layer._could_use_gpu_kernel)
 
   def test_keras_model_with_gru(self):
     input_shape = 10
@@ -91,7 +102,7 @@ class GRUV2Test(keras_parameterized.TestCase):
         test_samples=0,
         input_shape=(timestep, input_shape),
         num_classes=output_shape)
-    y_train = keras.utils.to_categorical(y_train, output_shape)
+    y_train = np_utils.to_categorical(y_train, output_shape)
 
     layer = rnn.GRU(rnn_state_size)
 
@@ -139,6 +150,10 @@ class GRUV2Test(keras_parameterized.TestCase):
 
   @test_util.run_v2_only
   def test_gru_v2_feature_parity_with_canonical_gru(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     input_shape = 10
     rnn_state_size = 8
     timestep = 4
@@ -150,7 +165,7 @@ class GRUV2Test(keras_parameterized.TestCase):
         input_shape=(timestep, input_shape),
         num_classes=rnn_state_size,
         random_seed=random_seed.DEFAULT_GRAPH_SEED)
-    y_train = keras.utils.to_categorical(y_train, rnn_state_size)
+    y_train = np_utils.to_categorical(y_train, rnn_state_size)
     # For the last batch item of the test data, we filter out the last
     # timestep to simulate the variable length sequence and masking test.
     x_train[-2:, -1, :] = 0.0
@@ -307,6 +322,10 @@ class GRUV2Test(keras_parameterized.TestCase):
     self.assertAllClose(y, y_ref)
 
   def test_with_masking_layer_GRU(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     layer_class = rnn.GRU
     inputs = np.random.random((2, 3, 4))
     targets = np.abs(np.random.random((2, 3, 5)))
@@ -319,6 +338,10 @@ class GRUV2Test(keras_parameterized.TestCase):
     model.fit(inputs, targets, epochs=1, batch_size=2, verbose=1)
 
   def test_masking_with_stacking_GRU(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     inputs = np.random.random((2, 3, 4))
     targets = np.abs(np.random.random((2, 3, 5)))
     targets /= targets.sum(axis=-1, keepdims=True)
@@ -342,7 +365,11 @@ class GRUV2Test(keras_parameterized.TestCase):
                 'return_sequences': True},
         input_shape=(num_samples, timesteps, embedding_dim))
 
+  @test_util.run_v2_only
   def test_float64_GRU(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Double type is yet not supported in ROCm')
+
     num_samples = 2
     timesteps = 3
     embedding_dim = 4
@@ -356,6 +383,10 @@ class GRUV2Test(keras_parameterized.TestCase):
         input_dtype='float64')
 
   def test_return_states_GRU(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     layer_class = rnn.GRU
     x = np.random.random((2, 3, 4))
     y = np.abs(np.random.random((2, 5)))
@@ -436,6 +467,10 @@ class GRUV2Test(keras_parameterized.TestCase):
       self.assertEqual(len(layer.get_losses_for(x)), 1)
 
   def test_statefulness_GRU(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     num_samples = 2
     timesteps = 3
     embedding_dim = 4
@@ -455,8 +490,7 @@ class GRUV2Test(keras_parameterized.TestCase):
     model.compile(
         optimizer=gradient_descent.GradientDescentOptimizer(0.01),
         loss='mse',
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
     out1 = model.predict(np.ones((num_samples, timesteps)))
     self.assertEqual(out1.shape, (num_samples, units))
 
@@ -528,12 +562,15 @@ class GRUV2Test(keras_parameterized.TestCase):
     model.compile(
         optimizer='adam',
         loss='sparse_categorical_crossentropy',
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
     model.fit(x, y, epochs=1, shuffle=False)
 
   @test_util.run_v2_only
   def test_explicit_device_with_go_backward_and_mask(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     batch_size = 8
     timestep = 7
     masksteps = 5
@@ -557,22 +594,22 @@ class GRUV2Test(keras_parameterized.TestCase):
       outputs_trimmed = lstm(inputs[:, :masksteps])
     self.assertAllClose(outputs_masked[:, -masksteps:], outputs_trimmed)
 
-  @test_util.run_deprecated_v1
   def test_v1_session_behavior(self):
-    # See b/139132348 for more details.
-    x = np.random.uniform(size=(100, 4, 8))
-    y = np.random.uniform(size=(100, 1))
-    dataset = dataset_ops.Dataset.from_tensor_slices(
-        (x, y)).shuffle(100).batch(32)
+    with ops.get_default_graph().as_default():
+      # See b/139132348 for more details.
+      x = np.random.uniform(size=(100, 4, 8))
+      y = np.random.uniform(size=(100, 1))
+      dataset = dataset_ops.Dataset.from_tensor_slices(
+          (x, y)).shuffle(100).batch(32)
 
-    inp = keras.layers.Input(shape=(4, 8))
-    layer = rnn.GRU(1)(inp)
-    layer = keras.layers.Dense(1)(layer)
+      inp = keras.layers.Input(shape=(4, 8))
+      layer = rnn.GRU(1)(inp)
+      layer = keras.layers.Dense(1)(layer)
 
-    model = keras.models.Model(inp, layer)
+      model = keras.models.Model(inp, layer)
 
-    model.compile(loss='mse', optimizer='sgd')
-    model.fit(dataset)
+      model.compile(loss='mse', optimizer='sgd')
+      model.fit(dataset)
 
 
 class GRULayerGradientTapeTest(test.TestCase):
@@ -619,12 +656,11 @@ class GRUGraphRewriteTest(keras_parameterized.TestCase):
         test_samples=0,
         input_shape=(self.timestep, self.input_shape),
         num_classes=self.output_shape)
-    y_train = keras.utils.to_categorical(y_train, self.output_shape)
+    y_train = np_utils.to_categorical(y_train, self.output_shape)
 
     model.compile(
         optimizer='sgd',
-        loss=['categorical_crossentropy', None],
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        loss=['categorical_crossentropy', None])
 
     existing_loss = 0
     for _ in range(self.epoch):
@@ -658,6 +694,10 @@ class GRUGraphRewriteTest(keras_parameterized.TestCase):
 
   @test_util.run_v2_only
   def test_GRU_runtime_with_mask(self):
+    if test.is_built_with_rocm():
+      self.skipTest('Skipping the test as ROCm MIOpen does not '
+                    'support padded input yet.')
+
     # Masking will affect which backend is selected based on whether the mask
     # is strictly right padded.
     layer = rnn.GRU(self.rnn_state_size, return_runtime=True)
@@ -679,13 +719,12 @@ class GRUGraphRewriteTest(keras_parameterized.TestCase):
         test_samples=0,
         input_shape=(self.timestep, self.input_shape),
         num_classes=self.output_shape)
-    y_train = keras.utils.to_categorical(y_train, self.output_shape)
+    y_train = np_utils.to_categorical(y_train, self.output_shape)
 
     model.compile(
         optimizer='sgd',
         loss=['categorical_crossentropy', None],
-        run_eagerly=testing_utils.should_run_eagerly(),
-        experimental_run_tf_function=testing_utils.should_run_tf_function())
+        run_eagerly=testing_utils.should_run_eagerly())
 
     model.fit(x_train, y_train)
 

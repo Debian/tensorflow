@@ -209,7 +209,7 @@ string SummarizeTensor(const TensorProto& tensor_proto) {
   Tensor t;
   if (!t.FromProto(tensor_proto)) {
     return strings::StrCat(
-        "<Invalid TensorProto: ", ProtoShortDebugString(tensor_proto), ">");
+        "<Invalid TensorProto: ", tensor_proto.ShortDebugString(), ">");
   }
   return t.DebugString();
 }
@@ -480,6 +480,17 @@ DEFINE_SET_ATTR_VALUE_BOTH(bool, b)
 DEFINE_SET_ATTR_VALUE_LIST(const std::vector<bool>&, b)
 DEFINE_SET_ATTR_VALUE_LIST(std::initializer_list<bool>, b)
 DEFINE_SET_ATTR_VALUE_BOTH(DataType, type)
+
+void SetAttrValue(const tstring& value, AttrValue* out) {
+  out->set_s(value.data(), value.size());
+}
+
+void SetAttrValue(gtl::ArraySlice<tstring> value, AttrValue* out) {
+  out->mutable_list()->Clear();
+  for (const auto& v : value) {
+    out->mutable_list()->add_s(v.data(), v.size());
+  }
+}
 
 void SetAttrValue(StringPiece value, AttrValue* out) {
   out->set_s(value.data(), value.size());
