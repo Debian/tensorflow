@@ -1,51 +1,5 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
-# mandatorily colorized output reduces burden to human eyes
-# NOTE: there is an intentional trailing space
-export NINJA_STATUS=[38;5;198m[%es (%p) %f/%t][0;m 
-export CCACHE_DIR=/tmp/ccache/
-
-LIBDIR=debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
-SHELL=/bin/bash
-
 %:
 	dh $@ -Sninja -D.
-
-override_dh_auto_clean:
-	: # TODO
-
-override_dh_auto_configure:
-	$(SHELL) debian/dev configure # read code for detail
-	$(SHELL) tensorflow/c/generate-pc.sh \
-	   	-p usr -l lib/$(DEB_HOST_MULTIARCH) -v 2.0.0
-
-override_dh_auto_build:
-	dh_auto_build -- -f libtensorflow_framework.ninja
-	$(SHELL) debian/dev gen_cc_ops
-	dh_auto_build -- -f libtensorflow.ninja
-	dh_auto_build -- -f libtensorflow_cc.ninja
-	#dh_auto_build -- -f pippackage.gen.ninja
-
-override_dh_auto_test:
-	: # TODO
-
-override_dh_auto_install:
-	$(SHELL) debian/dev install-headers debian/tmp/usr/include/
-	mkdir -p $(LIBDIR)
-	-$(RM) tensorflow/*.params
-	# libtensorflow_framework.so (fundamental)
-	install -vm0644 tensorflow/libtensorflow_framework.so.2.0.0 $(LIBDIR)
-	ln -sf libtensorflow_framework.so.2.0.0 $(LIBDIR)/libtensorflow_framework.so.2
-	ln -sf libtensorflow_framework.so.2 $(LIBDIR)/libtensorflow_framework.so
-	# libtensorflow.so (C)
-	install -vm0644 tensorflow/libtensorflow.so.2.0.0 $(LIBDIR)
-	ln -sf libtensorflow.so.2.0.0 $(LIBDIR)/libtensorflow.so.2
-	ln -sf libtensorflow.so.2 $(LIBDIR)/libtensorflow.so
-	# libtensorflow_cc.so (C++)
-	install -vm0644 tensorflow/libtensorflow_cc.so.2.0.0 $(LIBDIR)
-	ln -sf libtensorflow_cc.so.2.0.0 $(LIBDIR)/libtensorflow_cc.so.2
-	ln -sf libtensorflow_cc.so.2 $(LIBDIR)/libtensorflow_cc.so
-	# pkg-config
-	install -vDm0644 tensorflow.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow.pc
-	install -vDm0644 tensorflow_cc.pc debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/tensorflow_cc.pc
