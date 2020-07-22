@@ -1,0 +1,19 @@
+Author: Michael R. Crusoe <crusoe@debian.org>
+Description: force the use of the newer bazel version
+Forward: not-needed
+--- tensorflow.orig/.bazelversion
++++ tensorflow/.bazelversion
+@@ -1 +1 @@
+-2.0.0
++3.4.1
+--- tensorflow.orig/configure.py
++++ tensorflow/configure.py
+@@ -50,7 +50,7 @@
+ _TF_BAZELRC = ''
+ _TF_CURRENT_BAZEL_VERSION = None
+ _TF_MIN_BAZEL_VERSION = '2.0.0'
+-_TF_MAX_BAZEL_VERSION = '2.0.0'
++_TF_MAX_BAZEL_VERSION = '3.4.1'
+ 
+ NCCL_LIB_PATHS = [
+     'lib64/', 'lib/powerpc64le-linux-gnu/', 'lib/x86_64-linux-gnu/', ''

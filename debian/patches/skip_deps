@@ -1,0 +1,196 @@
+From a639f34a55db83d869541ffea2592eb2db5ca2b5 Mon Sep 17 00:00:00 2001
+From: Yun Peng <pcloudy@google.com>
+Date: Thu, 23 Jul 2020 13:32:01 +0000
+Subject: [PATCH] ** Comment out dependencies we don't need
+
+So that Bazel won't try to download them
+---
+ WORKSPACE                | 94 ++++++++++++++++++++--------------------
+ tensorflow/workspace.bzl | 42 +++++++++---------
+ 2 files changed, 68 insertions(+), 68 deletions(-)
+
+--- tensorflow.orig/WORKSPACE
++++ tensorflow/WORKSPACE
+@@ -20,38 +20,38 @@
+ 
+ register_toolchains("@local_config_python//:py_toolchain")
+ 
+-load("@io_bazel_rules_closure//closure:defs.bzl", "closure_repositories")
+-
+-closure_repositories()
+-
+-load("//third_party/toolchains/preconfig/generate:archives.bzl",
+-     "bazel_toolchains_archive")
+-
+-bazel_toolchains_archive()
+-
+-load(
+-    "@bazel_toolchains//repositories:repositories.bzl",
+-    bazel_toolchains_repositories = "repositories",
+-)
+-
+-bazel_toolchains_repositories()
+-
+-load(
+-    "@io_bazel_rules_docker//repositories:repositories.bzl",
+-    container_repositories = "repositories",
+-)
+-
+-container_repositories()
+-
+-load("//third_party/toolchains/preconfig/generate:workspace.bzl",
+-     "remote_config_workspace")
+-
+-remote_config_workspace()
++#load("@io_bazel_rules_closure//closure:defs.bzl", "closure_repositories")
++#
++#closure_repositories()
++
++# load("//third_party/toolchains/preconfig/generate:archives.bzl",
++#     "bazel_toolchains_archive")
++
++# bazel_toolchains_archive()
++
++#load(
++#    "@bazel_toolchains//repositories:repositories.bzl",
++#    bazel_toolchains_repositories = "repositories",
++#)
++#
++# bazel_toolchains_repositories()
++
++#load(
++#    "@io_bazel_rules_docker//repositories:repositories.bzl",
++#    container_repositories = "repositories",
++#)
++#
++#container_repositories()
++
++#load("//third_party/toolchains/preconfig/generate:workspace.bzl",
++#     "remote_config_workspace")
++#
++#remote_config_workspace()
+ 
+ # Use `swift_rules_dependencies` to fetch the toolchains. With the
+ # `git_repository` rules above, the following call will skip redefining them.
+-load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
+-swift_rules_dependencies()
++# load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
++# swift_rules_dependencies()
+ 
+ # We must check the bazel version before trying to parse any other BUILD
+ # files, in case the parsing of those build files depends on the bazel
+@@ -59,11 +59,11 @@
+ load("//tensorflow:version_check.bzl", "check_bazel_version_at_least")
+ check_bazel_version_at_least("1.0.0")
+ 
+-load("//third_party/android:android_configure.bzl", "android_configure")
+-android_configure(name="local_config_android")
+-load("@local_config_android//:android.bzl", "android_workspace")
+-android_workspace()
+-
++# load("//third_party/android:android_configure.bzl", "android_configure")
++# android_configure(name="local_config_android")
++# load("@local_config_android//:android.bzl", "android_workspace")
++# android_workspace()
++# 
+ # If a target is bound twice, the later one wins, so we have to do tf bindings
+ # at the end of the WORKSPACE file.
+ load("//tensorflow:workspace.bzl", "tf_bind")
+@@ -120,19 +120,19 @@
+ 
+ grpc_deps()
+ 
+-load(
+-    "@build_bazel_rules_apple//apple:repositories.bzl",
+-    "apple_rules_dependencies",
+-)
+-
+-apple_rules_dependencies()
+-
+-load(
+-    "@build_bazel_apple_support//lib:repositories.bzl",
+-    "apple_support_dependencies",
+-)
+-
+-apple_support_dependencies()
++# load(
++#     "@build_bazel_rules_apple//apple:repositories.bzl",
++#     "apple_rules_dependencies",
++# )
++# 
++# apple_rules_dependencies()
++# 
++# load(
++#     "@build_bazel_apple_support//lib:repositories.bzl",
++#     "apple_support_dependencies",
++# )
++# 
++# apple_support_dependencies()
+ 
+ load("@upb//bazel:repository_defs.bzl", "bazel_version_repository")
+ 
+--- tensorflow.orig/tensorflow/workspace.bzl
++++ tensorflow/tensorflow/workspace.bzl
+@@ -16,7 +16,7 @@
+ load("//third_party/clang_toolchain:cc_configure_clang.bzl", "cc_download_clang_toolchain")
+ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+ load("@bazel_tools//tools/build_defs/repo:java.bzl", "java_import_external")
+-load("@io_bazel_rules_closure//closure:defs.bzl", "filegroup_external")
++# load("@io_bazel_rules_closure//closure:defs.bzl", "filegroup_external")
+ load(
+     "//tensorflow/tools/def_file_filter:def_file_filter_configure.bzl",
+     "def_file_filter_configure",
+@@ -363,16 +363,16 @@
+         ],
+     )
+ 
+-    filegroup_external(
+-        name = "astunparse_license",
+-        licenses = ["notice"],  # PSFL
+-        sha256_urls = {
+-            "92fc0e4f4fa9460558eedf3412b988d433a2dcbb3a9c45402a145a4fab8a6ac6": [
+-                "https://storage.googleapis.com/mirror.tensorflow.org/raw.githubusercontent.com/simonpercivall/astunparse/v1.6.2/LICENSE",
+-                "https://raw.githubusercontent.com/simonpercivall/astunparse/v1.6.2/LICENSE",
+-            ],
+-        },
+-    )
++    #filegroup_external(
++    #    name = "astunparse_license",
++    #    licenses = ["notice"],  # PSFL
++    #    sha256_urls = {
++    #        "92fc0e4f4fa9460558eedf3412b988d433a2dcbb3a9c45402a145a4fab8a6ac6": [
++    #            "https://storage.googleapis.com/mirror.tensorflow.org/raw.githubusercontent.com/simonpercivall/astunparse/v1.6.2/LICENSE",
++    #            "https://raw.githubusercontent.com/simonpercivall/astunparse/v1.6.2/LICENSE",
++    #        ],
++    #    },
++    #)
+ 
+     tf_http_archive(
+         name = "functools32_archive",
+@@ -461,16 +461,16 @@
+         ],
+     )
+ 
+-    filegroup_external(
+-        name = "org_python_license",
+-        licenses = ["notice"],  # Python 2.0
+-        sha256_urls = {
+-            "e76cacdf0bdd265ff074ccca03671c33126f597f39d0ed97bc3e5673d9170cf6": [
+-                "https://storage.googleapis.com/mirror.tensorflow.org/docs.python.org/2.7/_sources/license.rst.txt",
+-                "https://docs.python.org/2.7/_sources/license.rst.txt",
+-            ],
+-        },
+-    )
++    #filegroup_external(
++    #    name = "org_python_license",
++    #    licenses = ["notice"],  # Python 2.0
++    #    sha256_urls = {
++    #        "e76cacdf0bdd265ff074ccca03671c33126f597f39d0ed97bc3e5673d9170cf6": [
++    #            "https://storage.googleapis.com/mirror.tensorflow.org/docs.python.org/2.7/_sources/license.rst.txt",
++    #            "https://docs.python.org/2.7/_sources/license.rst.txt",
++    #        ],
++    #    },
++    #)
+ 
+     # 310ba5ee72661c081129eb878c1bbcec936b20f0 is based on 3.8.0 with a fix for protobuf.bzl.
+     PROTOBUF_URLS = [

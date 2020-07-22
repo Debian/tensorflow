@@ -1,0 +1,53 @@
+From 735797d7c16ae63ad876ddcc64ab24c034929a4f Mon Sep 17 00:00:00 2001
+From: Yun Peng <pcloudy@google.com>
+Date: Thu, 23 Jul 2020 15:41:00 +0000
+Subject: [PATCH] ** Make boringssl installed by Debian work
+
+Google's boringssl is packaged in Debian via android-libboringssl-dev,
+which is not in the standard location. We need to add extra compiler and
+linker flag to make it work.
+---
+ tensorflow/core/platform/s3/BUILD      | 1 +
+ third_party/aws/BUILD.bazel            | 2 ++
+ third_party/systemlibs/boringssl.BUILD | 4 ++--
+ 3 files changed, 5 insertions(+), 2 deletions(-)
+
+--- tensorflow.orig/tensorflow/core/platform/s3/BUILD
++++ tensorflow/tensorflow/core/platform/s3/BUILD
+@@ -49,6 +49,7 @@
+     hdrs = [
+         "aws_crypto.h",
+     ],
++    copts = ["-isystem", "/usr/include/android"],
+     deps = [
+         "@aws",
+         "@boringssl//:crypto",
+--- tensorflow.orig/third_party/aws/BUILD.bazel
++++ tensorflow/third_party/aws/BUILD.bazel
+@@ -67,6 +67,8 @@
+         "aws-cpp-sdk-core/include/aws/core/SDKConfig.h",
+     ],
+     copts = [
++        "-isystem",
++        "/usr/include/android",
+         "-DENABLE_OPENSSL_ENCRYPTION",
+         "-DAWS_SDK_VERSION_MAJOR=1",
+         "-DAWS_SDK_VERSION_MINOR=7",
+--- tensorflow.orig/third_party/systemlibs/boringssl.BUILD
++++ tensorflow/third_party/systemlibs/boringssl.BUILD
+@@ -7,13 +7,13 @@
+ 
+ cc_library(
+     name = "crypto",
+-    linkopts = ["-lcrypto"],
++    linkopts = ["-L/usr/lib/x86_64-linux-gnu/android", "-lcrypto"],
+     visibility = ["//visibility:public"],
+ )
+ 
+ cc_library(
+     name = "ssl",
+-    linkopts = ["-lssl"],
++    linkopts = ["-L/usr/lib/x86_64-linux-gnu/android", "-lssl"],
+     visibility = ["//visibility:public"],
+     deps = [
+         ":crypto",

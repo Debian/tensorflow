@@ -1,5 +1,20 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export PYTHON_BIN_PATH=/usr/bin/python3
+export TF_IGNORE_MAX_BAZEL_VERSION=1
 
 %:
-	dh $@ -Sninja -D.
+	dh $@
+
+override_dh_auto_configure:
+	./configure
+
+override_dh_auto_build:
+	bazel build \
+		-k \
+		--verbose_failures \
+		--repository_cache= \
+		--config=opt \
+		--distdir=./debian/dist \
+		--repo_env=TF_SYSTEM_LIBS=nsync,curl,double_conversion,snappy,gif,zlib \
+		//tensorflow:tensorflow_framework 

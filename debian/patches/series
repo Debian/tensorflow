@@ -4,3 +4,6 @@
 #genrule-setup.sh
 #tensorrt_config.h
 #version_info.cc
+bazel-version
+skip_deps
+boringssl
