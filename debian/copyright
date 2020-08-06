@@ -7,7 +7,6 @@ Files-Excluded:
  tensorflow/core/lib/gif/testdata/lena.gif
 
 Files:     *
-           tensorflow/*
            debian/embedded/43ef2148c0936ebf7cb4be6b19927a9d9d145b8f.tar.gz
 Copyright: 2016-2019 TensorFlow Authors.
            2015-2019 Google Inc.
