@@ -7,7 +7,7 @@ export TF_IGNORE_MAX_BAZEL_VERSION=1
 	dh $@
 
 override_dh_auto_configure:
-	./configure
+	echo skipping ./configure
 
 override_dh_auto_build:
 	bazel build \
@@ -17,7 +17,7 @@ override_dh_auto_build:
 		--config=opt \
 		--distdir=./debian/dist \
 		--repo_env=TF_SYSTEM_LIBS=nsync,curl,double_conversion,snappy,gif,zlib,com_google_protobuf,com_github_grpc_grpc,jsoncpp_git,libjpeg_turbo,nasm \
-		--override_repository=bazel_skylib=$PWD/debian/mock_repos/bazel_skylib \
-		--override_repository=rules_cc=$PWD/debian/mock_repos/rules_cc \
-		--override_repository=rules_java=$PWD/debian/mock_repos/rules_java \
+		--override_repository=bazel_skylib=$(CURDIR)/debian/mock_repos/bazel_skylib \
+		--override_repository=rules_cc=$(CURDIR)/debian/mock_repos/rules_cc \
+		--override_repository=rules_java=$(CURDIR)/debian/mock_repos/rules_java \
 		//tensorflow:tensorflow_framework 
