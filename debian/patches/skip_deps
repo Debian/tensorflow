@@ -96,10 +96,14 @@ So that Bazel won't try to download them
  # If a target is bound twice, the later one wins, so we have to do tf bindings
  # at the end of the WORKSPACE file.
  load("//tensorflow:workspace.bzl", "tf_bind")
-@@ -120,19 +120,19 @@
+@@ -116,25 +116,25 @@
  
- grpc_deps()
+ # Required for dependency @com_github_grpc_grpc
  
+-load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+-
+-grpc_deps()
+-
 -load(
 -    "@build_bazel_rules_apple//apple:repositories.bzl",
 -    "apple_rules_dependencies",
@@ -113,6 +117,15 @@ So that Bazel won't try to download them
 -)
 -
 -apple_support_dependencies()
+-
+-load("@upb//bazel:repository_defs.bzl", "bazel_version_repository")
+-
+-bazel_version_repository(name = "bazel_version")
+-
++# load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
++# 
++# grpc_deps()
++
 +# load(
 +#     "@build_bazel_rules_apple//apple:repositories.bzl",
 +#     "apple_rules_dependencies",
@@ -126,9 +139,11 @@ So that Bazel won't try to download them
 +# )
 +# 
 +# apple_support_dependencies()
- 
- load("@upb//bazel:repository_defs.bzl", "bazel_version_repository")
- 
++
++# load("@upb//bazel:repository_defs.bzl", "bazel_version_repository")
++# 
++# bazel_version_repository(name = "bazel_version")
++# 
 --- tensorflow.orig/tensorflow/workspace.bzl
 +++ tensorflow/tensorflow/workspace.bzl
 @@ -16,7 +16,7 @@
@@ -194,3 +209,111 @@ So that Bazel won't try to download them
  
      # 310ba5ee72661c081129eb878c1bbcec936b20f0 is based on 3.8.0 with a fix for protobuf.bzl.
      PROTOBUF_URLS = [
+--- tensorflow.orig/tensorflow/core/example/BUILD
++++ tensorflow/tensorflow/core/example/BUILD
+@@ -1,7 +1,7 @@
+-load(
+-    "@io_bazel_rules_closure//closure:defs.bzl",
+-    "closure_proto_library",
+-)
++# load(
++#     "@io_bazel_rules_closure//closure:defs.bzl",
++#     "closure_proto_library",
++# )
+ load(
+     "//tensorflow:tensorflow.bzl",
+     "tf_cc_test",
+@@ -136,11 +136,11 @@
+     proto_srcfile = "feature.proto",
+ )
+ 
+-closure_proto_library(
+-    name = "example_protos_closure",
+-    visibility = ["//visibility:public"],
+-    deps = [":example_protos"],
+-)
++# closure_proto_library(
++#     name = "example_protos_closure",
++#     visibility = ["//visibility:public"],
++#     deps = [":example_protos"],
++# )
+ 
+ filegroup(
+     name = "mobile_srcs_no_runtime",
+--- tensorflow.orig/tensorflow/core/kernels/BUILD
++++ tensorflow/tensorflow/core/kernels/BUILD
+@@ -1,4 +1,4 @@
+-load("@bazel_skylib//rules:build_test.bzl", "build_test")
++# load("@bazel_skylib//rules:build_test.bzl", "build_test")
+ load(
+     "//tensorflow:tensorflow.bzl",
+     "cc_header_only_library",
+@@ -6959,10 +6959,10 @@
+     alwayslink = 1,
+ )
+ 
+-build_test(
+-    name = "android_tensorflow_kernels_build_test",
+-    targets = [":android_tensorflow_kernels"],
+-)
++# build_test(
++#     name = "android_tensorflow_kernels_build_test",
++#     targets = [":android_tensorflow_kernels"],
++# )
+ 
+ cc_library(
+     name = "android_tensorflow_image_op",
+@@ -6979,10 +6979,10 @@
+     alwayslink = 1,
+ )
+ 
+-build_test(
+-    name = "android_tensorflow_image_op_build_test",
+-    targets = [":android_tensorflow_image_op"],
+-)
++# build_test(
++#     name = "android_tensorflow_image_op_build_test",
++#     targets = [":android_tensorflow_image_op"],
++# )
+ 
+ cc_library(
+     name = "android_whole_file_read_ops",
+--- tensorflow.orig/tensorflow/core/platform/default/rules_cc.bzl
++++ tensorflow/tensorflow/core/platform/default/rules_cc.bzl
+@@ -7,13 +7,13 @@
+     _cc_library = "cc_library",
+     _cc_test = "cc_test",
+ )
+-load(
+-    "@rules_cc//examples:experimental_cc_shared_library.bzl",
+-    _cc_shared_library = "cc_shared_library",
+-)
+-
++# load(
++#     "@rules_cc//examples:experimental_cc_shared_library.bzl",
++#     _cc_shared_library = "cc_shared_library",
++# )
++# 
+ cc_binary = _cc_binary
+ cc_import = _cc_import
+ cc_library = _cc_library
+-cc_shared_library = _cc_shared_library
++# cc_shared_library = _cc_shared_library
+ cc_test = _cc_test
+--- tensorflow.orig/tensorflow/core/platform/rules_cc.bzl
++++ tensorflow/tensorflow/core/platform/rules_cc.bzl
+@@ -5,12 +5,12 @@
+     _cc_binary = "cc_binary",
+     _cc_import = "cc_import",
+     _cc_library = "cc_library",
+-    _cc_shared_library = "cc_shared_library",
++#    _cc_shared_library = "cc_shared_library",
+     _cc_test = "cc_test",
+ )
+ 
+ cc_binary = _cc_binary
+ cc_import = _cc_import
+ cc_library = _cc_library
+-cc_shared_library = _cc_shared_library
++# cc_shared_library = _cc_shared_library
+ cc_test = _cc_test
