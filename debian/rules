@@ -8,7 +8,7 @@ export HOME=$(CURDIR)
 	dh $@
 
 override_dh_auto_configure:
-	echo skipping ./configure
+	printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' /usr/lib/python3/dist-packages N N N N -Wno-sign-compare N | ./configure
 
 override_dh_auto_build:
 	mkdir -p $(CURDIR)/debian/dist
