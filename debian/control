@@ -6,7 +6,7 @@ Standards-Version: 4.4.1
 Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
 Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
-Uploaders:
+Uploaders: Michael R. Crusoe <crusoe@debian.org>
 Build-Depends:
  debhelper-compat (= 11),
  dh-python,

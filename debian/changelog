@@ -1,6 +1,10 @@
 tensorflow (2.2.0-1) UNRELEASED; urgency=medium
 
+  [ Mo Zhou ]
   * New upstream version 2.2.0
+
+  [ Michael R. Crusoe ]
+  * Restart packaging using bazel-bootstrap
 
  -- Mo Zhou <lumin@debian.org>  Sun, 19 Jul 2020 00:22:48 +0800
 
