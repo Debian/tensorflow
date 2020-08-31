@@ -35,7 +35,7 @@ Build-Depends:
  libsqlite3-dev,
  libssl-dev,
  libsuperlu-dev,
- bazel,
+ bazel-bootstrap,
  protobuf-compiler (>= 3.8.0~),
  protobuf-compiler-grpc (>= 1.23~),
  python3,
