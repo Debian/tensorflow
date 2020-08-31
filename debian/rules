@@ -2,7 +2,8 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export PYTHON_BIN_PATH=/usr/bin/python3
 export TF_IGNORE_MAX_BAZEL_VERSION=1
-export HOME=$(CURDIR)
+export HOME=/tmp
+# not $(CURDIR), that leads to recursive symlinks
 
 %:
 	dh $@
