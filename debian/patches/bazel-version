@@ -2,9 +2,10 @@ Author: Michael R. Crusoe <crusoe@debian.org>
 Description: force the use of the newer bazel version
 Forward: not-needed
 --- tensorflow.orig/.bazelversion
-+++ /dev/null
-@@ -1 +0,0 @@
++++ tensorflow/.bazelversion
+@@ -1 +1 @@
 -2.0.0
++3
 --- tensorflow.orig/configure.py
 +++ tensorflow/configure.py
 @@ -50,7 +50,7 @@
