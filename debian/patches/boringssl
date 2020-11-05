@@ -12,9 +12,9 @@ linker flag to make it work.
  third_party/systemlibs/boringssl.BUILD | 4 ++--
  3 files changed, 5 insertions(+), 2 deletions(-)
 
---- tensorflow.orig/tensorflow/core/platform/s3/BUILD
-+++ tensorflow/tensorflow/core/platform/s3/BUILD
-@@ -49,6 +49,7 @@
+--- a/tensorflow/core/platform/s3/BUILD
++++ b/tensorflow/core/platform/s3/BUILD
+@@ -49,6 +49,7 @@ cc_library(
      hdrs = [
          "aws_crypto.h",
      ],
@@ -22,9 +22,9 @@ linker flag to make it work.
      deps = [
          "@aws",
          "@boringssl//:crypto",
---- tensorflow.orig/third_party/aws/BUILD.bazel
-+++ tensorflow/third_party/aws/BUILD.bazel
-@@ -67,6 +67,8 @@
+--- a/third_party/aws/BUILD.bazel
++++ b/third_party/aws/BUILD.bazel
+@@ -74,6 +74,8 @@ cc_library(
          "aws-cpp-sdk-core/include/aws/core/SDKConfig.h",
      ],
      copts = [
@@ -33,9 +33,9 @@ linker flag to make it work.
          "-DENABLE_OPENSSL_ENCRYPTION",
          "-DAWS_SDK_VERSION_MAJOR=1",
          "-DAWS_SDK_VERSION_MINOR=7",
---- tensorflow.orig/third_party/systemlibs/boringssl.BUILD
-+++ tensorflow/third_party/systemlibs/boringssl.BUILD
-@@ -7,13 +7,13 @@
+--- a/third_party/systemlibs/boringssl.BUILD
++++ b/third_party/systemlibs/boringssl.BUILD
+@@ -7,13 +7,13 @@ filegroup(
  
  cc_library(
      name = "crypto",
