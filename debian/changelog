@@ -1,4 +1,4 @@
-tensorflow (2.2.0-1) UNRELEASED; urgency=medium
+tensorflow (2.3.1-1) UNRELEASED; urgency=medium
 
   [ Mo Zhou ]
   * New upstream version 2.2.0
@@ -9,8 +9,9 @@ tensorflow (2.2.0-1) UNRELEASED; urgency=medium
   [ Andreas Tille ]
   * Move package to Debian Deep Learning Team
   * Uncomment python3-tensorflow
+  * New upstream version
 
- -- Andreas Tille <tille@debian.org>  Thu, 05 Nov 2020 11:30:41 +0100
+ -- Andreas Tille <tille@debian.org>  Thu, 05 Nov 2020 11:36:39 +0100
 
 tensorflow (2.0.0-1) experimental; urgency=medium
 
