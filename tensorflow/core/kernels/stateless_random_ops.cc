@@ -252,13 +252,14 @@ class StatelessRandomGammaOp : public StatelessRandomOpBase {
     // avoid a couple flops which can be done on a per-alpha basis.
 
     auto DoWork = [samples_per_alpha, num_alphas, &random, samples_flat,
-                   alpha_flat](int start_output, int limit_output) {
+                   alpha_flat](int64 start_output, int64 limit_output) {
       // Capturing "random" by-value would only make a copy for the _shared_
       // lambda.  Since we want to let each worker have its own copy, we pass
       // "random" by reference and explicitly do a copy assignment.
 
       using Eigen::numext::exp;
       using Eigen::numext::log;
+      using Eigen::numext::log1p;
       using Eigen::numext::pow;
 
       Normal normal;
@@ -288,7 +289,7 @@ class StatelessRandomGammaOp : public StatelessRandomOpBase {
             gen.Skip(kReservedSamplesPerOutput * output_idx);
             int16 uniform_remaining = 0;
             UNIFORM(u);
-            const double res = -log(1.0 - u);
+            const double res = -log1p(-u);
             samples_alpha_offset[sample_idx * num_alphas] = static_cast<T>(res);
           }       // for (sample_idx)
         } else {  // if alpha != 1.0

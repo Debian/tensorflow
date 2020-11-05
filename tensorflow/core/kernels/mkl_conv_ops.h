@@ -22,6 +22,7 @@ limitations under the License.
 
 #include "mkldnn.hpp"
 #include "tensorflow/core/framework/bounds_check.h"
+#include "tensorflow/core/framework/kernel_shape_util.h"
 #include "tensorflow/core/framework/numeric_op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -50,7 +51,7 @@ using mkldnn::stream;
 namespace tensorflow {
 
 #ifdef ENABLE_MKLDNN_V1
-#define MKLDNN_SIZE_DTYPE long int
+#define MKLDNN_SIZE_DTYPE memory::dim
 #else
 #define MKLDNN_SIZE_DTYPE int
 #endif  // ENABLE_MKLDNN_V1

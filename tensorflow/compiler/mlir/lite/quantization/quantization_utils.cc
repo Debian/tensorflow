@@ -15,21 +15,23 @@ limitations under the License.
 
 #include "tensorflow/compiler/mlir/lite/quantization/quantization_utils.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <numeric>
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/QuantOps/FakeQuantSupport.h"  // TF:llvm-project
-#include "mlir/Dialect/QuantOps/QuantOps.h"  // TF:llvm-project
-#include "mlir/Dialect/QuantOps/QuantTypes.h"  // TF:llvm-project
-#include "mlir/Dialect/QuantOps/QuantizeUtils.h"  // TF:llvm-project
-#include "mlir/Dialect/QuantOps/UniformSupport.h"  // TF:llvm-project
-#include "mlir/IR/Attributes.h"  // TF:llvm-project
-#include "mlir/IR/MLIRContext.h"  // TF:llvm-project
-#include "mlir/IR/StandardTypes.h"  // TF:llvm-project
-#include "mlir/Support/LLVM.h"  // TF:llvm-project
+#include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Quant/FakeQuantSupport.h"  // from @llvm-project
+#include "mlir/Dialect/Quant/QuantOps.h"  // from @llvm-project
+#include "mlir/Dialect/Quant/QuantTypes.h"  // from @llvm-project
+#include "mlir/Dialect/Quant/QuantizeUtils.h"  // from @llvm-project
+#include "mlir/Dialect/Quant/UniformSupport.h"  // from @llvm-project
+#include "mlir/IR/Attributes.h"  // from @llvm-project
+#include "mlir/IR/MLIRContext.h"  // from @llvm-project
+#include "mlir/IR/StandardTypes.h"  // from @llvm-project
+#include "mlir/Support/LLVM.h"  // from @llvm-project
 
 namespace mlir {
 namespace quant {
@@ -53,7 +55,7 @@ static Type GetQuantizedType(Builder builder, Type input_type,
   } else if (min.size() == max.size()) {
     auto shape = input_type.dyn_cast<ShapedType>();
     if (!shape || shape.getRank() <= quant_dim ||
-        min.size() != shape.getDimSize(quant_dim)) {
+        static_cast<int64_t>(min.size()) != shape.getDimSize(quant_dim)) {
       return {};
     }
     // TODO(b/141508873): the quantization dim is set to the last dimension.
@@ -74,11 +76,12 @@ TypeAttr RescaleQuantizedType(Type input, Attribute factor) {
   if (auto qtype = ele_type.dyn_cast<quant::UniformQuantizedPerAxisType>()) {
     ArrayRef<double> scales = qtype.getScales();
     // Broadcasting hasn't been implemented yet.
-    if (scales.size() != factor_values.getNumElements()) return {};
+    if (static_cast<int64_t>(scales.size()) != factor_values.getNumElements())
+      return {};
     SmallVector<double, 4> new_scales;
     new_scales.reserve(scales.size());
     auto scales_iter = scales.begin();
-    for (auto f : factor_values) {
+    for (const auto& f : factor_values) {
       new_scales.push_back(*(scales_iter++) *
                            std::fabs(FloatAttr::getValueAsDouble(f)));
     }
@@ -147,29 +150,45 @@ static bool BroadcastVector(int target_size, SmallVectorImpl<T>& data) {
 // Changes the axis of the input per-channel quantized type to match the
 // dimension of the target type. Returns nullptr if it fails.
 static quant::UniformQuantizedPerAxisType ResetAxisAndBroadcast(
-    quant::UniformQuantizedPerAxisType qtype, Type target, int quant_dim) {
+    ArrayRef<int64_t> shape, quant::UniformQuantizedPerAxisType qtype,
+    Type target, int quant_dim) {
   auto shaped = target.dyn_cast<RankedTensorType>();
   if (!shaped) return {};
+  ArrayRef<int64_t> new_shape = shaped.getShape();
 
   SmallVector<double, 4> scales(qtype.getScales().begin(),
                                 qtype.getScales().end());
   SmallVector<int64_t, 4> zero_points(qtype.getZeroPoints().begin(),
                                       qtype.getZeroPoints().end());
-  // Broadcast the scales and zero points to match the target size, which is
-  // usually the axis-th dimension of the target type. Currently, it covers two
-  // cases:
-  // - for Transpose, the data layout is changed so the `dim[axis]` still equals
-  // to the `scales_size`. The broadcast skips;
-  // - for Reshape, the data layout isn't changed but the innermost dimension is
-  // expand to cover the last two original dimensions. Thus we just need to be
-  // repeated the `scales` dim[2] times to covers the new dim length.
-  //
-  // TODO(b/141709944): after the fix, the `scales` can be for dim[2], thus we
-  // have to repeat each elements in the `scales` locally dim[3] times.
-  if (BroadcastVector<double>(shaped.getDimSize(quant_dim), scales) ||
-      BroadcastVector<int64_t>(shaped.getDimSize(quant_dim), zero_points)) {
+
+  if (new_shape.size() == shape.size()) {  // same rank
+    // Broadcast the scales and zero points to match the target size, which is
+    // usually the axis-th dimension of the target type. Currently, it covers
+    // two cases:
+    // - for Transpose, the data layout is changed so the `dim[axis]` still
+    // equals to the `scales_size`. The broadcast skips;
+    // - for Reshape, the data layout isn't changed but the innermost dimension
+    // is expand to cover the last two original dimensions. Thus we just need to
+    // be repeated the `scales` dim[2] times to covers the new dim length.
+    //
+    // TODO(b/141709944): after the fix, the `scales` can be for dim[2], thus we
+    // have to repeat each elements in the `scales` locally dim[3] times.
+    if (BroadcastVector<double>(shaped.getDimSize(quant_dim), scales) ||
+        BroadcastVector<int64_t>(shaped.getDimSize(quant_dim), zero_points)) {
+      return {};
+    }
+  } else if ((new_shape.size() == shape.size() + 1) && new_shape.back() == 1) {
+    // This is a trivial shift left, then we shift the quant_dim as well.
+    if (std::equal(shape.begin(), shape.end(), new_shape.begin()) &&
+        quant_dim == -1) {
+      quant_dim = shape.size() + quant_dim;
+    } else {
+      return {};
+    }
+  } else {
     return {};
   }
+
   return quant::UniformQuantizedPerAxisType::get(
       qtype.getFlags(), qtype.getStorageType(), qtype.getExpressedType(),
       scales, zero_points, quant_dim, qtype.getStorageTypeMin(),
@@ -179,20 +198,21 @@ static quant::UniformQuantizedPerAxisType ResetAxisAndBroadcast(
 TypeAttr CastQuantizedTypeAttrFromExpressedType(Builder builder,
                                                 TypeAttr source, Type target,
                                                 int axis) {
-  if (auto source_type = source.getValue().dyn_cast_or_null<ShapedType>()) {
-    auto src_ele_type = source_type.getElementType();
-    if (auto quantized_type = src_ele_type.dyn_cast<quant::QuantizedType>()) {
-      if (auto qtype =
-              quantized_type.dyn_cast<quant::UniformQuantizedPerAxisType>()) {
-        quantized_type = ResetAxisAndBroadcast(qtype, target, axis);
-        if (!src_ele_type) return {};
-      }
-      Type final_type = quantized_type.castFromExpressedType(target);
-      if (!final_type) return {};
-      return TypeAttr::get(final_type);
-    }
+  auto source_type = source.getValue().dyn_cast_or_null<ShapedType>();
+  if (!source_type) return {};
+  auto src_ele_type = source_type.getElementType();
+  auto qtype = src_ele_type.dyn_cast<quant::QuantizedType>();
+
+  // Reset the quantization dimensions if it is per-axis.
+  if (auto per_axis =
+          qtype.dyn_cast_or_null<quant::UniformQuantizedPerAxisType>()) {
+    qtype =
+        ResetAxisAndBroadcast(source_type.getShape(), per_axis, target, axis);
   }
-  return {};
+  if (!qtype) return {};
+  Type final_type = qtype.castFromExpressedType(target);
+  if (!final_type) return {};
+  return TypeAttr::get(final_type);
 }
 
 Type GetUniformQuantizedTypeForWeight(ElementsAttr attr, bool symmetric,
@@ -251,7 +271,7 @@ Type GetUniformQuantizedPerAxisTypeForWeight(ElementsAttr attr, int quant_dim,
                                              bool narrow_range) {
   Builder builder(attr.getContext());
   auto shape = attr.getType().cast<ShapedType>().getShape();
-  if (shape.size() <= quant_dim) return {};
+  if (static_cast<int>(shape.size()) <= quant_dim) return {};
   // `symmetric` can only be used when it is `signed` and `narrow_range`.
   if (symmetric && (!is_signed || !narrow_range)) return {};
 
@@ -316,7 +336,7 @@ quant::QuantizedType GetUniformQuantizedTypeForBias(
     const std::vector<quant::QuantizedType>& op_types) {
   if (op_types.empty()) return {};
 
-  int axis_size = 1;
+  size_t axis_size = 1;
   int32_t quant_dim = -1;
   Type expressed_type;
   // Requires all the op types are valid UniformQuantizedTypes or
@@ -350,7 +370,7 @@ quant::QuantizedType GetUniformQuantizedTypeForBias(
         scales[index_scale.index()] *= index_scale.value();
       }
     } else if (auto type = op_type.dyn_cast<quant::UniformQuantizedType>()) {
-      for (int index = 0; index != axis_size; ++index) {
+      for (int index = 0, e = axis_size; index != e; ++index) {
         scales[index] *= type.getScale();
       }
     }
@@ -417,6 +437,16 @@ bool RemoveRedundantStatsOps(mlir::FuncOp func,
                              OpQuantSpecGetter op_quant_spec_getter) {
   llvm::SmallVector<quant::StatisticsOp, 16> all_stats_ops;
   llvm::DenseSet<Operation*> redundant_stats_ops;
+
+  // Step 0: remove the quant::StatisticsOp which are used by the tfl.quantize
+  // op in case it overrides the information from training FakeQuant ops.
+  func.walk([&](quant::QuantizeCastOp q) {
+    auto input_op = q.arg().getDefiningOp();
+    if (auto stats = llvm::dyn_cast_or_null<quant::StatisticsOp>(input_op)) {
+      q.setOperand(stats.arg());
+      if (stats.use_empty()) stats.erase();
+    }
+  });
 
   // Step 1: forward pass: propagate any value scales which are not produces
   // by `SameOperandsAndResultsScale`. Additionally, remove the value scales

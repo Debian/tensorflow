@@ -27,14 +27,13 @@ from tensorflow.core.protobuf import config_pb2
 from tensorflow.core.util import event_pb2
 from tensorflow.python.client import session as session_lib
 from tensorflow.python.data.ops import dataset_ops
+from tensorflow.python.distribute import distribute_utils
 from tensorflow.python.distribute import distribution_strategy_context as ds_context
 from tensorflow.python.distribute import reduce_util
-from tensorflow.python.distribute import values
 from tensorflow.python.eager import backprop
 from tensorflow.python.eager import context
 from tensorflow.python.eager import def_function
 from tensorflow.python.eager import test
-from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
@@ -120,7 +119,7 @@ class DistributionTestBase(test.TestCase):
       l = core.Dense(1, use_bias=False)
 
       def loss(x):
-        y = array_ops.reshape(l(x), []) - constant_op.constant(1.)
+        y = array_ops.reshape(l(x), []) - array_ops.identity(1.)
         return y * y
       # TODO(isaprykin): Extract implicit_grad+get_filtered_grad_fn into a
       # common `implicit_grad` function and put it in DistributionStrategy.
@@ -130,7 +129,7 @@ class DistributionTestBase(test.TestCase):
       def update(v, g):
         return v.assign_sub(0.2 * g)
 
-      one = constant_op.constant([[1.]])
+      one = array_ops.identity([[1.]])
 
       def step():
         """Perform one optimization step."""
@@ -177,7 +176,7 @@ class DistributionTestBase(test.TestCase):
       l = core.Dense(1, use_bias=False)
 
       def loss(x):
-        y = array_ops.reshape(l(x), []) - constant_op.constant(1.)
+        y = array_ops.reshape(l(x), []) - array_ops.identity(1.)
         return y * y
 
       grad_fn = backprop.implicit_grad(loss)
@@ -185,7 +184,7 @@ class DistributionTestBase(test.TestCase):
       def update(v, g):
         return v.assign_sub(learning_rate * g)
 
-      one = constant_op.constant([[1.]])
+      one = array_ops.identity([[1.]])
 
       def step():
         """Perform one optimization step."""
@@ -349,7 +348,8 @@ class DistributionTestBase(test.TestCase):
     for expected_value in expected_values:
       next_element = iterator.get_next()
       computed_value = evaluate(
-          [values.select_replica(r, next_element) for r in range(len(devices))])
+          [distribute_utils.select_replica(r, next_element) for r in
+           range(len(devices))])
       if ignore_order:
         self.assertCountEqual(expected_value, computed_value)
       else:
@@ -358,7 +358,8 @@ class DistributionTestBase(test.TestCase):
     with self.assertRaises(errors.OutOfRangeError):
       next_element = iterator.get_next()
       evaluate(
-          [values.select_replica(r, next_element) for r in range(len(devices))])
+          [distribute_utils.select_replica(r, next_element) for r in
+           range(len(devices))])
 
     # After re-initializing the iterator, should be able to iterate again.
     if test_reinitialize:
@@ -367,7 +368,8 @@ class DistributionTestBase(test.TestCase):
       for expected_value in expected_values:
         next_element = iterator.get_next()
         computed_value = evaluate([
-            values.select_replica(r, next_element) for r in range(len(devices))
+            distribute_utils.select_replica(r, next_element) for r in
+            range(len(devices))
         ])
         if ignore_order:
           self.assertCountEqual(expected_value, computed_value)
@@ -453,7 +455,7 @@ class OneDeviceDistributionTestBase(test.TestCase):
   """Some tests that should work with any one-device DistributionStrategy."""
 
   def _test_run(self, strategy):
-    out1 = strategy.run(lambda: constant_op.constant(4.))
+    out1 = strategy.run(lambda: array_ops.identity(4.))
     self.assertAllEqual([4.], self.evaluate(strategy.unwrap(out1)))
 
     out2 = strategy.run(lambda x: {"a": x * 2, "b": x * x}, args=(out1,))
@@ -506,7 +508,7 @@ class OneDeviceDistributionTestBase(test.TestCase):
       self.skipTest("`tf.gradients` is not supported with eager execution.")
 
     def step(c):
-      x = constant_op.constant(42.)
+      x = array_ops.identity(42.)
       y = comm_fn(x) * c
       return gradients_impl.gradients(y, [x])[0]
 
@@ -524,7 +526,7 @@ class OneDeviceDistributionTestBase(test.TestCase):
                                            expected_grads):
 
     def step(c):
-      x = constant_op.constant(42.)
+      x = array_ops.identity(42.)
       with backprop.GradientTape() as tape:
         tape.watch(x)
         y = comm_fn(x) * c
@@ -634,7 +636,7 @@ class TwoDeviceDistributionTestBase(test.TestCase):
       self.skipTest("`tf.gradients` is not supported with eager execution.")
 
     def step(c):
-      x = constant_op.constant(42.)
+      x = array_ops.identity(42.)
       y = comm_fn(x) * c
       return gradients_impl.gradients(y, [x])[0]
 
@@ -652,7 +654,7 @@ class TwoDeviceDistributionTestBase(test.TestCase):
                                            expected_grads):
 
     def step(c):
-      x = constant_op.constant(42.)
+      x = array_ops.identity(42.)
       with backprop.GradientTape() as tape:
         tape.watch(x)
         y = comm_fn(x) * c

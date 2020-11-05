@@ -28,10 +28,18 @@ namespace tflite {
 namespace gpu {
 namespace cl {
 
-enum class Vendor { QUALCOMM, MALI, POWERVR, NVIDIA, AMD, UNKNOWN };
+enum class Vendor { QUALCOMM, MALI, POWERVR, NVIDIA, AMD, INTEL, UNKNOWN };
 std::string VendorToString(Vendor v);
 
-enum class OpenCLVersion { CL_1_0, CL_1_1, CL_1_2, CL_2_0 };
+enum class OpenCLVersion {
+  CL_1_0,
+  CL_1_1,
+  CL_1_2,
+  CL_2_0,
+  CL_2_1,
+  CL_2_2,
+  CL_3_0
+};
 std::string OpenCLVersionToString(OpenCLVersion version);
 
 // for use only in cl_device.cc, but putted here to make tests
@@ -59,6 +67,46 @@ struct AdrenoInfo {
   // Not supported on some Adreno devices with specific driver version.
   // b/131099086
   bool support_one_layer_texture_array = true;
+};
+
+enum class MaliGPU {
+  T604,
+  T622,
+  T624,
+  T628,
+  T658,
+  T678,
+  T720,
+  T760,
+  T820,
+  T830,
+  T860,
+  T880,
+  G31,
+  G51,
+  G71,
+  G52,
+  G72,
+  G76,
+  G57,
+  G77,
+  UNKNOWN
+};
+
+struct MaliInfo {
+  MaliInfo() = default;
+  explicit MaliInfo(const std::string& device_name);
+  MaliGPU gpu_version;
+
+  bool IsMaliT6xx() const;
+  bool IsMaliT7xx() const;
+  bool IsMaliT8xx() const;
+  bool IsMidgard() const;
+  bool IsBifrostGen1() const;
+  bool IsBifrostGen2() const;
+  bool IsBifrostGen3() const;
+  bool IsBifrost() const;
+  bool IsValhall() const;
 };
 
 struct DeviceInfo {
@@ -98,6 +146,7 @@ struct DeviceInfo {
   bool supports_fp16_rtn;
 
   AdrenoInfo adreno_info;
+  MaliInfo mali_info;
 };
 
 // A wrapper around opencl device id
@@ -129,6 +178,8 @@ class CLDevice {
   bool SupportsExtension(const std::string& extension) const;
   bool SupportsFP32RTN() const;
   bool SupportsFP16RTN() const;
+  bool IsCL20OrHigher() const;
+  bool SupportsSubGroupWithSize(int sub_group_size) const;
   bool IsAdreno() const;
   bool IsAdreno3xx() const;
   bool IsAdreno4xx() const;
@@ -139,6 +190,7 @@ class CLDevice {
   bool IsNvidia() const;
   bool IsMali() const;
   bool IsAMD() const;
+  bool IsIntel() const;
 
   // To track bug on some Adreno. b/131099086
   bool SupportsOneLayerTextureArray() const;
@@ -150,7 +202,7 @@ class CLDevice {
   DeviceInfo info_;
 };
 
-Status CreateDefaultGPUDevice(CLDevice* result);
+absl::Status CreateDefaultGPUDevice(CLDevice* result);
 
 template <typename T>
 T GetDeviceInfo(cl_device_id id, cl_device_info info) {
@@ -163,12 +215,12 @@ T GetDeviceInfo(cl_device_id id, cl_device_info info) {
 }
 
 template <typename T>
-Status GetDeviceInfo(cl_device_id id, cl_device_info info, T* result) {
+absl::Status GetDeviceInfo(cl_device_id id, cl_device_info info, T* result) {
   cl_int error = clGetDeviceInfo(id, info, sizeof(T), result, nullptr);
   if (error != CL_SUCCESS) {
-    return InvalidArgumentError(CLErrorCodeToString(error));
+    return absl::InvalidArgumentError(CLErrorCodeToString(error));
   }
-  return OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace cl

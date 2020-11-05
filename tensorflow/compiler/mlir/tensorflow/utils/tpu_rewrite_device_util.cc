@@ -26,10 +26,10 @@ limitations under the License.
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "tensorflow/compiler/xla/array3d.h"
+#include "mlir/IR/Attributes.h"  // from @llvm-project
+#include "tensorflow/compiler/xla/array4d.h"
 #include "tensorflow/compiler/xla/service/computation_placer.h"
 #include "tensorflow/compiler/xla/xla_data.pb.h"
 #include "tensorflow/core/framework/types.h"
@@ -39,15 +39,21 @@ limitations under the License.
 #include "tensorflow/stream_executor/lib/statusor.h"
 
 namespace tensorflow {
-// Device coordinates are defined as (x, y, core), thus resulting in a rank 3
+
+const char* const kTPUReplicatedHost = "TPU_REPLICATED_HOST";
+const char* const kNumCoresPerReplicaAttr = "num_cores_per_replica";
+const char* const kTopologyAttr = "topology";
+const char* const kDeviceAssignmentAttr = "device_assignment";
+
+// Device coordinates are defined as (x, y, z, core), thus resulting in a rank 4
 // topology.
-constexpr int kTPUTopologyRank = 3;
+constexpr int kTPUTopologyRank = 4;
 
 constexpr char kDeviceTPUSystem[] = "TPU_SYSTEM";
 constexpr char kDeviceTPU[] = "TPU";
 constexpr char kTPUReplicatedCore[] = "TPU_REPLICATED_CORE";
-constexpr char kTopologyAttr[] = "topology";
-constexpr char kDeviceAssignmentAttr[] = "device_assignment";
+constexpr char kBadIntArrayElementMsg[] =
+    "bad '{0}' attribute at index {1}, not an int";
 
 using Device = DeviceNameUtils::ParsedName;
 using Devices = llvm::ArrayRef<DeviceNameUtils::ParsedName>;
@@ -164,12 +170,19 @@ std::string GetTPUCompilationDevice(Device system_device) {
   return DeviceNameUtils::ParsedNameToString(system_device);
 }
 
+// Finds the host CPU device for a given TPU device.
+std::string GetCPUHostDeviceForTPUDevice(Device tpu_device) {
+  tpu_device.type = DEVICE_CPU;
+  tpu_device.id = 0;
+  return DeviceNameUtils::ParsedNameToString(tpu_device);
+}
+
 // Determines execution devices when topology and device assignment are not
 // defined. This is a special case where a single core computation is replicated
 // to every core in the mesh. TPU devices are simply added to
 // `execution_devices` of one replica. `num_replicas` must be 1 or the total
 // number of TPU devices available, and `num_cores_per_replica` must be 1.
-StatusOr<ExecutionDevices> GetFullMeshTPUExecutionDeviceAssignment(
+StatusOr<TPUDevicesAndHosts> GetFullMeshTPUExecutionDeviceAssignment(
     int num_replicas, int num_cores_per_replica,
     llvm::ArrayRef<llvm::SmallVector<Device, 8>> tpu_devices) {
   const int num_tasks = tpu_devices.size();
@@ -185,17 +198,18 @@ StatusOr<ExecutionDevices> GetFullMeshTPUExecutionDeviceAssignment(
         "'num_cores_per_replica' must be equal to 1, got ",
         num_cores_per_replica);
 
-  ExecutionDevices execution_devices;
-  execution_devices.reserve(num_replicas);
+  TPUDevicesAndHosts devices_and_hosts;
+  devices_and_hosts.reserve(num_replicas);
   for (int i = 0; i < num_replicas; ++i) {
     const int task = i / num_tpus_per_task;
     const int device = i % num_tpus_per_task;
-    execution_devices.push_back(
-        {tensorflow::DeviceNameUtils::ParsedNameToString(
-            tpu_devices[task][device])});
+    const auto& tpu_device = tpu_devices[task][device];
+    devices_and_hosts.push_back({TPUDeviceAndHost(
+        /*device=*/tensorflow::DeviceNameUtils::ParsedNameToString(tpu_device),
+        /*host=*/GetCPUHostDeviceForTPUDevice(tpu_device))});
   }
 
-  return execution_devices;
+  return devices_and_hosts;
 }
 
 // Helper struct for keeping track of task and device for an associated TPU
@@ -209,43 +223,43 @@ struct TaskAndDevice {
 };
 
 // Checks if device coordinate is outside of topology mesh shape bounds.
-bool DeviceCoordinateOutOfBound(int x, int y, int core, int bound_x,
-                                int bound_y, int bound_core) {
-  return x < 0 || x >= bound_x || y < 0 || y >= bound_y || core < 0 ||
-         core >= bound_core;
+bool DeviceCoordinateOutOfBound(int x, int y, int z, int core, int bound_x,
+                                int bound_y, int bound_z, int bound_core) {
+  return x < 0 || x >= bound_x || y < 0 || y >= bound_y || z < 0 ||
+         z >= bound_z || core < 0 || core >= bound_core;
 }
 
 // Creates error message for an out of bound device coordinate.
 Status DeviceCoordinateErrorMsg(absl::string_view attribute, int x, int y,
-                                int core, int bound_x, int bound_y,
-                                int bound_core) {
-  return errors::InvalidArgument("device coordinate (", x, ", ", y, ", ", core,
-                                 ") in '", attribute,
+                                int z, int core, int bound_x, int bound_y,
+                                int bound_z, int bound_core) {
+  return errors::InvalidArgument("device coordinate (", x, ", ", y, ", ", z,
+                                 ", ", core, ") in '", attribute,
                                  "' is outside of mesh shape (", bound_x, ", ",
-                                 bound_y, ", ", bound_core, ")");
+                                 bound_y, ", ", bound_z, ", ", bound_core, ")");
 }
 
 // Creates error message for a duplicate device coordinate.
 Status DuplicateCoordinateErrorMsg(absl::string_view attribute, int x, int y,
-                                   int core) {
+                                   int z, int core) {
   return errors::InvalidArgument("'", attribute,
                                  "' has duplicate device coordinate (", x, ", ",
-                                 y, ", ", core, ")");
+                                 y, ", ", z, ", ", core, ")");
 }
 
 // Parses and validates topology (serialized string of TopologyProto), and maps
-// device coordinate (x, y, core) to task and device (of available TPUs).
+// device coordinate (x, y, z, core) to task and device (of available TPUs).
 // Topology attribute device coordinates are ordered by task then device (major
 // to minor).
 //
 // A valid TopologyProto must have:
-//  - a valid mesh shape (rank 3 with positive dimensions)
+//  - a valid mesh shape (rank 4 with positive dimensions)
 //  - `num_tasks` and `num_tpu_devices_per_task` must match the number of
 //    available TPU hosts and devices per host
 //  - device coordinates within the mesh shape
 //  - no duplicate device coordinates
 //  - number of device coordinates (in tuple 3) match number of availabe TPUs
-StatusOr<xla::Array3D<TaskAndDevice>> ParseTopologyAttr(
+StatusOr<xla::Array4D<TaskAndDevice>> ParseTopologyAttr(
     llvm::StringRef topology_attr, int num_tasks, int num_tpus_per_task) {
   tpu::TopologyProto topology_proto;
   if (!topology_proto.ParseFromString(topology_attr.str()))
@@ -288,22 +302,25 @@ StatusOr<xla::Array3D<TaskAndDevice>> ParseTopologyAttr(
 
   const int bound_x = topology_proto.mesh_shape(0);
   const int bound_y = topology_proto.mesh_shape(1);
-  const int bound_core = topology_proto.mesh_shape(2);
+  const int bound_z = topology_proto.mesh_shape(2);
+  const int bound_core = topology_proto.mesh_shape(3);
 
-  xla::Array3D<TaskAndDevice> topology(bound_x, bound_y, bound_core, {});
+  xla::Array4D<TaskAndDevice> topology(bound_x, bound_y, bound_z, bound_core);
   int pos = 0;
   for (int task = 0; task < num_tasks; ++task) {
     for (int device = 0; device < num_tpus_per_task; ++device) {
       int x = topology_proto.device_coordinates(pos++);
       int y = topology_proto.device_coordinates(pos++);
+      int z = topology_proto.device_coordinates(pos++);
       int core = topology_proto.device_coordinates(pos++);
-      if (DeviceCoordinateOutOfBound(x, y, core, bound_x, bound_y, bound_core))
-        return DeviceCoordinateErrorMsg(kTopologyAttr, x, y, core, bound_x,
-                                        bound_y, bound_core);
+      if (DeviceCoordinateOutOfBound(x, y, z, core, bound_x, bound_y, bound_z,
+                                     bound_core))
+        return DeviceCoordinateErrorMsg(kTopologyAttr, x, y, z, core, bound_x,
+                                        bound_y, bound_z, bound_core);
 
-      auto& task_and_device = topology(x, y, core);
+      auto& task_and_device = topology(x, y, z, core);
       if (task_and_device.task != -1)
-        return DuplicateCoordinateErrorMsg(kTopologyAttr, x, y, core);
+        return DuplicateCoordinateErrorMsg(kTopologyAttr, x, y, z, core);
 
       task_and_device = {task, device};
     }
@@ -323,7 +340,7 @@ StatusOr<xla::Array3D<TaskAndDevice>> ParseTopologyAttr(
 //  - number of device coordinates (in tuple 3) match number 'num_replicas' *
 //    'num_cores_per_replica'
 //  - a TPU device associated with each device coordinate
-StatusOr<std::pair<ExecutionDevices, xla::DeviceAssignmentProto>>
+StatusOr<std::pair<TPUDevicesAndHosts, xla::DeviceAssignmentProto>>
 GetGeneralTPUExecutionDeviceAssignment(
     int num_replicas, int num_cores_per_replica,
     llvm::ArrayRef<llvm::SmallVector<Device, 8>> tpu_devices,
@@ -346,19 +363,21 @@ GetGeneralTPUExecutionDeviceAssignment(
 
   const int bound_x = topology.n1();
   const int bound_y = topology.n2();
-  const int bound_core = topology.n3();
+  const int bound_z = topology.n3();
+  const int bound_core = topology.n4();
 
   // TPU XLA device ID is determined by its device coordinate, from major to
-  // minor coordinates (y, x, core).
-  auto location_to_id = [&](int x, int y, int core) {
-    return x * bound_core + y * bound_x * bound_core + core;
+  // minor coordinates (z, y, x, core).
+  auto location_to_id = [&](int x, int y, int z, int core) {
+    return (x + bound_x * (y + bound_y * z)) * bound_core + core;
   };
 
   std::vector<bool> used_device_ids(
-      location_to_id(bound_x - 1, bound_y - 1, bound_core - 1), false);
-  ExecutionDevices execution_devices(
-      num_replicas,
-      llvm::SmallVector<std::string, 8>(num_cores_per_replica, ""));
+      location_to_id(bound_x - 1, bound_y - 1, bound_z - 1, bound_core - 1),
+      false);
+  TPUDevicesAndHosts devices_and_hosts(
+      num_replicas, llvm::SmallVector<TPUDeviceAndHost, 8>(
+                        num_cores_per_replica, TPUDeviceAndHost()));
   xla::DeviceAssignment device_assignment(num_replicas, num_cores_per_replica);
   int pos = 0;
   for (int replica = 0; replica < num_replicas; ++replica) {
@@ -366,38 +385,64 @@ GetGeneralTPUExecutionDeviceAssignment(
          ++logical_core) {
       int x = device_assignment_attr[pos++];
       int y = device_assignment_attr[pos++];
+      int z = device_assignment_attr[pos++];
       int core = device_assignment_attr[pos++];
-      if (DeviceCoordinateOutOfBound(x, y, core, bound_x, bound_y, bound_core))
-        return DeviceCoordinateErrorMsg(kDeviceAssignmentAttr, x, y, core,
-                                        bound_x, bound_y, bound_core);
+      if (DeviceCoordinateOutOfBound(x, y, z, core, bound_x, bound_y, bound_z,
+                                     bound_core))
+        return DeviceCoordinateErrorMsg(kDeviceAssignmentAttr, x, y, z, core,
+                                        bound_x, bound_y, bound_z, bound_core);
 
-      TaskAndDevice task_and_device = topology(x, y, core);
+      TaskAndDevice task_and_device = topology(x, y, z, core);
       const int task = task_and_device.task;
       const int device = task_and_device.device;
       if (task == -1 || device == -1)
         return errors::InvalidArgument(
             "no TPU device found for '", kDeviceAssignmentAttr,
-            "' device coordinate (", x, ", ", y, ", ", core, ")");
+            "' device coordinate (", x, ", ", y, ", ", z, ", ", core, ")");
 
-      const int device_id = location_to_id(x, y, core);
+      const int device_id = location_to_id(x, y, z, core);
       if (used_device_ids[device_id])
-        return DuplicateCoordinateErrorMsg(kDeviceAssignmentAttr, x, y, core);
+        return DuplicateCoordinateErrorMsg(kDeviceAssignmentAttr, x, y, z,
+                                           core);
 
       used_device_ids[device_id] = true;
       device_assignment(replica, logical_core) = device_id;
-      execution_devices[replica][logical_core] =
-          DeviceNameUtils::ParsedNameToString(tpu_devices[task][device]);
+      auto& device_and_host = devices_and_hosts[replica][logical_core];
+      const auto& tpu_device = tpu_devices[task][device];
+      device_and_host.device = DeviceNameUtils::ParsedNameToString(tpu_device);
+      device_and_host.host = GetCPUHostDeviceForTPUDevice(tpu_device);
     }
   }
 
   xla::DeviceAssignmentProto device_assignment_proto;
   TF_RETURN_IF_ERROR(device_assignment.Serialize(&device_assignment_proto));
 
-  return std::pair<ExecutionDevices, xla::DeviceAssignmentProto>(
-      std::move(execution_devices), std::move(device_assignment_proto));
+  return std::pair<TPUDevicesAndHosts, xla::DeviceAssignmentProto>(
+      std::move(devices_and_hosts), std::move(device_assignment_proto));
 }
 
 }  // anonymous namespace
+
+StatusOr<llvm::SmallVector<int64_t, 8>> GetDeviceCoordinates(
+    mlir::ArrayAttr device_assignment_attr) {
+  llvm::SmallVector<int64_t, 8> device_coordinates;
+  device_coordinates.reserve(device_assignment_attr.size());
+
+  for (auto device_coordinate_and_idx :
+       llvm::enumerate(device_assignment_attr)) {
+    auto device_coordinate =
+        device_coordinate_and_idx.value().dyn_cast<mlir::IntegerAttr>();
+    if (!device_coordinate)
+      return errors::InvalidArgument(
+          llvm::formatv(kBadIntArrayElementMsg, kDeviceAssignmentAttr,
+                        device_coordinate_and_idx.index())
+              .str());
+
+    device_coordinates.push_back(device_coordinate.getInt());
+  }
+
+  return device_coordinates;
+}
 
 StatusOr<TPUDeviceAssignment> GetTPUCompilationAndExecutionDevices(
     Devices devices, int num_replicas, int num_cores_per_replica,

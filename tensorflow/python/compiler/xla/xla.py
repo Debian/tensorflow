@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
 import contextlib
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
@@ -37,6 +36,7 @@ from tensorflow.python.platform import tf_logging as logging
 from tensorflow.python.util import compat
 from tensorflow.python.util import nest
 from tensorflow.python.util import tf_inspect
+from tensorflow.python.util.compat import collections_abc
 from tensorflow.python.util.tf_export import tf_export
 
 _XLA_COMPILE_ATTR = '_xla_compile_id'
@@ -329,7 +329,7 @@ def _compile_internal(computation, inputs=None):
   if inputs is None:
     inputs = []
 
-  if not isinstance(inputs, collections.Sequence):
+  if not isinstance(inputs, collections_abc.Sequence):
     raise TypeError('inputs must be a list')
 
   # Flatten inputs.
@@ -414,10 +414,11 @@ def is_flat(outputs):
     2) A single object
     3) A list or tuple of Tensors/Operations
 
-    The only structures that this function understands are sequences and
-    dictionaries.  E.g. this means that if outputs contains a single
-    user-defined Object, it is considered to be flat. Errors are raised later on
-    if that Object cannot be converted to a Tensor.
+    The only structures that this function understands are sequences,
+    dictionaries and types defined using the attrs library.  E.g. this means
+    that if outputs contains a single user-defined Object, it is considered to
+    be flat. Errors are raised later on if that Object cannot be converted to a
+    Tensor.
 
   Args:
     outputs: Output from `computation` inside `xla.compile`.
@@ -427,13 +428,19 @@ def is_flat(outputs):
   """
   # If outputs is a list or tuple, check if it has any nested structure. If
   # there is, then outputs is non-flat.
-  if isinstance(outputs, collections.Sequence):
+  if isinstance(outputs, collections_abc.Sequence):
     for o in outputs:
-      if isinstance(o, collections.Sequence) or isinstance(o, dict):
+      if (isinstance(o, collections_abc.Sequence) or
+          isinstance(o, collections_abc.Mapping) or
+          hasattr(o.__class__, '__attrs_attrs__')):
         return False
 
   # If outputs is a dict, it is non-flat.
-  if isinstance(outputs, dict):
+  if isinstance(outputs, collections_abc.Mapping):
+    return False
+
+  # If outputs is from the attrs library, it is non-flat.
+  if hasattr(outputs.__class__, '__attrs_attrs__'):
     return False
 
   # Getting here means either outputs itself is a single non-structured value
@@ -460,7 +467,7 @@ def _postprocess_flat_outputs(outputs):
   if outputs is None:
     outputs = tuple()
   # If the computation only returned one value, make it a tuple.
-  if not isinstance(outputs, collections.Sequence):
+  if not isinstance(outputs, collections_abc.Sequence):
     outputs = (outputs,)
 
   # Append `no_op` here so that return value of this function always contains

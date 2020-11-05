@@ -20,7 +20,7 @@ limitations under the License.
 #define TF_Quantization
 
 include "mlir/IR/OpBase.td"
-include "mlir/Dialect/QuantOps/QuantPredicates.td"
+include "mlir/Dialect/Quant/QuantOpsBase.td"
 
 //===----------------------------------------------------------------------===//
 // QuantizedType definitions.
@@ -62,6 +62,22 @@ def QI32 : QuantizedType<"Uniform", [32], 1>;
 // Ops in this link should have those traits specified:
 // https://www.tensorflow.org/lite/performance/quantization_spec
 //===----------------------------------------------------------------------===//
+
+// TODO(b/157870442): replace all FixedResultScale trait
+def FixedOutputRangeInterface : OpInterface<
+  "FixedOutputRangeInterface"> {
+  let description = [{
+    Interface for defining the fixed output range.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      [{Returns the fixed output range.}],
+      "UniformQuantizedType", "GetFixedOutputRange",
+      (ins "bool":$sign, "int":$bit_width)
+    >,
+  ];
+}
 
 // Specify this trait if the op has a fixed output value range.
 class FixedResultScale<QuantizedType qt> : NativeOpTrait<!strconcat(

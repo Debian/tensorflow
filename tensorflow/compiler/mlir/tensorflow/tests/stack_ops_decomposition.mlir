@@ -1,4 +1,4 @@
-// RUN: tf-opt %s -split-input-file -verify-diagnostics -tf-stack-ops-decomposition | FileCheck %s -dump-input-on-failure
+// RUN: tf-opt %s -split-input-file -verify-diagnostics -tf-stack-ops-decomposition | FileCheck %s
 
 // Tests simple scalar stack operations without control flow.
 
@@ -6,14 +6,14 @@
 func @main() -> tensor<f32> {
   // CHECK-NEXT: "tf.Const"() {value = dense<10> : tensor<i32>}
   %max_size = "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
-  // CHECK-NEXT: %[[BUFFER:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<10xf32>>>
-  // CHECK-NEXT: %[[SIZE:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<1xi32>>>
-  // CHECK-NEXT: %[[ZERO:.*]] = "tf.Const"() {value = dense<0> : tensor<1xi32>} : () -> tensor<1xi32>
-  // CHECK-NEXT: "tf.AssignVariableOp"(%[[SIZE]], %[[ZERO]])
   // CHECK-NEXT: %[[ZERO_SCALAR:.*]] = "tf.Const"() {value = dense<0> : tensor<i32>} : () -> tensor<i32>
   // CHECK-NEXT: %[[CAST_ZERO:.*]] = "tf.Cast"(%[[ZERO_SCALAR]]) : (tensor<i32>) -> tensor<f32>
   // CHECK-NEXT: %[[CONST10:.*]] = "tf.Const"() {value = dense<10> : tensor<1xi32>} : () -> tensor<1xi32>
   // CHECK-NEXT: %[[BROADCAST:.*]] = "tf.BroadcastTo"(%[[CAST_ZERO]], %[[CONST10]]) : (tensor<f32>, tensor<1xi32>) -> tensor<10xf32>
+  // CHECK-NEXT: %[[BUFFER:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<10xf32>>>
+  // CHECK-NEXT: %[[SIZE:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<1xi32>>>
+  // CHECK-NEXT: %[[ZERO:.*]] = "tf.Const"() {value = dense<0> : tensor<1xi32>} : () -> tensor<1xi32>
+  // CHECK-NEXT: "tf.AssignVariableOp"(%[[SIZE]], %[[ZERO]])
   // CHECK-NEXT: "tf.AssignVariableOp"(%[[BUFFER]], %[[BROADCAST]])
   %stack = "tf.StackV2"(%max_size) {elem_type = f32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
   %id = "tf.Identity"(%stack) : (tensor<!tf.resource>) -> tensor<!tf.resource>
@@ -52,13 +52,13 @@ func @main() -> tensor<f32> {
 func @main() -> tensor<2xi32> {
   // CHECK-NEXT: "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
   %size = "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
+  // CHECK-NEXT: %[[ZERO_CONST:.*]] = "tf.Const"() {value = dense<0> : tensor<i32>} : () -> tensor<i32>
+  // CHECK-NEXT: %[[STACK_SHAPE:.*]] = "tf.Const"() {value = dense<[10, 2]> : tensor<2xi32>} : () -> tensor<2xi32>
+  // CHECK-NEXT: %[[BROADCAST:.*]] = "tf.BroadcastTo"(%[[ZERO_CONST]], %[[STACK_SHAPE]]) : (tensor<i32>, tensor<2xi32>) -> tensor<10x2xi32>
   // CHECK-NEXT: %[[BUFFER:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<10x2xi32>>>
   // CHECK-NEXT: %[[SIZE:.*]] = "tf.MlirLocalVarOp"() : () -> tensor<!tf.resource<tensor<1xi32>>>
   // CHECK-NEXT: %[[ZERO_SIZE:.*]] = "tf.Const"() {value = dense<0> : tensor<1xi32>} : () -> tensor<1xi32>
   // CHECK-NEXT: "tf.AssignVariableOp"(%[[SIZE]], %[[ZERO_SIZE]]) : (tensor<!tf.resource<tensor<1xi32>>>, tensor<1xi32>) -> ()
-  // CHECK-NEXT: %[[ZERO_CONST:.*]] = "tf.Const"() {value = dense<0> : tensor<i32>} : () -> tensor<i32>
-  // CHECK-NEXT: %[[STACK_SHAPE:.*]] = "tf.Const"() {value = dense<[10, 2]> : tensor<2xi32>} : () -> tensor<2xi32>
-  // CHECK-NEXT: %[[BROADCAST:.*]] = "tf.BroadcastTo"(%[[ZERO_CONST]], %[[STACK_SHAPE]]) : (tensor<i32>, tensor<2xi32>) -> tensor<10x2xi32>
   // CHECK-NEXT: "tf.AssignVariableOp"(%[[BUFFER]], %[[BROADCAST]]) : (tensor<!tf.resource<tensor<10x2xi32>>>, tensor<10x2xi32>) -> ()
   %stack = "tf.StackV2"(%size) {elem_type = i32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
   // CHECK-NEXT: %[[PUSH_VAL:.*]] = "tf._SomeOp"() : () -> tensor<2xi32>
@@ -151,10 +151,10 @@ func @if_then(%arg0: tensor<!tf.resource>) -> tensor<!tf.resource> {
 }
 // CHECK: func @if_else(%[[EARG0:.*]]: tensor<!tf.resource<tensor<10xf32>>>, %[[EARG1:.*]]: tensor<!tf.resource<tensor<1xi32>>>)
 func @if_else(%arg0: tensor<!tf.resource>) -> tensor<!tf.resource> {
-  // CHECK-NOT: "tf.StackPushV2"
+  // CHECK-NOT: "tf.StackPopV2"
   // CHECK: "tf.Slice"
   // CHECK: "tf.AssignVariableOp"(%[[EARG1:.*]],
-  // CHECK-NOT: "tf.StackPushV2"
+  // CHECK-NOT: "tf.StackPopV2"
   %pop = "tf.StackPopV2"(%arg0) : (tensor<!tf.resource>) -> tensor<f32>
   return %arg0 : tensor<!tf.resource>
 }
@@ -185,7 +185,7 @@ func @main(%arg0: tensor<i1>) -> () {
 }
 
 // CHECK: func @callee(%[[AARG0:.*]]: tensor<!tf.resource>, %[[AARG1:.*]]: tensor<i1>) -> tensor<!tf.resource>
-func @callee(%arg0: tensor<!tf.resource>, %arg1: tensor<i1>) -> tensor<!tf.resource> {
+func @callee(%arg0: tensor<!tf.resource>, %arg1: tensor<i1>) -> tensor<!tf.resource> attributes {sym_visibility = "public"} {
   %elem = "tf._SomeOp"(%arg1) : (tensor<i1>) -> tensor<f32>
   // CHECK: tf.StackPushV2"
   %push = "tf.StackPushV2"(%arg0, %elem) {swap_memory = false} : (tensor<!tf.resource>, tensor<f32>) -> tensor<f32>
@@ -201,10 +201,66 @@ func @callee(%arg0: tensor<!tf.resource>, %arg1: tensor<i1>) -> tensor<!tf.resou
 
 // -----
 
+// Tests PartitionedCall/StatefulPartitionedCall with private callee function.
+
+// CHECK-LABEL: func @main
+func @main(%arg0: tensor<i1>) -> () {
+  %max_size = "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
+  // CHECK-NOT: tf.Stack
+  %stack = "tf.StackV2"(%max_size) {elem_type = f32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
+  // CHECK: "tf.StatefulPartitionedCall"
+  // CHECK-SAME: f = @callee
+  %call = "tf.StatefulPartitionedCall"(%stack, %arg0) {f = @callee, config = "", config_proto = "", executor_type = ""}
+    : (tensor<!tf.resource>, tensor<i1>) -> tensor<!tf.resource>
+  // CHECK: "tf.PartitionedCall"
+  // CHECK-SAME: f = @callee
+  %call2 = "tf.PartitionedCall"(%stack, %arg0) {f = @callee, config = "", config_proto = "", executor_type = ""}
+    : (tensor<!tf.resource>, tensor<i1>) -> tensor<!tf.resource>
+  // CHECK: "tf.Slice"
+  %pop = "tf.StackPopV2"(%call) : (tensor<!tf.resource>) -> tensor<f32>
+  // CHECK-NOT: tf.Stack
+  "tf.StackCloseV2"(%stack) : (tensor<!tf.resource>) -> ()
+  // CHECK: return
+  return
+}
+
+// CHECK: func @callee(%[[ARG0:.*]]: tensor<!tf.resource<tensor<10xf32>>>, %[[ARG1:.*]]: tensor<i1>, %[[ARG2:.*]]: tensor<!tf.resource<tensor<1xi32>>>)
+func @callee(%arg0: tensor<!tf.resource>, %arg1: tensor<i1>) -> tensor<!tf.resource> attributes {sym_visibility = "private"} {
+  %elem = "tf._SomeOp"(%arg1) : (tensor<i1>) -> tensor<f32>
+  // CHECK-NOT: "tf.StackPushV2"
+  // CHECK: %[[UPDATE:.*]] = "tf.XlaDynamicUpdateSlice"
+  // CHECK: "tf.AssignVariableOp"(%[[TARG0:.*]], %[[UPDATE]])
+  // CHECK: "tf.AssignVariableOp"(%[[EARG1:.*]],
+  // CHECK-NOT: "tf.StackPushV2"
+  %push = "tf.StackPushV2"(%arg0, %elem) {swap_memory = false} : (tensor<!tf.resource>, tensor<f32>) -> tensor<f32>
+  return %arg0 : tensor<!tf.resource>
+}
+
+// -----
+
+// Tests PartitionedCall op with no signature change on callee.
+
+// CHECK-LABEL: func @main
+func @main() -> () {
+  "tf.PartitionedCall"() {f = @callee, config = "", config_proto = "", executor_type = ""} : () -> ()
+  return
+}
+// CHECK: func @callee()
+func @callee() -> () attributes {sym_visibility = "public"} {
+  %max_size = "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
+  // CHECK-NOT: tf.Stack
+  %stack = "tf.StackV2"(%max_size) {elem_type = f32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
+  %elem = "tf._SomeOp"() : () -> tensor<f32>
+  %push = "tf.StackPushV2"(%stack, %elem) {swap_memory = false} : (tensor<!tf.resource>, tensor<f32>) -> tensor<f32>
+  return
+}
+
+// -----
+
 // Tests that the pass reports error on unknown stack size.
 
 func @main(%arg0: tensor<i32>) -> tensor<2xi32> {
-  // expected-error @+1 {{max size of stack is not a constant.}}
+  // expected-error @+1 {{unknown max element count}}
   %stack = "tf.StackV2"(%arg0) {elem_type = i32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
   %elem = "tf._SomeOp"() : () -> tensor<2xi32>
   %push = "tf.StackPushV2"(%stack, %elem) {swap_memory = false} : (tensor<!tf.resource>, tensor<2xi32>) -> tensor<2xi32>
@@ -218,7 +274,7 @@ func @main(%arg0: tensor<i32>) -> tensor<2xi32> {
 
 func @main(%arg0: tensor<i32>)  -> () {
   %max_size = "tf.Const"() {value = dense<10> : tensor<i32>} : () -> tensor<i32>
-  // expected-error @+1 {{cannot infer element shape of stack.}}
+  // expected-error @+1 {{cannot infer element shape of stack}}
   %stack = "tf.StackV2"(%max_size) {elem_type = i32, stack_name = "s"} : (tensor<i32>) -> tensor<!tf.resource>
   %elem = "tf._SomeOp"() : () -> tensor<*xi32>
   %push = "tf.StackPushV2"(%stack, %elem) {swap_memory = false} : (tensor<!tf.resource>, tensor<*xi32>) -> tensor<*xi32>
@@ -236,7 +292,7 @@ func @main(%arg0: tensor<i1>) -> () {
   %stack2 = "tf.StackV2"(%max_size) {elem_type = f32, stack_name = "s2"} : (tensor<i32>) -> tensor<!tf.resource>
   %if_op = "tf.If"(%arg0, %stack, %stack2) {then_branch = @if_then, else_branch = @if_else, is_stateless = false}
     : (tensor<i1>, tensor<!tf.resource>, tensor<!tf.resource>) -> tensor<!tf.resource>
-  // expected-error @+1 {{unknown stack.}}
+  // expected-error @+1 {{unknown stack}}
   %pop = "tf.StackPopV2"(%if_op) : (tensor<!tf.resource>) -> tensor<f32>
   "tf.StackCloseV2"(%stack) : (tensor<!tf.resource>) -> ()
   // CHECK: return

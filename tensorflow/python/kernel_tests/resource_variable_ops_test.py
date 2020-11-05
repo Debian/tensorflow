@@ -56,6 +56,8 @@ from tensorflow.python.training import training_util
 from tensorflow.python.util import compat
 
 
+@test_util.disable_tfrt(
+    "Trying to assign variable with wrong dtype. b/156200342")
 @test_util.with_control_flow_v2
 class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
                               parameterized.TestCase):
@@ -207,6 +209,26 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
         resource_variable_ops.assign_variable_op(
             handle, constant_op.constant([1.], dtype=dtypes.float32))
 
+  def testRepr(self):
+    with context.eager_mode():
+      v = resource_variable_ops.ResourceVariable(1)
+      text = "%r" % v
+      self.assertEqual(
+          "<tf.Variable 'Variable:0' shape=() dtype=int32, numpy=1>", text)
+
+  def testReprUnavailable(self):
+    with context.eager_mode():
+      v = resource_variable_ops.ResourceVariable(1)
+
+      # Monkey-patch this variable to not have an available value
+      def broken_read():
+        raise ValueError("This doesn't work")
+
+      v.read_value = broken_read
+      text = "%r" % v
+      self.assertEqual("<tf.Variable 'Variable:0' shape=() dtype=int32,"
+                       " numpy=<unavailable>>", text)
+
   def testUnprintableHandle(self):
     with context.eager_mode():
       handle = resource_variable_ops.var_handle_op(
@@ -311,6 +333,7 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     g = gradients_impl.gradients(c, [b], unconnected_gradients="zero")[0]
     self.assertAllEqual(g.shape.as_list(), [1, 2])
 
+  @test_util.disable_tfrt("Graph is not supported yet. b/156187905")
   @test_util.run_deprecated_v1
   def testGradientCondInWhileLoop(self):
     v = resource_variable_ops.ResourceVariable(initial_value=1.0)
@@ -944,6 +967,7 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
           assign = var.assign(np.zeros(shape=[2, 2]))
           self.evaluate(assign)
 
+  @test_util.disable_tfrt("Graph is not supported yet. b/156187905")
   @test_util.disable_xla("XLA doesn't allow changing shape at assignment, as "
                          "dictated by tf2xla/xla_resource.cc:SetTypeAndShape")
   @test_util.run_in_graph_and_eager_modes
@@ -1047,8 +1071,7 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
           dtype=v.dtype.base_dtype, shape=v.get_shape(), shared_name="var5",
           container=ops.get_default_graph()._container)
       with self.assertRaisesOpError(
-          "(Resource .*/var5/.* does not exist|Read of uninitialized variable)"
-      ):
+          "(Resource .*/var5/.* does not exist|uninitialized)"):
         resource_variable_ops.read_variable_op(x, v.dtype.base_dtype).eval()
 
   @test_util.run_deprecated_v1
@@ -1306,6 +1329,7 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
 
   # TODO(ebrevdo): Add run_in_graph_and_eager_modes once we can create
   # EagerTensor constants with TensorProto inputs.
+  @test_util.disable_tfrt("Graph is not supported yet. b/156187905")
   @test_util.run_in_graph_and_eager_modes()
   def testVariantInitializer(self):
     variant_shape_and_type_data = self.create_variant_shape_and_type_data()

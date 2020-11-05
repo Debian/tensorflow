@@ -18,7 +18,6 @@ limitations under the License.
 // TODO(ghodrat): Remove this header file and the dependency to internal data
 // structure.
 #include "tensorflow/lite/c/builtin_op_data.h"
-#include "tensorflow/lite/kernels/cpu_backend_context.h"
 #include "tensorflow/lite/kernels/internal/reference/portable_tensor_utils_impl.h"
 
 #if defined(_MSC_VER)
@@ -61,52 +60,50 @@ void AsymmetricQuantizeFloats(const float* values, const int size,
 
 void MatrixBatchVectorMultiplyAccumulate(const float* matrix, int m_rows,
                                          int m_cols, const float* vector,
-                                         int n_batch, float* result,
-                                         int result_stride) {
+                                         int n_batch, float* result) {
   PortableMatrixBatchVectorMultiplyAccumulate(matrix, m_rows, m_cols, vector,
-                                              n_batch, result, result_stride);
+                                              n_batch, result);
 }
 
-void MatrixBatchVectorMultiplyAccumulate(
-    const int8_t* __restrict__ matrix, const int m_rows, const int m_cols,
-    const int8_t* __restrict__ vector, const float* scaling_factors,
-    int n_batch, float* __restrict__ result, int result_stride) {
+void MatrixBatchVectorMultiplyAccumulate(const int8_t* __restrict__ matrix,
+                                         const int m_rows, const int m_cols,
+                                         const int8_t* __restrict__ vector,
+                                         const float* scaling_factors,
+                                         int n_batch,
+                                         float* __restrict__ result) {
   PortableMatrixBatchVectorMultiplyAccumulate(matrix, m_rows, m_cols, vector,
-                                              scaling_factors, n_batch, result,
-                                              result_stride);
+                                              scaling_factors, n_batch, result);
 }
 
 void MatrixBatchVectorMultiplyAccumulate(
     const int8_t* __restrict__ matrix, const int m_rows, const int m_cols,
     const int8_t* __restrict__ vectors, const float* scaling_factors,
-    int n_batch, float* __restrict__ result, int result_stride,
-    const float* per_channel_scale, const int32_t* input_offset,
-    int32_t* scratch, int32_t* row_sums, bool* compute_row_sums,
-    CpuBackendContext* context) {
+    int n_batch, float* __restrict__ result, const float* per_channel_scale,
+    const int32_t* input_offset, int32_t* scratch, int32_t* row_sums,
+    bool* compute_row_sums, CpuBackendContext* context) {
   PortableMatrixBatchVectorMultiplyAccumulate(
       matrix, m_rows, m_cols, vectors, scaling_factors, n_batch, result,
-      result_stride, per_channel_scale, input_offset, scratch, row_sums,
-      compute_row_sums, context);
+      per_channel_scale, input_offset, scratch, row_sums, compute_row_sums,
+      context);
 }
 
-void MatrixBatchVectorMultiplyAccumulate(
-    const int8_t* __restrict__ matrix, const int m_rows, const int m_cols,
-    const int8_t* __restrict__ vector, const float* scaling_factors,
-    int n_batch, int32_t* scratch, float* __restrict__ result,
-    int result_stride, CpuBackendContext* context) {
+void MatrixBatchVectorMultiplyAccumulate(const int8_t* __restrict__ matrix,
+                                         const int m_rows, const int m_cols,
+                                         const int8_t* __restrict__ vector,
+                                         const float* scaling_factors,
+                                         int n_batch, int32_t* scratch,
+                                         float* __restrict__ result,
+                                         CpuBackendContext* context) {
   PortableMatrixBatchVectorMultiplyAccumulate(matrix, m_rows, m_cols, vector,
-                                              scaling_factors, n_batch, result,
-                                              result_stride);
+                                              scaling_factors, n_batch, result);
 }
 
-void MatrixBatchVectorMultiplyAccumulate(
-    const int8_t* __restrict__ matrix, const int m_rows, const int m_cols,
-    const int8_t* __restrict__ vectors, const float* scaling_factors,
-    int n_batch, float* __restrict__ result, int result_stride,
-    const float* per_channel_scale, const int32_t* input_offset) {
-  PortableMatrixBatchVectorMultiplyAccumulate(
-      matrix, m_rows, m_cols, vectors, scaling_factors, n_batch, result,
-      result_stride, per_channel_scale, input_offset);
+void SparseMatrixBatchVectorMultiplyAccumulate1x4(
+    const float* __restrict__ matrix, const int32_t* __restrict__ segments,
+    const int32_t* __restrict__ indices, int m_rows, int m_cols,
+    const float* __restrict__ vector, int n_batch, float* __restrict__ result) {
+  PortableSparseMatrixBatchVectorMultiplyAccumulate1x4(
+      matrix, segments, indices, m_rows, m_cols, vector, n_batch, result);
 }
 
 void SparseMatrixBatchVectorMultiplyAccumulate(

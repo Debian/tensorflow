@@ -147,7 +147,7 @@ genrule(
         "@double_conversion//:LICENSE",
         "@eigen_archive//:COPYING.MPL2",
         "@farmhash_archive//:COPYING",
-        "@fft2d//:fft2d/readme2d.txt",
+        "@fft2d//:readme2d.txt",
         "@gemmlowp//:LICENSE",
         "@gif//:COPYING",
         "@highwayhash//:LICENSE",
@@ -162,7 +162,6 @@ genrule(
         "@nsync//:LICENSE",
         "@png//:LICENSE",
         "@snappy//:COPYING",
-        "@sobol_data//:LICENSE",
         "@zlib//:zlib.h",
     ] + select({
         "//tensorflow:android": [],
@@ -227,7 +226,7 @@ genrule(
         "@double_conversion//:LICENSE",
         "@eigen_archive//:COPYING.MPL2",
         "@farmhash_archive//:COPYING",
-        "@fft2d//:fft2d/readme2d.txt",
+        "@fft2d//:readme2d.txt",
         "@gemmlowp//:LICENSE",
         "@gif//:COPYING",
         "@com_github_grpc_grpc//:LICENSE",
@@ -244,7 +243,6 @@ genrule(
         "@nsync//:LICENSE",
         "@png//:LICENSE",
         "@snappy//:COPYING",
-        "@sobol_data//:LICENSE",
         "@zlib//:zlib.h",
     ] + select({
         "//tensorflow:android": [],

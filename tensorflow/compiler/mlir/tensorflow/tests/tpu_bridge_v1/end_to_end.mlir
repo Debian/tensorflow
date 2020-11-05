@@ -1,10 +1,11 @@
-// RUN: tf-opt %s -tf-tpu-bridge-v1 | FileCheck %s --dump-input=fail
+// RUN: tf-opt %s -tf-tpu-bridge-v1 | FileCheck %s
 
 module attributes {tf.devices = ["/job:localhost/replica:0/task:0/device:CPU:0", "/job:localhost/replica:0/task:0/device:TPU:0", "/job:localhost/replica:0/task:0/device:TPU:1", "/job:localhost/replica:0/task:0/device:TPU_SYSTEM:0"], tf.versions = {bad_consumers = [], min_consumer = 0 : i32, producer = 296 : i32}} {
   func @main() {
 // CHECK: std.constant
 // CHECK: TPUCompile
 // CHECK: TPUExecute
+// CHECK-NOT: func @_func
     tf_executor.graph {
       %outputs, %control = tf_executor.island wraps "std.constant"() {value = dense<2.000000e+00> : tensor<f32>} : () -> tensor<f32>
       %outputs_0, %control_1 = tf_executor.island wraps "std.constant"() {value = dense<3.000000e+00> : tensor<f32>} : () -> tensor<f32>

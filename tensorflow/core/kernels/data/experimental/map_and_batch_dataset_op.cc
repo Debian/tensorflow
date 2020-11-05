@@ -100,7 +100,8 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
         traceme_metadata_(
             {{"autotune",
               num_parallel_calls == model::kAutotune ? "true" : "false"},
-             {"batch_size", strings::Printf("%lld", batch_size)},
+             {"batch_size",
+              strings::Printf("%lld", static_cast<long long>(batch_size))},
              {"drop_remainder", drop_remainder ? "true" : "false"}}) {
     input_->Ref();
   }
@@ -124,6 +125,9 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
   }
 
   int64 Cardinality() const override {
+    if (!preserve_cardinality_) {
+      return kUnknownCardinality;
+    }
     int64 n = input_->Cardinality();
     if (n == kInfiniteCardinality || n == kUnknownCardinality) {
       return n;
@@ -250,14 +254,17 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
                                 /*max=*/ctx->runner_threadpool_size())});
     }
 
-    Status SaveInternal(IteratorStateWriter* writer) override {
+    Status SaveInternal(SerializationContext* ctx,
+                        IteratorStateWriter* writer) override {
+      TF_RETURN_IF_ERROR(ctx->HandleCheckExternalStateStatus(
+          dataset()->captured_func_->CheckExternalState()));
       mutex_lock l(*mu_);
       // Wait for all in-flight calls to complete.
       while (num_calls_ > 0) {
         cond_var_->wait(l);
       }
       DCHECK_EQ(num_calls_, 0);
-      TF_RETURN_IF_ERROR(SaveInput(writer, input_impl_));
+      TF_RETURN_IF_ERROR(SaveInput(ctx, writer, input_impl_));
       TF_RETURN_IF_ERROR(
           writer->WriteScalar(full_name(kCallCounter), call_counter_));
       TF_RETURN_IF_ERROR(writer->WriteScalar(full_name(kBatchResultsSize),
@@ -284,8 +291,8 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
     }
 
     TraceMeMetadata GetTraceMeMetadata() const override {
-      int64 parallelism = -1;
-      int64 max_batch_results = -1;
+      long long parallelism = -1;        // NOLINT
+      long long max_batch_results = -1;  // NOLINT
       // NOTE: We only set the parallelism value if the lock can be acquired
       // right away to avoid introducing tracing overhead.
       if (mu_->try_lock()) {
@@ -295,9 +302,11 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
       }
       auto result = dataset()->traceme_metadata_;
       result.push_back(std::make_pair(
-          "max_batch_results", strings::Printf("%lld", max_batch_results)));
-      result.push_back(
-          std::make_pair("parallelism", strings::Printf("%lld", parallelism)));
+          "max_batch_results",
+          strings::Printf("%lld", static_cast<long long>(max_batch_results))));
+      result.push_back(std::make_pair(
+          "parallelism",
+          strings::Printf("%lld", static_cast<long long>(parallelism))));
       return result;
     }
 
@@ -435,7 +444,7 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
       // `return_values`, and invoking `done` when finished.
       instantiated_captured_func_->RunAsync(ctx.get(), std::move(input_element),
                                             return_values.get(),
-                                            std::move(done), prefix());
+                                            std::move(done), model_node());
     }
 
     void CancelThreads(bool wait) TF_LOCKS_EXCLUDED(mu_) {
@@ -786,10 +795,8 @@ class MapAndBatchDatasetOp::Dataset : public DatasetBase {
 
 MapAndBatchDatasetOp::MapAndBatchDatasetOp(OpKernelConstruction* ctx)
     : UnaryDatasetOpKernel(ctx) {
-  FunctionMetadata::Params params;
-  params.is_multi_device_function = true;
-  OP_REQUIRES_OK(ctx,
-                 FunctionMetadata::Create(ctx, kFunc, params, &func_metadata_));
+  OP_REQUIRES_OK(ctx, FunctionMetadata::Create(ctx, kFunc, /*params=*/{},
+                                               &func_metadata_));
   OP_REQUIRES_OK(ctx, ctx->GetAttr(kOutputTypes, &output_types_));
   OP_REQUIRES_OK(ctx, ctx->GetAttr(kOutputShapes, &output_shapes_));
   OP_REQUIRES_OK(ctx,

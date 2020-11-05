@@ -330,8 +330,9 @@ class ShuffleTest(test_base.DatasetTestBase, parameterized.TestCase):
       self.evaluate(get_next())
 
   @combinations.generate(
-      combinations.times(test_base.default_test_combinations(),
-                         combinations.combine(reshuffle=[True, False])))
+      combinations.times(
+          test_base.default_test_combinations(),
+          combinations.combine(reshuffle=[True, False])))
   def testRerandomizeOnReplicate(self, reshuffle):
     random_seed.set_random_seed(None)
     # When no seeds are fixed, each instantiation of the shuffle dataset should

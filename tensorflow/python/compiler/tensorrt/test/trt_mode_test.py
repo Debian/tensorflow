@@ -20,7 +20,7 @@ from __future__ import print_function
 
 from unittest import SkipTest  # pylint: disable=g-importing-member
 
-from tensorflow.compiler.tf2tensorrt.wrap_py_utils import get_linked_tensorrt_version
+from tensorflow.compiler.tf2tensorrt._pywrap_py_utils import get_linked_tensorrt_version
 from tensorflow.python.compiler.tensorrt.test import tf_trt_integration_test_base as trt_test
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
@@ -39,6 +39,11 @@ class TrtModeTestBase(trt_test.TfTrtIntegrationTestBase):
     q = math_ops.abs(q)
     q = q + 5.0
     return array_ops.identity(q, name="output_0")
+
+  def ShouldRunTest(self, run_params):
+    # Squeeze op produces dynamic shaped values. Therefore, we don't run the
+    # test with static engine to avoid native segment execution.
+    return (run_params.dynamic_engine, "test dynamic engine only")
 
   def GetParams(self):
     """The input has 1 as a first dimension, which is removed by the squeeze.
@@ -128,7 +133,8 @@ class ExplicitBatchTest(TrtModeTestBase):
   def ShouldRunTest(self, run_params):
     # Only run for TRT 6 and above.
     ver = get_linked_tensorrt_version()
-    return ver[0] >= 6 and (not run_params.use_calibration)
+    return run_params.is_v2 and ver[0] >= 6 and (
+        not run_params.use_calibration), "test v2, >=TRT6 and non-calibration"
 
 
 class DynamicShapesTest(TrtModeTestBase):
@@ -164,7 +170,8 @@ class DynamicShapesTest(TrtModeTestBase):
   def ShouldRunTest(self, run_params):
     # Only run for TRT 6 and above.
     ver = get_linked_tensorrt_version()
-    return ver[0] >= 6 and (not run_params.use_calibration)
+    return run_params.is_v2 and ver[0] >= 6 and (
+        not run_params.use_calibration), "test v2 >=TRT6 and non-calibration"
 
 
 if __name__ == "__main__":

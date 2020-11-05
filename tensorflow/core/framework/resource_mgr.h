@@ -95,7 +95,6 @@ class ScopedStepContainer {
   ScopedStepContainer(const int64 step_id,
                       std::function<void(const string&)> cleanup)
       : container_(strings::StrCat("__per_step_", step_id)),
-        step_id_(step_id),
         cleanup_(cleanup),
         dirty_(false) {}
 
@@ -103,7 +102,6 @@ class ScopedStepContainer {
                       std::function<void(const string&)> cleanup,
                       const string& prefix)
       : container_(strings::StrCat("__", prefix, "_per_step_", step_id)),
-        step_id_(step_id),
         cleanup_(cleanup),
         dirty_(false) {}
 
@@ -144,11 +142,8 @@ class ScopedStepContainer {
   Status LookupOrCreate(ResourceMgr* rm, const string& name, T** resource,
                         std::function<Status(T**)> creator) TF_MUST_USE_RESULT;
 
-  const int64 step_id() const { return step_id_; }
-
  private:
   const string container_;
-  const int64 step_id_;
   const std::function<void(const string&)> cleanup_;
   mutex mu_;
   mutable std::atomic<bool> dirty_ TF_GUARDED_BY(mu_);
@@ -296,19 +291,17 @@ class ResourceMgr {
 ResourceHandle MakeResourceHandle(
     const string& container, const string& name, const DeviceBase& device,
     const TypeIndex& type_index,
-    const std::vector<DtypeAndPartialTensorShape>& dtypes_and_shapes = {},
-    const std::vector<string>& allowed_devices = {}) TF_MUST_USE_RESULT;
+    const std::vector<DtypeAndPartialTensorShape>& dtypes_and_shapes = {})
+    TF_MUST_USE_RESULT;
 
 template <typename T>
 ResourceHandle MakeResourceHandle(
     OpKernelContext* ctx, const string& container, const string& name,
-    const std::vector<DtypeAndPartialTensorShape>& dtypes_and_shapes = {},
-    const std::vector<string>& allowed_devices = {}) {
-  return MakeResourceHandle(container.empty()
-                                ? ctx->resource_manager()->default_container()
-                                : container,
-                            name, *ctx->device(), MakeTypeIndex<T>(),
-                            dtypes_and_shapes, allowed_devices);
+    const std::vector<DtypeAndPartialTensorShape>& dtypes_and_shapes = {}) {
+  return MakeResourceHandle(
+      container.empty() ? ctx->resource_manager()->default_container()
+                        : container,
+      name, *ctx->device(), MakeTypeIndex<T>(), dtypes_and_shapes);
 }
 
 template <typename T>

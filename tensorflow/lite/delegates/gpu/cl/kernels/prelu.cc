@@ -29,6 +29,18 @@ PReLU::PReLU(const OperationDef& definition, const PReLUAttributes& attr,
     : ElementwiseOperation(definition) {
   if (attr.clip != 0) {
     clip_ = FLT(scalar_precision, attr.clip);
+    if (definition.precision == CalculationsPrecision::F32) {
+      args_.AddFloat("clip", attr.clip);
+    } else {
+      args_.AddHalf("clip", half(attr.clip));
+    }
+    code_ =
+        "in_out_value = clamp(in_out_value, (FLT4)(0.0f), (FLT4)(args.clip)) + "
+        "min((FLT4)(0.0f), in_out_value) * args.alpha.Read(S_COORD);";
+  } else {
+    code_ =
+        "in_out_value = max((FLT4)(0.0f), in_out_value) + min((FLT4)(0.0f), "
+        "in_out_value) * args.alpha.Read(S_COORD);";
   }
 }
 
@@ -73,21 +85,21 @@ std::string PReLU::GetArgsDeclaration() const {
   return args;
 }
 
-Status PReLU::BindArguments(CLKernel* kernel) {
+absl::Status PReLU::BindArguments(CLKernel* kernel) {
   RETURN_IF_ERROR(kernel->SetMemoryAuto(alpha_.GetMemoryPtr()));
   if (clip_.Active()) {
     RETURN_IF_ERROR(kernel->SetBytesAuto(clip_));
   }
-  return OkStatus();
+  return absl::OkStatus();
 }
 
-Status CreatePReLU(const CreationContext& creation_context,
-                   const OperationDef& definition, const PReLUAttributes& attr,
-                   PReLU* result) {
-  auto alpha = absl::get_if<::tflite::gpu::Tensor<Linear, DataType::FLOAT32>>(
-      &attr.alpha);
+absl::Status CreatePReLU(const CreationContext& creation_context,
+                         const OperationDef& definition,
+                         const PReLUAttributes& attr, PReLU* result) {
+  auto alpha =
+      absl::get_if<tflite::gpu::Tensor<Linear, DataType::FLOAT32>>(&attr.alpha);
   if (!alpha) {
-    return InvalidArgumentError("Alpha is missing");
+    return absl::InvalidArgumentError("Alpha is missing");
   }
   const auto scalar_precision = creation_context.device->IsPowerVR()
                                     ? CalculationsPrecision::F32
@@ -95,7 +107,7 @@ Status CreatePReLU(const CreationContext& creation_context,
   *result = PReLU(definition, attr, scalar_precision);
   RETURN_IF_ERROR(result->UploadParameters(*alpha, creation_context.context));
   result->SetLinkIndex(0);
-  return OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace cl

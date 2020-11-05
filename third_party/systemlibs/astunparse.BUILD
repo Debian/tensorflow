@@ -12,4 +12,3 @@ filegroup(
     name = "LICENSE",
     visibility = ["//visibility:public"],
 )
-

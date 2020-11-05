@@ -19,6 +19,8 @@ limitations under the License.
 #include <tuple>
 
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/IR/Builders.h"  // from @llvm-project
+#include "mlir/IR/MLIRContext.h"  // from @llvm-project
 #include "tensorflow/core/lib/core/status_test_util.h"
 #include "tensorflow/core/platform/test.h"
 #include "tensorflow/core/protobuf/tpu/topology.pb.h"
@@ -129,6 +131,7 @@ std::string TopologyWithDeviceCoordinates(
   topology_proto.add_mesh_shape(2);
   topology_proto.add_mesh_shape(1);
   topology_proto.add_mesh_shape(1);
+  topology_proto.add_mesh_shape(1);
   topology_proto.set_num_tasks(2);
   topology_proto.set_num_tpu_devices_per_task(1);
   for (int device_coordinate : device_coordinates)
@@ -155,89 +158,100 @@ INSTANTIATE_TEST_SUITE_P(
             "failed to parse 'topology' attribute to TopologyProto"),
         std::make_tuple(4, 2, TopologyWithMeshShape({0}),
                         std::vector<int64_t>(),
-                        "'topology' 'mesh_shape' must be rank 3, got rank 1"),
+                        "'topology' 'mesh_shape' must be rank 4, got rank 1"),
         std::make_tuple(
-            2, 1, TopologyWithMeshShape({2, 0, 2}), std::vector<int64_t>(),
+            2, 1, TopologyWithMeshShape({2, 0, 1, 2}), std::vector<int64_t>(),
             "'topology' 'mesh_shape' dimension 1 must be positive, got 0"),
-        std::make_tuple(2, 1, TopologyWithMeshShapeAndTasks({1, 1, 1}, 1, 1),
+        std::make_tuple(2, 1, TopologyWithMeshShapeAndTasks({1, 1, 1, 1}, 1, 1),
                         std::vector<int64_t>(),
                         "number of tasks from available TPU devices must be "
                         "'num_tasks' in 'topology' (1), got 2"),
-        std::make_tuple(2, 1, TopologyWithMeshShapeAndTasks({1, 1, 1}, 2, 2),
+        std::make_tuple(2, 1, TopologyWithMeshShapeAndTasks({1, 1, 1, 1}, 2, 2),
                         std::vector<int64_t>(),
                         "number of TPU devices available per task must be "
                         "'num_tpu_devices_per_task' in 'topology' (2), got 1"),
         std::make_tuple(
             2, 1, TopologyWithDeviceCoordinates({}), std::vector<int64_t>(),
             "length of 'device_coordinates' in 'topology' must be 'num_tasks' "
-            "* 'num_tpus_per_task' * 3 (2 * 1 * 3), got 0"),
-        std::make_tuple(2, 1,
-                        TopologyWithDeviceCoordinates({-1, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (-1, 0, 0) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({2, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (2, 0, 0) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1,
-                        TopologyWithDeviceCoordinates({0, -1, 0, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (0, -1, 0) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 1, 0, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (0, 1, 0) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1,
-                        TopologyWithDeviceCoordinates({0, 0, -1, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (0, 0, -1) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 1, 1, 0, 0}),
-                        std::vector<int64_t>(),
-                        "device coordinate (0, 0, 1) in 'topology' is outside "
-                        "of mesh shape (2, 1, 1)"),
+            "* 'num_tpus_per_task' * 4 (2 * 1 * 4), got 0"),
         std::make_tuple(
-            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 0, 0}),
+            2, 1, TopologyWithDeviceCoordinates({-1, 0, 0, 0, 1, 0, 0, 0}),
             std::vector<int64_t>(),
-            "'topology' has duplicate device coordinate (0, 0, 0)")));
+            "device coordinate (-1, 0, 0, 0) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({2, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "device coordinate (2, 0, 0, 0) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, -1, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "device coordinate (0, -1, 0, 0) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 1, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "device coordinate (0, 1, 0, 0) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, -1, 1, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "device coordinate (0, 0, 0, -1) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 1, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "device coordinate (0, 0, 0, 1) in 'topology' is outside "
+            "of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 0, 0, 0, 0}),
+            std::vector<int64_t>(),
+            "'topology' has duplicate device coordinate (0, 0, 0, 0)")));
 
 INSTANTIATE_TEST_SUITE_P(
     BadGeneralDeviceAssignmentMetadata, ParameterizedMetadataTest,
     ::testing::Values(
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
+        std::make_tuple(2, 1,
+                        TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
                         std::vector<int64_t>(),
                         "length of 'device_assignment' must be 'num_replicas' "
-                        "* 'num_cores_per_replica' * 3 (2 * 1 * 3), got 0"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{-1, 0, 0, 0, 0, 0},
-                        "device coordinate (-1, 0, 0) in 'device_assignment' "
-                        "is outside of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{2, 0, 0, 0, 0, 0},
-                        "device coordinate (2, 0, 0) in 'device_assignment' is "
-                        "outside of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{0, -1, 0, 0, 0, 0},
-                        "device coordinate (0, -1, 0) in 'device_assignment' "
-                        "is outside of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{0, 1, 0, 0, 0, 0},
-                        "device coordinate (0, 1, 0) in 'device_assignment' is "
-                        "outside of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{0, 0, -1, 0, 0, 0},
-                        "device coordinate (0, 0, -1) in 'device_assignment' "
-                        "is outside of mesh shape (2, 1, 1)"),
-        std::make_tuple(2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-                        std::vector<int64_t>{0, 0, 1, 0, 0, 0},
-                        "device coordinate (0, 0, 1) in 'device_assignment' is "
-                        "outside of mesh shape (2, 1, 1)"),
+                        "* 'num_cores_per_replica' * 4 (2 * 1 * 4), got 0"),
         std::make_tuple(
-            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 1, 0, 0}),
-            std::vector<int64_t>{0, 0, 0, 0, 0, 0},
-            "'device_assignment' has duplicate device coordinate (0, 0, 0)")));
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{-1, 0, 0, 0, 0, 0, 0, 0},
+            "device coordinate (-1, 0, 0, 0) in 'device_assignment' "
+            "is outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{2, 0, 0, 0, 0, 0, 0, 0},
+            "device coordinate (2, 0, 0, 0) in 'device_assignment' is "
+            "outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{0, -1, 0, 0, 0, 0, 0, 0},
+            "device coordinate (0, -1, 0, 0) in 'device_assignment' "
+            "is outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{0, 1, 0, 0, 0, 0, 0, 0},
+            "device coordinate (0, 1, 0, 0) in 'device_assignment' is "
+            "outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{0, 0, 0, -1, 0, 0, 0, 0},
+            "device coordinate (0, 0, 0, -1) in 'device_assignment' "
+            "is outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(
+            2, 1, TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+            std::vector<int64_t>{0, 0, 0, 1, 0, 0, 0, 0},
+            "device coordinate (0, 0, 0, 1) in 'device_assignment' is "
+            "outside of mesh shape (2, 1, 1, 1)"),
+        std::make_tuple(2, 1,
+                        TopologyWithDeviceCoordinates({0, 0, 0, 0, 1, 0, 0, 0}),
+                        std::vector<int64_t>{0, 0, 0, 0, 0, 0, 0, 0},
+                        "'device_assignment' has duplicate device coordinate "
+                        "(0, 0, 0, 0)")));
 
 std::vector<std::string> MakeDeviceSet(int num_tasks,
                                        int num_devices_per_task) {
@@ -270,15 +284,17 @@ TEST(TPURewriteDeviceUtilTest,
     topology_proto.add_mesh_shape(2);
     topology_proto.add_mesh_shape(1);
     topology_proto.add_mesh_shape(1);
+    topology_proto.add_mesh_shape(1);
     topology_proto.set_num_tasks(1);
     topology_proto.set_num_tpu_devices_per_task(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
   }
 
   std::string topology_attr = topology_proto.SerializeAsString();
-  std::vector<int64_t> device_assignment_attr{1, 0, 0};
+  std::vector<int64_t> device_assignment_attr{1, 0, 0, 0};
 
   llvm::SmallVector<Device, 8> devices;
   std::vector<std::string> device_names =
@@ -292,7 +308,7 @@ TEST(TPURewriteDeviceUtilTest,
   ASSERT_FALSE(status_or.ok());
   EXPECT_EQ(status_or.status().error_message(),
             "no TPU device found for 'device_assignment' device coordinate (1, "
-            "0, 0)");
+            "0, 0, 0)");
 }
 
 TEST(TPURewriteDeviceUtilTest, ValidFullMeshDeviceAssignment) {
@@ -309,30 +325,46 @@ TEST(TPURewriteDeviceUtilTest, ValidFullMeshDeviceAssignment) {
 
   TF_ASSERT_OK(status_or.status());
 
-  auto& tpu_device_assignment = status_or.ValueOrDie();
+  const auto& tpu_device_assignment = status_or.ValueOrDie();
   EXPECT_EQ(tpu_device_assignment.compilation_device,
             "/job:worker/replica:0/task:0/device:CPU:0");
-  auto& execution_devices = tpu_device_assignment.execution_devices;
-  ASSERT_EQ(execution_devices.size(), 8);
-  for (const auto& replica_execution_device : execution_devices)
-    ASSERT_EQ(replica_execution_device.size(), 1);
+  const auto& tpu_devices = tpu_device_assignment.tpu_devices;
+  ASSERT_EQ(tpu_devices.size(), 8);
+  for (const auto& replica_tpu_devices : tpu_devices)
+    ASSERT_EQ(replica_tpu_devices.size(), 1);
 
-  EXPECT_EQ(execution_devices[0][0],
+  EXPECT_EQ(tpu_devices[0][0].device,
             "/job:worker/replica:0/task:0/device:TPU:0");
-  EXPECT_EQ(execution_devices[1][0],
+  EXPECT_EQ(tpu_devices[0][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][0].device,
             "/job:worker/replica:0/task:0/device:TPU:1");
-  EXPECT_EQ(execution_devices[2][0],
+  EXPECT_EQ(tpu_devices[1][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[2][0].device,
             "/job:worker/replica:0/task:0/device:TPU:2");
-  EXPECT_EQ(execution_devices[3][0],
+  EXPECT_EQ(tpu_devices[2][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[3][0].device,
             "/job:worker/replica:0/task:0/device:TPU:3");
-  EXPECT_EQ(execution_devices[4][0],
+  EXPECT_EQ(tpu_devices[3][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[4][0].device,
             "/job:worker/replica:0/task:1/device:TPU:0");
-  EXPECT_EQ(execution_devices[5][0],
+  EXPECT_EQ(tpu_devices[4][0].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[5][0].device,
             "/job:worker/replica:0/task:1/device:TPU:1");
-  EXPECT_EQ(execution_devices[6][0],
+  EXPECT_EQ(tpu_devices[5][0].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[6][0].device,
             "/job:worker/replica:0/task:1/device:TPU:2");
-  EXPECT_EQ(execution_devices[7][0],
+  EXPECT_EQ(tpu_devices[6][0].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[7][0].device,
             "/job:worker/replica:0/task:1/device:TPU:3");
+  EXPECT_EQ(tpu_devices[7][0].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
 
   EXPECT_FALSE(tpu_device_assignment.xla_device_assignment.hasValue());
 }
@@ -342,6 +374,7 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh2x2x2) {
   {
     topology_proto.add_mesh_shape(2);
     topology_proto.add_mesh_shape(2);
+    topology_proto.add_mesh_shape(1);
     topology_proto.add_mesh_shape(2);
     topology_proto.set_num_tasks(2);
     topology_proto.set_num_tpu_devices_per_task(4);
@@ -349,31 +382,40 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh2x2x2) {
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
-    topology_proto.add_device_coordinates(1);
-    topology_proto.add_device_coordinates(0);
-    topology_proto.add_device_coordinates(1);
-    topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
   }
 
   std::string topology_attr = topology_proto.SerializeAsString();
-  std::vector<int64_t> device_assignment_attr{
-      0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1};
+  std::vector<int64_t> device_assignment_attr{0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0,
+                                              0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0,
+                                              0, 1, 1, 1, 0, 0, 1, 1, 0, 1};
 
   llvm::SmallVector<Device, 8> devices;
   std::vector<std::string> device_names =
@@ -386,30 +428,46 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh2x2x2) {
 
   TF_ASSERT_OK(status_or.status());
 
-  auto& tpu_device_assignment = status_or.ValueOrDie();
+  const auto& tpu_device_assignment = status_or.ValueOrDie();
   EXPECT_EQ(tpu_device_assignment.compilation_device,
             "/job:worker/replica:0/task:0/device:CPU:0");
-  auto& execution_devices = tpu_device_assignment.execution_devices;
-  ASSERT_EQ(execution_devices.size(), 4);
-  for (const auto& replica_execution_device : execution_devices)
-    ASSERT_EQ(replica_execution_device.size(), 2);
+  const auto& tpu_devices = tpu_device_assignment.tpu_devices;
+  ASSERT_EQ(tpu_devices.size(), 4);
+  for (const auto& replica_tpu_devices : tpu_devices)
+    ASSERT_EQ(replica_tpu_devices.size(), 2);
 
-  EXPECT_EQ(execution_devices[0][0],
+  EXPECT_EQ(tpu_devices[0][0].device,
             "/job:worker/replica:0/task:0/device:TPU:0");
-  EXPECT_EQ(execution_devices[0][1],
+  EXPECT_EQ(tpu_devices[0][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[0][1].device,
             "/job:worker/replica:0/task:1/device:TPU:3");
-  EXPECT_EQ(execution_devices[1][0],
+  EXPECT_EQ(tpu_devices[0][1].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][0].device,
             "/job:worker/replica:0/task:0/device:TPU:1");
-  EXPECT_EQ(execution_devices[1][1],
+  EXPECT_EQ(tpu_devices[1][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][1].device,
             "/job:worker/replica:0/task:1/device:TPU:2");
-  EXPECT_EQ(execution_devices[2][0],
+  EXPECT_EQ(tpu_devices[1][1].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[2][0].device,
             "/job:worker/replica:0/task:0/device:TPU:3");
-  EXPECT_EQ(execution_devices[2][1],
+  EXPECT_EQ(tpu_devices[2][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[2][1].device,
             "/job:worker/replica:0/task:1/device:TPU:0");
-  EXPECT_EQ(execution_devices[3][0],
+  EXPECT_EQ(tpu_devices[2][1].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[3][0].device,
             "/job:worker/replica:0/task:0/device:TPU:2");
-  EXPECT_EQ(execution_devices[3][1],
+  EXPECT_EQ(tpu_devices[3][0].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[3][1].device,
             "/job:worker/replica:0/task:1/device:TPU:1");
+  EXPECT_EQ(tpu_devices[3][1].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
 
   auto& xla_device_assignment = tpu_device_assignment.xla_device_assignment;
   ASSERT_TRUE(xla_device_assignment.hasValue());
@@ -433,11 +491,12 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh2x2x2) {
   EXPECT_EQ(computation_device_1.replica_device_ids(3), 7);
 }
 
-TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh1x2x3) {
+TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh1x2x1x3) {
   tpu::TopologyProto topology_proto;
   {
     topology_proto.add_mesh_shape(1);
     topology_proto.add_mesh_shape(2);
+    topology_proto.add_mesh_shape(1);
     topology_proto.add_mesh_shape(3);
     topology_proto.set_num_tasks(3);
     topology_proto.set_num_tpu_devices_per_task(2);
@@ -445,25 +504,31 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh1x2x3) {
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(2);
     topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(1);
+    topology_proto.add_device_coordinates(0);
     topology_proto.add_device_coordinates(2);
   }
 
   std::string topology_attr = topology_proto.SerializeAsString();
-  std::vector<int64_t> device_assignment_attr{0, 0, 1, 0, 1, 1, 0, 0, 2,
-                                              0, 1, 2, 0, 0, 0, 0, 1, 0};
+  std::vector<int64_t> device_assignment_attr{
+      0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 2, 0, 1, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0};
 
   llvm::SmallVector<Device, 8> devices;
   std::vector<std::string> device_names =
@@ -480,23 +545,35 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh1x2x3) {
   EXPECT_EQ(tpu_device_assignment.compilation_device,
             "/job:worker/replica:0/task:0/device:CPU:0");
 
-  auto& execution_devices = tpu_device_assignment.execution_devices;
-  ASSERT_EQ(execution_devices.size(), 2);
-  for (const auto& replica_execution_device : execution_devices)
-    ASSERT_EQ(replica_execution_device.size(), 3);
+  auto& tpu_devices = tpu_device_assignment.tpu_devices;
+  ASSERT_EQ(tpu_devices.size(), 2);
+  for (const auto& replica_tpu_devices : tpu_devices)
+    ASSERT_EQ(replica_tpu_devices.size(), 3);
 
-  EXPECT_EQ(execution_devices[0][0],
+  EXPECT_EQ(tpu_devices[0][0].device,
             "/job:worker/replica:0/task:1/device:TPU:1");
-  EXPECT_EQ(execution_devices[0][1],
+  EXPECT_EQ(tpu_devices[0][0].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[0][1].device,
             "/job:worker/replica:0/task:1/device:TPU:0");
-  EXPECT_EQ(execution_devices[0][2],
+  EXPECT_EQ(tpu_devices[0][1].host,
+            "/job:worker/replica:0/task:1/device:CPU:0");
+  EXPECT_EQ(tpu_devices[0][2].device,
             "/job:worker/replica:0/task:2/device:TPU:0");
-  EXPECT_EQ(execution_devices[1][0],
+  EXPECT_EQ(tpu_devices[0][2].host,
+            "/job:worker/replica:0/task:2/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][0].device,
             "/job:worker/replica:0/task:2/device:TPU:1");
-  EXPECT_EQ(execution_devices[1][1],
+  EXPECT_EQ(tpu_devices[1][0].host,
+            "/job:worker/replica:0/task:2/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][1].device,
             "/job:worker/replica:0/task:0/device:TPU:0");
-  EXPECT_EQ(execution_devices[1][2],
+  EXPECT_EQ(tpu_devices[1][1].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
+  EXPECT_EQ(tpu_devices[1][2].device,
             "/job:worker/replica:0/task:0/device:TPU:1");
+  EXPECT_EQ(tpu_devices[1][2].host,
+            "/job:worker/replica:0/task:0/device:CPU:0");
 
   auto& xla_device_assignment = tpu_device_assignment.xla_device_assignment;
   ASSERT_TRUE(xla_device_assignment.hasValue());
@@ -519,6 +596,30 @@ TEST(TPURewriteDeviceUtilTest, ValidGeneralDeviceAssignmentMesh1x2x3) {
   EXPECT_EQ(computation_device_1.replica_device_ids(1), 0);
   EXPECT_EQ(computation_device_2.replica_device_ids(0), 2);
   EXPECT_EQ(computation_device_2.replica_device_ids(1), 3);
+}
+
+TEST(TPURewriteDeviceUtilTest, TestGetDeviceCoordinates) {
+  mlir::MLIRContext context;
+  mlir::Builder builder(&context);
+  auto device_assignment_attr = builder.getI64ArrayAttr({1, 2, 3});
+  auto status_or_device_coodinates =
+      GetDeviceCoordinates(device_assignment_attr);
+  ASSERT_TRUE(status_or_device_coodinates.ok());
+  auto device_coordinates = status_or_device_coodinates.ConsumeValueOrDie();
+  EXPECT_EQ(device_coordinates[0], 1);
+  EXPECT_EQ(device_coordinates[1], 2);
+  EXPECT_EQ(device_coordinates[2], 3);
+}
+
+TEST(TPURewriteDeviceUtilTest, TestInvalidAttrForDeviceAssignmentDisallowed) {
+  mlir::MLIRContext context;
+  mlir::Builder builder(&context);
+  auto device_assignment_attr = builder.getF32ArrayAttr({1.0, 2.0, 3.0});
+  auto status_or_device_coodinates =
+      GetDeviceCoordinates(device_assignment_attr);
+  ASSERT_TRUE(!status_or_device_coodinates.ok());
+  EXPECT_EQ(status_or_device_coodinates.status().error_message(),
+            "bad 'device_assignment' attribute at index 0, not an int");
 }
 
 }  // anonymous namespace

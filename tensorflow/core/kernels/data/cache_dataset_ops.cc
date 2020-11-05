@@ -22,6 +22,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/strings/stringprintf.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/errors.h"
 #include "tensorflow/core/util/tensor_bundle/tensor_bundle.h"
 
 namespace tensorflow {
@@ -129,12 +130,11 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
       } else {
         mode_ = Mode::write;
       }
-      InitializeIterator();
     }
 
     Status Initialize(IteratorContext* ctx) override {
       mutex_lock l(mu_);
-      return iterator_->Initialize(ctx);
+      return InitializeIterator(ctx);
     }
 
     Status GetNextInternal(IteratorContext* ctx,
@@ -151,10 +151,11 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
                                        /*ratio=*/1);
     }
 
-    Status SaveInternal(IteratorStateWriter* writer) override {
+    Status SaveInternal(SerializationContext* ctx,
+                        IteratorStateWriter* writer) override {
       mutex_lock l(mu_);
       TF_RETURN_IF_ERROR(writer->WriteScalar(full_name(kMode), mode_));
-      return SaveInput(writer, iterator_);
+      return SaveInput(ctx, writer, iterator_);
     }
     Status RestoreInternal(IteratorContext* ctx,
                            IteratorStateReader* reader) override {
@@ -178,8 +179,7 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
             << "mistake, please remove the above file and try running again.";
         mode_ = Mode::read;
       }
-      InitializeIterator();
-      TF_RETURN_IF_ERROR(iterator_->Initialize(ctx));
+      TF_RETURN_IF_ERROR(InitializeIterator(ctx));
       return RestoreInput(ctx, reader, iterator_);
     }
 
@@ -290,7 +290,8 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
                                          /*ratio=*/1);
       }
 
-      Status SaveInternal(IteratorStateWriter* writer) override {
+      Status SaveInternal(SerializationContext* ctx,
+                          IteratorStateWriter* writer) override {
         mutex_lock l(mu_);
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name(kCurIndex), cur_index_));
@@ -320,7 +321,7 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
           lockfile_ = strings::StrCat(filename_, kLockFileSuffix);
           lockfile_created_ = false;
         }
-        TF_RETURN_IF_ERROR(SaveInput(writer, input_impl_));
+        TF_RETURN_IF_ERROR(SaveInput(ctx, writer, input_impl_));
         TF_RETURN_IF_ERROR(writer->WriteScalar(full_name(kShardId), shard_id_));
         return Status::OK();
       }
@@ -519,7 +520,8 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
                                          /*ratio=*/1);
       }
 
-      Status SaveInternal(IteratorStateWriter* writer) override {
+      Status SaveInternal(SerializationContext* ctx,
+                          IteratorStateWriter* writer) override {
         mutex_lock l(mu_);
         TF_RETURN_IF_ERROR(
             writer->WriteScalar(full_name(kCurIndex), cur_index_));
@@ -556,15 +558,16 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
       bool iterator_restored_ TF_GUARDED_BY(mu_);
     };  // FileReaderIterator
 
-    void InitializeIterator() TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-      // We intentionally use the same prefix for both `FileReaderIterator`
-      // and `FileWriterIterator`. Since at any time there will be at most
-      // one of them alive, there should be no conflicts. This allows both
-      // iterators to use a common key for `cur_index`. We leverage this
-      // in the corner case when this iterator is restored from an old
-      // checkpoint in `write` mode and the cache has been completely
-      // flushed to disk since then. In that case we simply build a
-      // `FileReaderIterator` and seek to the `cur_index`.
+    Status InitializeIterator(IteratorContext* ctx)
+        TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+      // We intentionally use the same prefix for both `FileReaderIterator` and
+      // `FileWriterIterator`. Since at any time there will be at most one of
+      // them alive, there should be no conflicts. This allows both iterators to
+      // use a common key for `cur_index`. We leverage this in the corner case
+      // when this iterator is restored from an old checkpoint in `write` mode
+      // and the cache has been completely flushed to disk since then. In that
+      // case we simply build a `FileReaderIterator` and seek to the
+      // `cur_index`.
       switch (mode_) {
         case Mode::read:
           iterator_ =
@@ -576,6 +579,8 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
               absl::make_unique<FileWriterIterator>(FileWriterIterator::Params{
                   dataset(), strings::StrCat(prefix(), kImpl)});
       }
+      TF_RETURN_IF_ERROR(iterator_->InitializeBase(ctx, this));
+      return iterator_->Initialize(ctx);
     }
 
     mutex mu_;
@@ -587,7 +592,7 @@ class CacheDatasetOp::FileDatasetBase : public DatasetBase {
   Env* const env_;
   const size_t num_tensors_;
   const size_t tensor_index_padding_size_;
-  static const size_t kMaxItems = 10000000;  // 10 million
+  static constexpr size_t kMaxItems = 10000000;  // 10 million
   const size_t item_index_padding_size_;
   const string tensor_format_string_;
 };  // FileDatasetBase
@@ -737,8 +742,7 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
 
     Status Initialize(IteratorContext* ctx) override {
       mutex_lock l(mu_);
-      InitializeIterator();
-      return iterator_->Initialize(ctx);
+      return InitializeIterator(ctx);
     }
 
     Status GetNextInternal(IteratorContext* ctx,
@@ -755,14 +759,15 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
                                        /*ratio=*/1);
     }
 
-    Status SaveInternal(IteratorStateWriter* writer) override {
+    Status SaveInternal(SerializationContext* ctx,
+                        IteratorStateWriter* writer) override {
       mutex_lock l(mu_);
       if (cache_->IsCompleted()) {
         TF_RETURN_IF_ERROR(writer->WriteScalar(full_name(kCacheCompleted), ""));
         TF_RETURN_IF_ERROR(SaveCache(
             writer, cache_, [this](const string& s) { return full_name(s); }));
       }
-      return SaveInput(writer, iterator_);
+      return SaveInput(ctx, writer, iterator_);
     }
 
     Status RestoreInternal(IteratorContext* ctx,
@@ -777,8 +782,7 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
                          [this](const string& s) { return full_name(s); }));
         cache_->Complete(std::move(temp_cache));
       }
-      InitializeIterator();
-      TF_RETURN_IF_ERROR(iterator_->Initialize(ctx));
+      TF_RETURN_IF_ERROR(InitializeIterator(ctx));
       return RestoreInput(ctx, reader, iterator_);
     }
 
@@ -814,11 +818,19 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
         TF_RETURN_IF_ERROR(
             input_impl_->GetNext(ctx, out_tensors, end_of_sequence));
         if (*end_of_sequence) {
-          cache_->Complete(std::move(temp_cache_));
+          if (!cache_->IsCompleted()) {
+            VLOG(2) << "Finalizing the cache because EOF has been reached.";
+            cache_->Complete(std::move(temp_cache_));
+          }
           return Status::OK();
         }
         RecordBufferEnqueue(ctx, *out_tensors);
         temp_cache_.emplace_back(*out_tensors);
+        if (temp_cache_.size() == dataset()->input_->Cardinality()) {
+          VLOG(2) << "Finalizing the cache because its size matches the "
+                     "expected input cardinality.";
+          cache_->Complete(std::move(temp_cache_));
+        }
         return Status::OK();
       }
 
@@ -829,14 +841,15 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
                                          /*ratio=*/1);
       }
 
-      Status SaveInternal(IteratorStateWriter* writer) override {
+      Status SaveInternal(SerializationContext* ctx,
+                          IteratorStateWriter* writer) override {
         mutex_lock l(mu_);
         if (!cache_->IsCompleted()) {
           TF_RETURN_IF_ERROR(
               SaveCache(writer, &temp_cache_,
                         [this](const string& s) { return full_name(s); }));
         }
-        return SaveInput(writer, input_impl_);
+        return SaveInput(ctx, writer, input_impl_);
       }
 
       Status RestoreInternal(IteratorContext* ctx,
@@ -901,7 +914,8 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
                                          /*ratio=*/1);
       }
 
-      Status SaveInternal(IteratorStateWriter* writer) override {
+      Status SaveInternal(SerializationContext* ctx,
+                          IteratorStateWriter* writer) override {
         mutex_lock l(mu_);
         TF_RETURN_IF_ERROR(writer->WriteScalar(full_name(kIndex), index_));
         return Status::OK();
@@ -924,7 +938,8 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
       size_t index_ TF_GUARDED_BY(mu_);
     };  // MemoryReaderIterator
 
-    void InitializeIterator() TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    Status InitializeIterator(IteratorContext* ctx)
+        TF_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
       if (cache_->IsCompleted()) {
         iterator_ = absl::make_unique<MemoryReaderIterator>(
             MemoryReaderIterator::Params{dataset(),
@@ -936,6 +951,8 @@ class CacheDatasetOp::MemoryDatasetBase : public DatasetBase {
                                          strings::StrCat(prefix(), kImpl)},
             cache_);
       }
+      TF_RETURN_IF_ERROR(iterator_->InitializeBase(ctx, this));
+      return iterator_->Initialize(ctx);
     }
 
     mutex mu_;

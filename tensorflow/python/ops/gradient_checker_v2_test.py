@@ -23,6 +23,7 @@ import numpy as np
 from tensorflow.python.eager import backprop
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import sparse_tensor
 from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import custom_gradient
@@ -30,6 +31,7 @@ from tensorflow.python.ops import \
 gradient_checker_v2 as gradient_checker
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
+from tensorflow.python.ops import sparse_ops
 # needs this to register gradient for SoftmaxCrossEntropyWithLogits:
 import tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
 from tensorflow.python.platform import test
@@ -46,6 +48,20 @@ def _random_complex(shape, dtype):
 @test_util.run_all_in_graph_and_eager_modes
 class GradientCheckerTest(test.TestCase):
 
+  def testSparseTensorReshape(self):
+    x = constant_op.constant(2.0, shape=(2,))
+
+    def sparse_tensor_reshape(values):
+      sparse = sparse_tensor.SparseTensor(
+          indices=[[0, 0], [1, 2]], values=values, dense_shape=[3, 4])
+      sparse = sparse_ops.sparse_reshape(sparse, shape=(12,))
+      return sparse.values
+
+    error = gradient_checker.max_error(
+        *gradient_checker.compute_gradient(sparse_tensor_reshape, [x]))
+
+    self.assertLess(error, 1e-4)
+
   def testWithStaticShape(self):
     size = (2, 3)
     constant = constant_op.constant(2.0, shape=size, name="const")
@@ -61,6 +77,17 @@ class GradientCheckerTest(test.TestCase):
 
     self.assertLess(error, 1e-4)
 
+  def testWithArgumentsAsTuple(self):
+    size = (2, 3)
+    x1 = constant_op.constant(2.0, shape=size, name="x1")
+    x2 = constant_op.constant(3.0, shape=size, name="x2")
+
+    error = gradient_checker.max_error(*gradient_checker.compute_gradient(
+        lambda x1: math_ops.add(x1, x2), (x1,)))
+
+    tf_logging.info("x1 error = %f", error)
+    self.assertLess(error, 1e-4)
+
   def testAddSimple(self):
     size = (2, 3)
     x1 = constant_op.constant(2.0, shape=size, name="x1")
@@ -69,6 +96,15 @@ class GradientCheckerTest(test.TestCase):
         lambda x1: math_ops.add(x1, x2), [x1]))
     tf_logging.info("x1 error = %f", error)
     self.assertLess(error, 1e-4)
+
+  def testBfloat16(self):
+    x1 = constant_op.constant(2.0, dtype="bfloat16")
+    x2 = constant_op.constant(3.0, dtype="bfloat16")
+    # bfloat16 is very imprecise, so we use very large delta and error bar here.
+    error = gradient_checker.max_error(*gradient_checker.compute_gradient(
+        lambda x1: math_ops.add(x1, x2), [x1], delta=0.1))
+    tf_logging.info("x1 error = %f", error)
+    self.assertLess(error, 0.07)
 
   def testAddCustomized(self):
     size = (2, 3)

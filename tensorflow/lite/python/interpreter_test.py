@@ -33,7 +33,7 @@ if hasattr(sys, 'setdlopenflags') and hasattr(sys, 'getdlopenflags'):
   sys.setdlopenflags(sys.getdlopenflags() | ctypes.RTLD_GLOBAL)
 
 from tensorflow.lite.python import interpreter as interpreter_wrapper
-from tensorflow.lite.python.testdata import test_registerer_wrapper as test_registerer
+from tensorflow.lite.python.testdata import _pywrap_test_registerer as test_registerer
 from tensorflow.python.framework import test_util
 from tensorflow.python.platform import resource_loader
 from tensorflow.python.platform import test
@@ -68,6 +68,20 @@ class InterpreterTest(test_util.TensorFlowTestCase):
     self.assertAllEqual(zero_points, params['zero_points'])
     self.assertEqual(quantized_dimension, params['quantized_dimension'])
 
+  def testThreads_NegativeValue(self):
+    with self.assertRaisesRegexp(ValueError,
+                                 'num_threads should >= 1'):
+      interpreter_wrapper.Interpreter(
+          model_path=resource_loader.get_path_to_datafile(
+              'testdata/permute_float.tflite'), num_threads=-1)
+
+  def testThreads_WrongType(self):
+    with self.assertRaisesRegexp(ValueError,
+                                 'type of num_threads should be int'):
+      interpreter_wrapper.Interpreter(
+          model_path=resource_loader.get_path_to_datafile(
+              'testdata/permute_float.tflite'), num_threads=4.2)
+
   def testFloat(self):
     interpreter = interpreter_wrapper.Interpreter(
         model_path=resource_loader.get_path_to_datafile(
@@ -97,6 +111,22 @@ class InterpreterTest(test_util.TensorFlowTestCase):
     interpreter.set_tensor(input_details[0]['index'], test_input)
     interpreter.invoke()
 
+    output_data = interpreter.get_tensor(output_details[0]['index'])
+    self.assertTrue((expected_output == output_data).all())
+
+  def testFloatWithTwoThreads(self):
+    interpreter = interpreter_wrapper.Interpreter(
+        model_path=resource_loader.get_path_to_datafile(
+            'testdata/permute_float.tflite'), num_threads=2)
+    interpreter.allocate_tensors()
+
+    input_details = interpreter.get_input_details()
+    test_input = np.array([[1.0, 2.0, 3.0, 4.0]], dtype=np.float32)
+    expected_output = np.array([[4.0, 3.0, 2.0, 1.0]], dtype=np.float32)
+    interpreter.set_tensor(input_details[0]['index'], test_input)
+    interpreter.invoke()
+
+    output_details = interpreter.get_output_details()
     output_data = interpreter.get_tensor(output_details[0]['index'])
     self.assertTrue((expected_output == output_data).all())
 

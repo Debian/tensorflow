@@ -14,18 +14,37 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/kernels/test_util.h"
 
-#include <numeric>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <algorithm>
+#include <complex>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/core/platform/logging.h"
-#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/core/api/op_resolver.h"
+#include "tensorflow/lite/core/subgraph.h"
 #include "tensorflow/lite/delegates/nnapi/acceleration_test_util.h"
 #include "tensorflow/lite/delegates/nnapi/nnapi_delegate.h"
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/kernels/acceleration_test_util.h"
+#include "tensorflow/lite/kernels/register.h"
 #include "tensorflow/lite/minimal_logging.h"
+#include "tensorflow/lite/model.h"
 #include "tensorflow/lite/nnapi/nnapi_implementation.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/string_type.h"
+#include "tensorflow/lite/string_util.h"
 #include "tensorflow/lite/tools/versioning/op_version.h"
 #include "tensorflow/lite/version.h"
 
@@ -122,7 +141,7 @@ int SingleOpModel::AddOutput(const TensorData& t) {
 void SingleOpModel::SetBuiltinOp(BuiltinOperator type,
                                  BuiltinOptions builtin_options_type,
                                  flatbuffers::Offset<void> builtin_options) {
-  opcodes_.push_back(CreateOperatorCode(builder_, type, 0));
+  opcodes_.push_back(CreateOperatorCode(builder_, type, 0, 0));
   operators_.push_back(CreateOperator(
       builder_, /*opcode_index=*/0, builder_.CreateVector<int32_t>(inputs_),
       builder_.CreateVector<int32_t>(outputs_), builtin_options_type,
@@ -199,16 +218,16 @@ void SingleOpModel::BuildInterpreter(std::vector<std::vector<int>> input_shapes,
   if (apply_delegate) ApplyDelegate();
 }
 
-void SingleOpModel::ApplyDelegate() {
+TfLiteStatus SingleOpModel::ApplyDelegate() {
   if (force_use_nnapi) {
-    // TODO(b/124505407): Check the result and fail accordingly.
-    interpreter_->ModifyGraphWithDelegate(TestNnApiDelegate());
+    delegate_ = TestNnApiDelegate();
   }
 
-  // Modify delegate with function.
-  if (apply_delegate_fn_) {
-    apply_delegate_fn_(interpreter_.get());
+  if (delegate_) {
+    return interpreter_->ModifyGraphWithDelegate(delegate_);
   }
+
+  return kTfLiteOk;
 }
 
 void SingleOpModel::Invoke() { ASSERT_EQ(interpreter_->Invoke(), kTfLiteOk); }
@@ -218,20 +237,6 @@ TfLiteStatus SingleOpModel::InvokeUnchecked() { return interpreter_->Invoke(); }
 void SingleOpModel::BuildInterpreter(
     std::vector<std::vector<int>> input_shapes) {
   BuildInterpreter(input_shapes, /*num_threads=*/-1,
-                   /*allow_fp32_relax_to_fp16=*/false,
-                   /*apply_delegate=*/true);
-}
-
-void SingleOpModel::BuildInterpreter(std::vector<std::vector<int>> input_shapes,
-                                     bool allow_fp32_relax_to_fp16,
-                                     bool apply_delegate) {
-  BuildInterpreter(input_shapes, /*num_threads=*/-1, allow_fp32_relax_to_fp16,
-                   apply_delegate);
-}
-
-void SingleOpModel::BuildInterpreter(std::vector<std::vector<int>> input_shapes,
-                                     int num_threads) {
-  BuildInterpreter(input_shapes, num_threads,
                    /*allow_fp32_relax_to_fp16=*/false,
                    /*apply_delegate=*/true);
 }
@@ -350,7 +355,7 @@ void MultiOpModel::AddBuiltinOp(
     BuiltinOperator type, BuiltinOptions builtin_options_type,
     const flatbuffers::Offset<void>& builtin_options,
     const std::vector<int32_t>& inputs, const std::vector<int32_t>& outputs) {
-  opcodes_.push_back(CreateOperatorCode(builder_, type, 0));
+  opcodes_.push_back(CreateOperatorCode(builder_, type, 0, 0));
   const int opcode_index = opcodes_.size() - 1;
   operators_.push_back(CreateOperator(
       builder_, opcode_index, builder_.CreateVector<int32_t>(inputs),

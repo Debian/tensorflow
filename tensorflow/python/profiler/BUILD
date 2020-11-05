@@ -48,6 +48,8 @@ py_library(
     srcs_version = "PY2AND3",
     visibility = ["//tensorflow:internal"],
     deps = [
+        "//tensorflow/python:errors",
+        "//tensorflow/python:platform",
         "//tensorflow/python:util",
         "//tensorflow/python/profiler/internal:_pywrap_profiler",
     ],
@@ -59,12 +61,13 @@ cuda_py_test(
     python_version = "PY3",
     tags = [
         "no_pip",
+        "no_rocm",
     ],
     deps = [
         ":profiler_v2",
         "//tensorflow/python:constant_op",
         "//tensorflow/python/eager:test",
-        "//tensorflow/python/profiler:traceme",
+        "//tensorflow/python/profiler:trace",
     ],
 )
 
@@ -218,21 +221,24 @@ py_test(
 )
 
 py_library(
-    name = "traceme",
-    srcs = ["traceme.py"],
+    name = "trace",
+    srcs = ["trace.py"],
     srcs_version = "PY2AND3",
+    visibility = [
+        "//perftools/accelerators/xprof/xprofilez/integration_tests:__pkg__",
+        "//tensorflow:internal",
+    ],
     deps = [
+        "//tensorflow/python:tf_export",
         "//tensorflow/python/profiler/internal:_pywrap_traceme",
-        "@six_archive//:six",
     ],
 )
 
 py_library(
-    name = "scoped_annotation",
-    srcs = ["scoped_annotation.py"],
+    name = "traceme",
+    srcs = ["traceme.py"],
     srcs_version = "PY2AND3",
     deps = [
-        "//tensorflow/python/profiler/internal:_pywrap_scoped_annotation",
-        "@six_archive//:six",
+        ":trace",
     ],
 )

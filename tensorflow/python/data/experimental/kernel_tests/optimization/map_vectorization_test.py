@@ -25,7 +25,6 @@ import numpy as np
 
 from tensorflow.core.example import example_pb2
 from tensorflow.core.example import feature_pb2
-from tensorflow.python.compat import compat
 from tensorflow.python.data.experimental.ops import batching
 from tensorflow.python.data.experimental.ops import testing
 from tensorflow.python.data.kernel_tests import test_base
@@ -45,6 +44,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 from tensorflow.python.ops import parsing_ops
 from tensorflow.python.ops import script_ops
+from tensorflow.python.ops import special_math_ops
 from tensorflow.python.platform import test
 
 
@@ -91,8 +91,9 @@ def _unary_real_test_combinations():
       ("Asinh", math_ops.asinh),
       ("Atan", math_ops.atan),
       ("Atanh", math_ops.atanh),
-      ("BesselI0e", math_ops.bessel_i0e),
-      ("BesselI1e", math_ops.bessel_i1e),
+      # TODO(b/157272291): Add testing for more special functions.
+      ("BesselI0e", special_math_ops.bessel_i0e),
+      ("BesselI1e", special_math_ops.bessel_i1e),
       ("Ceil", math_ops.ceil),
       ("Cos", math_ops.cos),
       ("Cosh", math_ops.cosh),
@@ -222,9 +223,7 @@ class MapVectorizationTest(test_base.DatasetTestBase, parameterized.TestCase):
     """
     map_node_name = "Map"
     if num_parallel_calls is not None:
-      map_node_name = "ParallelMap"
-      if compat.forward_compatible(2020, 3, 6):
-        map_node_name = "ParallelMapV2"
+      map_node_name = "ParallelMapV2"
 
     def _make_dataset(node_names):
       dataset = base_dataset.apply(testing.assert_next(node_names))
