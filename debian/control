@@ -9,7 +9,7 @@ Maintainer: Debian Deep Learning Team <debian-science-maintainers@lists.alioth.d
 Uploaders: Michael R. Crusoe <crusoe@debian.org>,
            Andreas Tille <tille@debian.org>
 Build-Depends:
- debhelper-compat (= 11),
+ debhelper-compat (= 13),
  dh-python,
  android-libboringssl-dev,
  libcurl4-nss-dev,

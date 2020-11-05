@@ -11,6 +11,7 @@ tensorflow (2.3.1-1) UNRELEASED; urgency=medium
   * Uncomment python3-tensorflow
   * New upstream version
   * Standards-Version: 4.5.0 (routine-update)
+  * debhelper-compat 13 (routine-update)
 
  -- Andreas Tille <tille@debian.org>  Thu, 05 Nov 2020 11:36:39 +0100
 
