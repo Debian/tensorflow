@@ -5,8 +5,9 @@ Priority: optional
 Standards-Version: 4.4.1
 Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
 Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
-Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
-Uploaders: Michael R. Crusoe <crusoe@debian.org>
+Maintainer: Debian Deep Learning Team <debian-science-maintainers@lists.alioth.debian.org>
+Uploaders: Michael R. Crusoe <crusoe@debian.org>,
+           Andreas Tille <tille@debian.org>
 Build-Depends:
  debhelper-compat (= 11),
  dh-python,
@@ -141,17 +142,17 @@ Description: Computation using data flow graphs for scalable machine learning (d
  .
  This package ships C and C++ headers files for tensorflow.
 
-#Package: python3-tensorflow
-#Architecture: any
-#Multi-Arch: foreign
-#Depends: ${misc:Depends}, ${shlibs:Depends},
-# libtensorflow-framework2 (= ${binary:Version}),
-#Description: Computation using data flow graphs for scalable machine learning (Py3)
-# TensorFlow is an open source software library for numerical computation
-# using data flow graphs. The graph nodes represent mathematical operations,
-# while the graph edges represent the multidimensional data arrays (tensors)
-# that flow between them. This flexible architecture enables you to deploy
-# computation to one or more CPUs or GPUs in a desktop, server, or mobile
-# device without rewriting code.
-# .
-# This package ships Python3 interface of tensorflow.
+Package: python3-tensorflow
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, ${shlibs:Depends},
+ libtensorflow-framework2 (= ${binary:Version}),
+Description: Computation using data flow graphs for scalable machine learning (Py3)
+ TensorFlow is an open source software library for numerical computation
+ using data flow graphs. The graph nodes represent mathematical operations,
+ while the graph edges represent the multidimensional data arrays (tensors)
+ that flow between them. This flexible architecture enables you to deploy
+ computation to one or more CPUs or GPUs in a desktop, server, or mobile
+ device without rewriting code.
+ .
+ This package ships Python3 interface of tensorflow.

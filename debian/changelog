@@ -6,7 +6,11 @@ tensorflow (2.2.0-1) UNRELEASED; urgency=medium
   [ Michael R. Crusoe ]
   * Restart packaging using bazel-bootstrap
 
- -- Mo Zhou <lumin@debian.org>  Sun, 19 Jul 2020 00:22:48 +0800
+  [ Andreas Tille ]
+  * Move package to Debian Deep Learning Team
+  * Uncomment python3-tensorflow
+
+ -- Andreas Tille <tille@debian.org>  Thu, 05 Nov 2020 11:30:41 +0100
 
 tensorflow (2.0.0-1) experimental; urgency=medium
 
