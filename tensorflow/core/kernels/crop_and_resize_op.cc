@@ -26,6 +26,7 @@ limitations under the License.
 #include "tensorflow/core/framework/bounds_check.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/framework/tensor_reference.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -222,7 +223,7 @@ struct CropAndResize<CPUDevice, T> {
     const int depth = crops.dimension(3);
 
     // Sharding across boxes.
-    auto CropAndResizePerBox = [&](int start_box, int limit_box) {
+    auto CropAndResizePerBox = [&](int64 start_box, int64 limit_box) {
       for (int b = start_box; b < limit_box; ++b) {
         const float y1 = boxes(b, 0);
         const float x1 = boxes(b, 1);
@@ -448,7 +449,7 @@ struct CropAndResizeBackpropImage<CPUDevice, T> {
 
     grads_image.setZero();
 
-    auto CropAndResizeBackImgPerBox = [&](int start_box, int limit_box) {
+    auto CropAndResizeBackImgPerBox = [&](int64 start_box, int64 limit_box) {
       for (int b = start_box; b < limit_box; ++b) {
         const float y1 = boxes(b, 0);
         const float x1 = boxes(b, 1);

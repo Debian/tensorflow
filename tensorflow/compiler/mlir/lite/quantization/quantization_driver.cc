@@ -24,18 +24,18 @@ limitations under the License.
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/QuantOps/QuantOps.h"  // TF:llvm-project
-#include "mlir/Dialect/QuantOps/QuantTypes.h"  // TF:llvm-project
-#include "mlir/Dialect/StandardOps/IR/Ops.h"  // TF:llvm-project
-#include "mlir/IR/Attributes.h"  // TF:llvm-project
-#include "mlir/IR/Builders.h"  // TF:llvm-project
-#include "mlir/IR/Function.h"  // TF:llvm-project
-#include "mlir/IR/MLIRContext.h"  // TF:llvm-project
-#include "mlir/IR/Matchers.h"  // TF:llvm-project
-#include "mlir/IR/Operation.h"  // TF:llvm-project
-#include "mlir/IR/StandardTypes.h"  // TF:llvm-project
-#include "mlir/IR/Value.h"  // TF:llvm-project
-#include "mlir/Support/LLVM.h"  // TF:llvm-project
+#include "mlir/Dialect/Quant/QuantOps.h"  // from @llvm-project
+#include "mlir/Dialect/Quant/QuantTypes.h"  // from @llvm-project
+#include "mlir/Dialect/StandardOps/IR/Ops.h"  // from @llvm-project
+#include "mlir/IR/Attributes.h"  // from @llvm-project
+#include "mlir/IR/Builders.h"  // from @llvm-project
+#include "mlir/IR/Function.h"  // from @llvm-project
+#include "mlir/IR/MLIRContext.h"  // from @llvm-project
+#include "mlir/IR/Matchers.h"  // from @llvm-project
+#include "mlir/IR/Operation.h"  // from @llvm-project
+#include "mlir/IR/StandardTypes.h"  // from @llvm-project
+#include "mlir/IR/Value.h"  // from @llvm-project
+#include "mlir/Support/LLVM.h"  // from @llvm-project
 #include "tensorflow/compiler/mlir/lite/quantization/quantization_traits.h"
 #include "tensorflow/compiler/mlir/lite/quantization/quantization_utils.h"
 #include "tensorflow/core/platform/logging.h"
@@ -294,7 +294,7 @@ class QuantizationDriver {
         return;
       if (current_op == op) llvm::errs() << "===>>>";
       llvm::errs() << op->getName() << " : (";
-      for (auto i = 0; i < op->getNumOperands(); ++i) {
+      for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
         if (auto params = GetOperandQuantState(op, i).params)
           params.print(llvm::errs());
         else
@@ -303,7 +303,7 @@ class QuantizationDriver {
         llvm::errs() << ",";
       }
       llvm::errs() << ") -> (";
-      for (auto i = 0; i < op->getNumResults(); ++i) {
+      for (int i = 0, e = op->getNumResults(); i < e; ++i) {
         if (auto params = GetResultQuantState(op, i).params)
           params.print(llvm::errs());
         else
@@ -494,6 +494,13 @@ void QuantizationDriver::QuantizeValue(Value value, QuantParams params,
   auto quantize = builder_.create<quant::QuantizeCastOp>(loc, new_type, value);
   auto dequantize = builder_.create<quant::DequantizeCastOp>(
       loc, expressed_type, quantize.getResult());
+
+  // This attribute is set to distinguish the quantize ops being added by the
+  // quantization pass. These ops can be removed without losing original
+  // program accuracy.
+  // TODO(fengliuai): make the attribute being part of op definition.
+  quantize.setAttr(kVolatileOpAttrName, builder_.getUnitAttr());
+
   // `original_result` has a use to `quantize`, so this will replace that use
   // by the result of `dequantize`. Remember to reset that use afterwards
   value.replaceAllUsesWith(dequantize);

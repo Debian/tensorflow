@@ -12,11 +12,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+#include <stdint.h>
+
+#include <limits>
+#include <vector>
+
 #include <gtest/gtest.h>
-#include "tensorflow/lite/interpreter.h"
-#include "tensorflow/lite/kernels/register.h"
+#include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/kernels/test_util.h"
-#include "tensorflow/lite/model.h"
+#include "tensorflow/lite/schema/schema_generated.h"
 
 namespace tflite {
 namespace {
@@ -142,6 +146,22 @@ TEST(FloatSubOpModel, WithBroadcast) {
   }
 }
 
+TEST(FloatSubOpModel, WithBroadcast5D) {
+  std::vector<std::vector<int>> test_shapes = {{1, 3, 1, 2, 1}};
+  for (int i = 0; i < test_shapes.size(); ++i) {
+    FloatSubOpModel m({TensorType_FLOAT32, test_shapes[i]},
+                      {TensorType_FLOAT32, {}},  // always a scalar
+                      {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
+    m.PopulateTensor<float>(m.input1(), {-2.0, 0.2, 1.7, 0.5, -1.1, 2.0});
+    m.PopulateTensor<float>(m.input2(), {0.5});
+    m.Invoke();
+    EXPECT_THAT(
+        m.GetOutput(),
+        ElementsAreArray(ArrayFloatNear({-2.5, -0.3, 1.2, 0.0, -1.6, 1.5})))
+        << "With shape number " << i;
+  }
+}
+
 TEST(IntegerSubOpModel, NoActivation) {
   IntegerSubOpModel m({TensorType_INT32, {1, 2, 2, 1}},
                       {TensorType_INT32, {1, 2, 2, 1}}, {TensorType_INT32, {}},
@@ -179,7 +199,7 @@ TEST(IntegerSubOpModel, VariousInputShapes) {
 
 TEST(IntegerSubOpModel, WithBroadcast) {
   std::vector<std::vector<int>> test_shapes = {
-      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
+      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}, {1, 3, 1, 2, 1}};
   for (int i = 0; i < test_shapes.size(); ++i) {
     IntegerSubOpModel m({TensorType_INT32, test_shapes[i]},
                         {TensorType_INT32, {}},  // always a scalar
@@ -375,7 +395,7 @@ TEST(QuantizedSubOpModel, QuantizedTestsNoActivationBroadcastInt16) {
       std::numeric_limits<int16_t>::max();
   float kQuantizedTolerance = GetToleranceInt16(kMin, kMax);
   std::vector<std::vector<int>> test_shapes = {
-      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
+      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}, {1, 3, 1, 2, 1}};
   for (int i = 0; i < test_shapes.size(); ++i) {
     QuantizedSubOpModel m({TensorType_INT16, test_shapes[i], kMin, kMax},
                           {TensorType_INT16, {}, kMin, kMax},
@@ -398,7 +418,7 @@ TEST(QuantizedSubOpModel, QuantizedTestsReluActivationBroadcastInt16) {
                      std::numeric_limits<int16_t>::max();
   float kQuantizedTolerance = GetToleranceInt16(kMin, kMax);
   std::vector<std::vector<int>> test_shapes = {
-      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
+      {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}, {1, 3, 1, 2, 1}};
   for (int i = 0; i < test_shapes.size(); ++i) {
     QuantizedSubOpModel m({TensorType_INT16, test_shapes[i], kMin, kMax},
                           {TensorType_INT16, {}, kMin, kMax},

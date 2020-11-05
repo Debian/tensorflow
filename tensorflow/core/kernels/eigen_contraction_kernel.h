@@ -171,6 +171,7 @@ struct mkldnn_gemm_kernel</*Scalar*/ float, IndexType, OutputMapper,
 #if DYNAMIC_ANNOTATIONS_ENABLED == 1 || defined(MEMORY_SANITIZER)
     for (IndexType col = 0; col < cols; ++col) {
       ResScalar* row_base = &output(0, col);
+      EIGEN_UNUSED_VARIABLE(row_base);  // Suppress unused variable error.
       TF_ANNOTATE_MEMORY_IS_INITIALIZED(row_base, sizeof(ResScalar) * rows);
     }
 #endif
@@ -241,6 +242,7 @@ struct mkldnn_gemm_s8u8s32_kernel {
 #if DYNAMIC_ANNOTATIONS_ENABLED == 1 || defined(MEMORY_SANITIZER)
     for (IndexType col = 0; col < cols; ++col) {
       ResScalar* row_base = &output(0, col);
+      EIGEN_UNUSED_VARIABLE(row_base);  // Suppress unused variable error.
       TF_ANNOTATE_MEMORY_IS_INITIALIZED(row_base, sizeof(ResScalar) * rows);
     }
 #endif
@@ -270,10 +272,10 @@ class TensorContractionBlocking<float, float, float, StorageIndex,
   static constexpr float kScaleN = 1.0;
 
   // Mkldnn Avx/Avx2/Avx512 unroll factors are: 8/16/48.
-  static const StorageIndex kUnrollM = 48;
+  static constexpr StorageIndex kUnrollM = 48;
 
   // Mkldnn Avx/Avx2/Avx512 unroll factors are: 6/6/8.
-  static const StorageIndex kUnrollN = 24;
+  static constexpr StorageIndex kUnrollN = 24;
 
  public:
   TensorContractionBlocking(StorageIndex k, StorageIndex m, StorageIndex n,

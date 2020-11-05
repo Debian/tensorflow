@@ -806,18 +806,6 @@ void GenEagerPythonOp::AddEagerFastPathExecute() {
   // Handle fallback.
   if (!fallback_params.empty()) strings::StrAppend(&fallback_params, ", ");
   strings::StrAppend(&fallback_params, "ctx=_ctx");
-  strings::StrAppend(&result_, "    ", "except _core._FallbackException:\n");
-  strings::StrAppend(&result_, "      try:\n");
-  strings::StrAppend(
-      &result_, "        ", "return ", function_name_, kEagerFallbackSuffix,
-      "(\n",
-      WordWrap(strings::StrCat("            "),
-               strings::StrCat(fallback_params, ")"), kRightMargin),
-      "\n");
-  strings::StrAppend(&result_, "      except _core._SymbolicException:\n");
-  strings::StrAppend(&result_,
-                     "        pass  # Add nodes to the TensorFlow graph.\n");
-  AddDispatch("      ");
 
   // Any errors thrown from execute need to be unwrapped from
   // _NotOkStatusException.
@@ -825,6 +813,20 @@ void GenEagerPythonOp::AddEagerFastPathExecute() {
                      "except _core._NotOkStatusException as e:\n");
   strings::StrAppend(&result_, "      ",
                      "_ops.raise_from_not_ok_status(e, name)\n");
+
+  strings::StrAppend(&result_, "    ", "except _core._FallbackException:\n");
+  strings::StrAppend(&result_, "      pass\n");
+  strings::StrAppend(&result_, "    try:\n");
+  strings::StrAppend(
+      &result_, "      ", "return ", function_name_, kEagerFallbackSuffix,
+      "(\n",
+      WordWrap(strings::StrCat("          "),
+               strings::StrCat(fallback_params, ")"), kRightMargin),
+      "\n");
+  strings::StrAppend(&result_, "    except _core._SymbolicException:\n");
+  strings::StrAppend(&result_,
+                     "      pass  # Add nodes to the TensorFlow graph.\n");
+  AddDispatch("    ");
 }
 
 void GenEagerPythonOp::AddEagerInferredAttrs(const string& indentation) {
@@ -957,7 +959,10 @@ void GenEagerPythonOp::AddDispatch(const string& prefix) {
 
   strings::StrAppend(&result_, prefix, "except (TypeError, ValueError):\n");
   strings::StrAppend(&result_, prefix, "  result = _dispatch.dispatch(\n");
-  AddBodyNoReturn(strings::StrCat(prefix, "        ", function_name_, ", "));
+  AddBodyNoReturn(strings::StrCat(prefix, "        ", function_name_,
+                                  ", "
+                                  "(), dict("));
+  strings::StrAppend(&result_, prefix, "      )\n");
   strings::StrAppend(&result_, prefix,
                      "  if result is not "
                      "_dispatch.OpDispatcher.NOT_SUPPORTED:\n");
@@ -976,9 +981,9 @@ void GenEagerPythonOp::AddRawOpExport(const string& parameters) {
                      function_name_, "))\n");
 }
 
-string GetPythonOps(const OpList& ops, const ApiDefMap& api_defs,
-                    const std::vector<string>& hidden_ops,
-                    const string& source_file_name = "") {
+string GetPythonOpsImpl(const OpList& ops, const ApiDefMap& api_defs,
+                        const std::vector<string>& hidden_ops,
+                        const string& source_file_name = "") {
   string result;
   // Header
   // TODO(josh11b): Mention the library for which wrappers are being generated.
@@ -1064,11 +1069,17 @@ from tensorflow.python.util.tf_export import tf_export
 
 }  // namespace
 
+string GetPythonOps(const OpList& ops, const ApiDefMap& api_defs,
+                    const std::vector<string>& hidden_ops,
+                    const string& source_file_name) {
+  return GetPythonOpsImpl(ops, api_defs, hidden_ops, source_file_name);
+}
+
 void PrintPythonOps(const OpList& ops, const ApiDefMap& api_defs,
                     const std::vector<string>& hidden_ops,
                     const string& source_file_name) {
   printf("%s",
-         GetPythonOps(ops, api_defs, hidden_ops, source_file_name).c_str());
+         GetPythonOpsImpl(ops, api_defs, hidden_ops, source_file_name).c_str());
 }
 
 string GetPythonWrappers(const char* op_list_buf, size_t op_list_len) {
@@ -1076,7 +1087,7 @@ string GetPythonWrappers(const char* op_list_buf, size_t op_list_len) {
   ops.ParseFromArray(op_list_buf, op_list_len);
 
   ApiDefMap api_def_map(ops);
-  return GetPythonOps(ops, api_def_map, {});
+  return GetPythonOpsImpl(ops, api_def_map, {});
 }
 
 }  // namespace tensorflow

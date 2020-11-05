@@ -1,10 +1,13 @@
-load("//tensorflow:tensorflow.bzl", "tf_cc_test", "tf_cc_test_mkl", "tf_kernel_library")
-load("//tensorflow:tensorflow.bzl", "tf_cuda_cc_test")
+load("//tensorflow:tensorflow.bzl", "tf_cc_test", "tf_cc_test_mkl", "tf_copts", "tf_cuda_cc_test", "tf_kernel_library")
 
 # Platform specific build config
 load(
     "//tensorflow/core/platform:build_config_root.bzl",
     "if_static",
+)
+load(
+    "//third_party/mkl:build_defs.bzl",
+    "mkl_deps",
 )
 
 package(
@@ -75,6 +78,7 @@ cc_library(
         "//tensorflow/core/grappler:op_types",
         "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/clusters:cluster",
+        "//tensorflow/core/grappler/utils:transitive_fanin",
     ],
 )
 
@@ -164,14 +168,11 @@ cc_library(
         "//tensorflow/core:framework",
         "//tensorflow/core:lib_internal",
         "//tensorflow/core:protos_all_cc",
-        "//tensorflow/core/grappler:graph_topology_view",
         "//tensorflow/core/grappler:graph_view",
         "//tensorflow/core/grappler:grappler_item",
         "//tensorflow/core/grappler:op_types",
         "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/utils:functions",
-        "//tensorflow/core/grappler/utils:topological_sort",
-        "//tensorflow/core/grappler/utils:traversal",
         "@com_google_absl//absl/algorithm:container",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
@@ -302,6 +303,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":arithmetic_optimizer",
+        ":common_subgraph_elimination",
         ":constant_folding",
         ":model_pruner",
         "//tensorflow/core:test",
@@ -330,6 +332,59 @@ tf_cuda_cc_test(
         "//tensorflow/core/grappler:grappler_item",
         "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/inputs:trivial_test_graph_input_yielder",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "common_subgraph_elimination",
+    srcs = ["common_subgraph_elimination.cc"],
+    hdrs = [
+        "common_subgraph_elimination.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":graph_optimizer",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:graph",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:lib_internal",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core/grappler:graph_topology_view",
+        "//tensorflow/core/grappler:grappler_item",
+        "//tensorflow/core/grappler:op_types",
+        "//tensorflow/core/grappler:utils",
+        "//tensorflow/core/grappler/utils:canonicalizer",
+        "//tensorflow/core/grappler/utils:topological_sort",
+        "//tensorflow/core/grappler/utils:traversal",
+        "//tensorflow/core/platform:hash",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+tf_cuda_cc_test(
+    name = "common_subgraph_elimination_test",
+    size = "small",
+    srcs = ["common_subgraph_elimination_test.cc"],
+    deps = [
+        ":arithmetic_optimizer_test_utils",
+        ":common_subgraph_elimination",
+        ":model_pruner",
+        "//tensorflow/cc:cc_ops",
+        "//tensorflow/cc:cc_ops_internal",
+        "//tensorflow/core:all_kernels",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+        "//tensorflow/core/grappler:grappler_item",
+        "//tensorflow/core/grappler:utils",
+        "//tensorflow/core/grappler/inputs:trivial_test_graph_input_yielder",
+        "//tensorflow/core/grappler/utils:grappler_test",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -479,7 +534,10 @@ cc_library(
 tf_cuda_cc_test(
     name = "memory_optimizer_test",
     srcs = ["memory_optimizer_test.cc"],
-    tags = ["no_cuda_on_cpu_tap"],  # Do not re-enable again without actually testing.
+    tags = [
+        "no_cuda_on_cpu_tap",  # Do not re-enable again without actually testing.
+        "no_windows",  # b/56402646
+    ],
     deps = [
         ":gpu_swapping_kernels",
         ":gpu_swapping_ops",
@@ -555,6 +613,7 @@ cc_library(
         "auto_mixed_precision.h",
         "auto_mixed_precision_lists.h",
     ],
+    copts = tf_copts(),
     visibility = ["//visibility:public"],
     deps = [
         ":custom_graph_optimizer_registry",
@@ -572,7 +631,7 @@ cc_library(
         "//tensorflow/core/grappler/costs:virtual_placer",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
-    ],
+    ] + mkl_deps(),
 )
 
 tf_cuda_cc_test(
@@ -605,6 +664,7 @@ cc_library(
         ":arithmetic_optimizer",
         ":auto_mixed_precision",
         ":auto_parallel",
+        ":common_subgraph_elimination",
         ":constant_folding",
         ":custom_graph_optimizer_registry",
         ":debug_stripper",
@@ -841,7 +901,6 @@ tf_cc_test_mkl(
     srcs = ["mkl_remapper_test.cc"],
     tags = [
         "no_mac",
-        "no_oss",
     ],
     deps = [
         ":remapper",
@@ -1007,8 +1066,10 @@ cc_library(
         "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
+        "//tensorflow/core:protos_all_cc",
         "//tensorflow/core/grappler:grappler_item",
         "//tensorflow/core/grappler:op_types",
+        "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/costs:graph_properties",
         "//tensorflow/core/grappler/utils:graph_view",
         "@com_google_absl//absl/strings",
@@ -1052,9 +1113,7 @@ cc_library(
         "//tensorflow/core/grappler:graph_view",
         "//tensorflow/core/grappler:grappler_item",
         "//tensorflow/core/grappler:op_types",
-        "//tensorflow/core/grappler:utils",
         "//tensorflow/core/grappler/costs:graph_properties",
-        "//tensorflow/core/grappler/utils:frame",
         "//tensorflow/core/grappler/utils:symbolic_shapes",
         "//tensorflow/core/grappler/utils:topological_sort",
         "//tensorflow/core/grappler/utils:tpu",

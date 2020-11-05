@@ -36,8 +36,8 @@ py_library(
     srcs = ["trt_convert.py"],
     srcs_version = "PY2AND3",
     deps = [
+        "//tensorflow/compiler/tf2tensorrt:_pywrap_py_utils",
         "//tensorflow/compiler/tf2tensorrt:trt_ops_loader",
-        "//tensorflow/compiler/tf2tensorrt:wrap_py_utils",
         "//tensorflow/python:convert_to_constants",
         "//tensorflow/python:func_graph",
         "//tensorflow/python:graph_util",
@@ -120,8 +120,11 @@ cuda_py_tests(
     srcs = [
         "test/base_test.py",
         "test/batch_matmul_test.py",
+        "test/biasadd_matmul_test.py",
         "test/binary_tensor_weight_broadcast_test.py",
+        "test/cast_test.py",
         "test/combined_nms_test.py",
+        "test/concatenation_test.py",
         "test/const_broadcast_test.py",
         "test/conv2d_test.py",
         "test/dynamic_input_shapes_test.py",
@@ -155,27 +158,6 @@ cuda_py_tests(
     ],
 )
 
-cuda_py_tests(
-    name = "concatenation_test",
-    srcs = [
-        "test/biasadd_matmul_test.py",
-        "test/concatenation_test.py",
-    ],
-    python_version = "PY3",
-    tags = [
-        "no_rocm",
-        "no_windows",
-        "nomac",
-        "notap",  # b/140261407
-    ],
-    xla_enable_strict_auto_jit = False,
-    deps = [
-        ":tf_trt_integration_test_base",
-        "//tensorflow/python:client_testlib",
-        "//tensorflow/python:framework_test_lib",
-    ],
-)
-
 cuda_py_test(
     name = "quantization_mnist_test",
     srcs = ["test/quantization_mnist_test.py"],
@@ -200,6 +182,5 @@ cuda_py_test(
         "//tensorflow/python:client_testlib",
         "//tensorflow/python:framework_test_lib",
         "//tensorflow/python/estimator",
-        "//tensorflow/python/keras",
     ],
 )

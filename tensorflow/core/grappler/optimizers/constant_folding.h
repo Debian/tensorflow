@@ -131,8 +131,8 @@ class ConstantFolding : public GraphOptimizer {
   Status SimplifyNode(bool use_shape_info, NodeDef* node,
                       GraphDef* optimized_graph, GraphProperties* properties);
 
-  Status RunOptimizationPass(Cluster* cluster, const GrapplerItem& item,
-                             GraphDef* output);
+  Status RunOptimizationPass(Cluster* cluster, GrapplerItem* item,
+                             GraphDef* optimized_graph);
 
   // Applies partial constant folding for Concat which is not commutative.
   // Returns true if the transformation applied successfully.
@@ -278,6 +278,13 @@ class ConstantFolding : public GraphOptimizer {
   // Simplifies a Slice operation to an Identity operation if applicable.
   Status SimplifySlice(const GraphProperties& properties, bool use_shape_info,
                        GraphDef* optimized_graph, NodeDef* node);
+
+  // Simplify a Case operation where the output_idx is known.
+  bool SimplifyCase(GraphDef* optimized_graph, NodeDef* node);
+
+  // Simplify a Select operation where the predicates are all true or all false.
+  bool SimplifySelect(const GraphProperties& properties,
+                      GraphDef* optimized_graph, NodeDef* node);
 
   // Removes Reverse op over dimensions with size 1.
   Status RemoveReverse(const GraphProperties& properties, bool use_shape_info,

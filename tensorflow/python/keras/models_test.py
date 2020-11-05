@@ -122,9 +122,9 @@ class TestModelCloning(keras_parameterized.TestCase):
         isinstance(new_model._layers[0], keras.layers.InputLayer),
         add_input_layer)
     self.assertEqual(new_model._is_graph_network, model._is_graph_network)
-    if input_shape:
+    if input_shape and not ops.executing_eagerly_outside_functions():
       # update ops from batch norm needs to be included
-      self.assertEqual(len(new_model.get_updates_for(new_model.inputs)), 2)
+      self.assertGreaterEqual(len(new_model.updates), 2)
 
     # On top of new tensor  -- clone model should always have an InputLayer.
     input_a = keras.Input(shape=(4,))
@@ -173,7 +173,8 @@ class TestModelCloning(keras_parameterized.TestCase):
 
     # With placeholder creation
     new_model = clone_fn(model)
-    self.assertEqual(len(new_model.get_updates_for(new_model.inputs)), 2)
+    if not ops.executing_eagerly_outside_functions():
+      self.assertGreaterEqual(len(new_model.updates), 2)
     new_model.compile(
         testing_utils.get_v2_optimizer('rmsprop'),
         'mse',
@@ -185,7 +186,8 @@ class TestModelCloning(keras_parameterized.TestCase):
     input_b = keras.Input(shape=(4,), name='b')
     new_model = keras.models.clone_model(
         model, input_tensors=[input_a, input_b])
-    self.assertEqual(len(new_model.get_updates_for(new_model.inputs)), 2)
+    if not ops.executing_eagerly_outside_functions():
+      self.assertLen(new_model.updates, 2)
     new_model.compile(
         testing_utils.get_v2_optimizer('rmsprop'),
         'mse',
@@ -199,7 +201,7 @@ class TestModelCloning(keras_parameterized.TestCase):
       input_a = keras.backend.variable(val_a)
       input_b = keras.backend.variable(val_b)
       new_model = clone_fn(model, input_tensors=[input_a, input_b])
-      self.assertEqual(len(new_model.get_updates_for(new_model.inputs)), 2)
+      self.assertGreaterEqual(len(new_model.updates), 2)
       new_model.compile(
           testing_utils.get_v2_optimizer('rmsprop'),
           'mse',

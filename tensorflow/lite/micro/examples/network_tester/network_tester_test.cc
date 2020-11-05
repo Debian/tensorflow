@@ -10,10 +10,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/examples/network_tester/expected_output_data.h"
 #include "tensorflow/lite/micro/examples/network_tester/input_data.h"
 #include "tensorflow/lite/micro/examples/network_tester/network_model.h"
-#include "tensorflow/lite/micro/kernels/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/micro/testing/micro_test.h"
@@ -66,11 +66,16 @@ TF_LITE_MICRO_TEST(TestInvoke) {
     return 1;
   }
 
-  tflite::ops::micro::AllOpsResolver resolver;
+  tflite::AllOpsResolver resolver;
 
   tflite::MicroInterpreter interpreter(model, resolver, tensor_arena,
                                        TENSOR_ARENA_SIZE, error_reporter);
-  interpreter.AllocateTensors();
+
+  TfLiteStatus allocate_status = interpreter.AllocateTensors();
+  if (allocate_status != kTfLiteOk) {
+    TF_LITE_REPORT_ERROR(error_reporter, "Tensor allocation failed\n");
+  }
+  TF_LITE_MICRO_EXPECT_EQ(kTfLiteOk, allocate_status);
 
   TfLiteTensor* input = interpreter.input(0);
   memcpy(input->data.uint8, input_data, input->bytes);

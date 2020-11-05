@@ -61,7 +61,7 @@ class GpuExecutable : public Executable {
                 std::unique_ptr<HloProfileIndexMap> hlo_profile_index_map);
   ~GpuExecutable() override;
 
-  int64 SizeOfGeneratedCodeInBytes() override;
+  int64 SizeOfGeneratedCodeInBytes() const override;
 
   // This should be called after set_ir_module_string.
   const string& ir_module_string() const { return ir_module_string_; }
@@ -84,7 +84,7 @@ class GpuExecutable : public Executable {
   // doesn't match the compute capability passed to this object's constructor.
   StatusOr<ExecutionOutput> ExecuteAsyncOnStream(
       const ServiceExecutableRunOptions* run_options,
-      std::vector<ShapeTree<MaybeOwningDeviceMemory>> arguments,
+      std::vector<ExecutionInput> arguments,
       HloExecutionProfile* hlo_execution_profile) override;
 
   std::shared_ptr<const BufferAssignment> GetBufferAssignment() const {
@@ -123,10 +123,23 @@ class GpuExecutable : public Executable {
   Status CheckCompatibilityWithServiceExecutableRunOptions(
       const ServiceExecutableRunOptions* run_options);
 
-  // The LLVM IR, in string format, of the unoptimized module generated for this
-  // GpuExecutable. We save a string instead of an llvm::Module* because leaving
-  // llvm::Module* in a singleton can cause the heap checker to emit false
-  // positives.
+  StatusOr<BufferAllocations> GenerateBufferAllocations(
+      absl::Span<ExecutionInput const> arguments,
+      const GpuExecutable::BufferAllocToDeviceMemoryMap* globals,
+      se::DeviceMemoryAllocator* const memory_allocator,
+      se::StreamExecutor* executor);
+
+  StatusOr<se::DeviceMemoryBase> BufferForAllocation(
+      absl::Span<ExecutionInput const> arguments,
+      const GpuExecutable::BufferAllocToDeviceMemoryMap* globals,
+      const BufferAllocation& allocation,
+      se::DeviceMemoryAllocator* const memory_allocator, int device_ordinal,
+      int64 arg_idx);
+
+  // The LLVM IR, in string format, of the unoptimized module generated for
+  // this GpuExecutable. We save a string instead of an llvm::Module* because
+  // leaving llvm::Module* in a singleton can cause the heap checker to emit
+  // false positives.
   //
   // This string should be modified only before ExecuteOnStream.
   string ir_module_string_;
@@ -150,10 +163,6 @@ class GpuExecutable : public Executable {
   // Owns the buffer data at runtime. It provides information to allocate
   // memory for every output/temp buffers.
   const std::shared_ptr<const BufferAssignment> assignment_;
-
-  // Maps a thunk to a string describing the thunk.  This is useful when
-  // constructing ScopeAnnotation objects.
-  absl::flat_hash_map<Thunk*, string> thunk_annotations_;
 
   // Cache of module handles and constant buffer allocation maps used by
   // `ResolveConstantGlobals`.

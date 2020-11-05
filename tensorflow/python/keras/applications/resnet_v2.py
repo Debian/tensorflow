@@ -13,7 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 # pylint: disable=invalid-name
-"""ResNet v2 models for Keras."""
+"""ResNet v2 models for Keras.
+
+Reference paper:
+  - [Identity Mappings in Deep Residual Networks]
+    (https://arxiv.org/abs/1603.05027) (CVPR 2016)
+"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -32,8 +37,7 @@ def ResNet50V2(
     input_shape=None,
     pooling=None,
     classes=1000,
-    classifier_activation='softmax',
-):
+    classifier_activation='softmax'):
   """Instantiates the ResNet50V2 architecture."""
   def stack_fn(x):
     x = resnet.stack2(x, 64, 3, name='conv2')
@@ -52,8 +56,7 @@ def ResNet50V2(
       input_shape,
       pooling,
       classes,
-      classifier_activation=classifier_activation,
-  )
+      classifier_activation=classifier_activation)
 
 
 @keras_export('keras.applications.resnet_v2.ResNet101V2',
@@ -65,8 +68,7 @@ def ResNet101V2(
     input_shape=None,
     pooling=None,
     classes=1000,
-    classifier_activation='softmax',
-):
+    classifier_activation='softmax'):
   """Instantiates the ResNet101V2 architecture."""
   def stack_fn(x):
     x = resnet.stack2(x, 64, 3, name='conv2')
@@ -85,8 +87,7 @@ def ResNet101V2(
       input_shape,
       pooling,
       classes,
-      classifier_activation=classifier_activation,
-  )
+      classifier_activation=classifier_activation)
 
 
 @keras_export('keras.applications.resnet_v2.ResNet152V2',
@@ -98,8 +99,7 @@ def ResNet152V2(
     input_shape=None,
     pooling=None,
     classes=1000,
-    classifier_activation='softmax',
-):
+    classifier_activation='softmax'):
   """Instantiates the ResNet152V2 architecture."""
   def stack_fn(x):
     x = resnet.stack2(x, 64, 3, name='conv2')
@@ -118,51 +118,31 @@ def ResNet152V2(
       input_shape,
       pooling,
       classes,
-      classifier_activation=classifier_activation,
-  )
+      classifier_activation=classifier_activation)
 
 
 @keras_export('keras.applications.resnet_v2.preprocess_input')
 def preprocess_input(x, data_format=None):
-  """Preprocesses a numpy array encoding a batch of images.
-
-  Arguments
-    x: A 4D numpy array consists of RGB values within [0, 255].
-
-  Returns
-    Preprocessed array.
-
-  Raises
-    ValueError: In case of unknown `data_format` argument.
-  """
   return imagenet_utils.preprocess_input(
       x, data_format=data_format, mode='tf')
 
 
 @keras_export('keras.applications.resnet_v2.decode_predictions')
 def decode_predictions(preds, top=5):
-  """Decodes the prediction result from the model.
-
-  Arguments
-    preds: Numpy tensor encoding a batch of predictions.
-    top: Integer, how many top-guesses to return.
-
-  Returns
-    A list of lists of top class prediction tuples
-    `(class_name, class_description, score)`.
-    One list of tuples per sample in batch input.
-
-  Raises
-    ValueError: In case of invalid shape of the `preds` array (must be 2D).
-  """
   return imagenet_utils.decode_predictions(preds, top=top)
 
 
 preprocess_input.__doc__ = imagenet_utils.PREPROCESS_INPUT_DOC.format(
-    mode='', ret=imagenet_utils.PREPROCESS_INPUT_RET_DOC_CAFFE)
+    mode='',
+    ret=imagenet_utils.PREPROCESS_INPUT_RET_DOC_TF,
+    error=imagenet_utils.PREPROCESS_INPUT_ERROR_DOC)
 decode_predictions.__doc__ = imagenet_utils.decode_predictions.__doc__
 
 DOC = """
+
+  Reference:
+  - [Identity Mappings in Deep Residual Networks]
+    (https://arxiv.org/abs/1603.05027) (CVPR 2016)
 
   Optionally loads weights pre-trained on ImageNet.
   Note that the data format convention used by the model is

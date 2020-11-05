@@ -52,15 +52,25 @@ cc_library(
     name = "test_macros_header",
     testonly = True,
     hdrs = ["test_macros.h"],
-    deps = [
-        "//tensorflow/compiler/xla:types",
-        "//tensorflow/core:test",
-        "@com_google_absl//absl/strings",
-    ],
 )
 
 # Generate a test_macros_${BACKEND} library per backend with the proper copts.
 generate_backend_test_macros()
+
+cc_library(
+    name = "manifest_checking_test",
+    testonly = True,
+    srcs = ["manifest_checking_test.cc"],
+    hdrs = ["manifest_checking_test.h"],
+    deps = [
+        ":test_macros_header",
+        "//tensorflow/core:regexp_internal",
+        "//tensorflow/core:test",
+        "//tensorflow/core/platform:logging",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+    ],
+)
 
 cc_library(
     name = "test_utils",
@@ -136,6 +146,7 @@ cc_library(
     hdrs = ["hlo_test_base.h"],
     deps = [
         ":literal_test_util",
+        ":manifest_checking_test",
         ":test_utils",
         ":verified_hlo_module",
         "//tensorflow/compiler/xla:debug_options_flags",
@@ -175,7 +186,7 @@ tf_cc_binary(
         "//tensorflow/compiler/xla/service/cpu:cpu_compiler",
         "//tensorflow/compiler/xla/service/llvm_ir:llvm_util",
         "//tensorflow/core:lib",
-        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:Support",
     ],
 )
 
@@ -193,6 +204,7 @@ cc_library(
     srcs = ["client_library_test_base.cc"],
     hdrs = ["client_library_test_base.h"],
     deps = [
+        ":manifest_checking_test",
         "//tensorflow/compiler/xla:array2d",
         "//tensorflow/compiler/xla:array3d",
         "//tensorflow/compiler/xla:array4d",
@@ -273,6 +285,7 @@ cc_library(
     hdrs = ["local_client_test_base.h"],
     deps = [
         ":client_library_test_base",
+        ":manifest_checking_test",
         ":verified_hlo_module",
         "//tensorflow/compiler/xla:shape_util",
         "//tensorflow/compiler/xla:status_macros",
@@ -807,6 +820,8 @@ xla_test(
         # This is a big test that we skip for capacity reasons in OSS testing.
         "no_oss",
         "no_pip",
+        # TODO(b/151340488): Timed out on 2020-03-18.
+        "nozapfhahn",
     ],
     deps = [
         ":client_library_test_base",
@@ -939,6 +954,8 @@ xla_test(
     tags = [
         "no_rocm",
         "optonly",
+        # TODO(b/151340488): Timed out on 2020-03-12.
+        "nozapfhahn",
     ],
     deps = [
         ":client_library_test_base",
@@ -969,11 +986,12 @@ xla_test(
         ":client_library_test_base",
         ":hlo_test_base",
         ":test_macros_header",
+        ":xla_internal_test_main",
         "//tensorflow/compiler/xla:execution_options_util",
+        "//tensorflow/compiler/xla:literal_util",
         "//tensorflow/compiler/xla:status_macros",
         "//tensorflow/compiler/xla:test",
         "//tensorflow/compiler/xla/client:xla_builder",
-        "//tensorflow/compiler/xla/tests:xla_internal_test_main",
     ],
 )
 
@@ -1099,6 +1117,7 @@ xla_test(
     shard_count = 40,
     tags = [
         "no_rocm",
+        "nozapfhahn",
         "optonly",
     ],
     deps = CONVOLUTION_TEST_DEPS + [
@@ -1134,7 +1153,9 @@ xla_test(
     backend_args = {"gpu": ["--xla_backend_extra_options=xla_gpu_experimental_conv_disable_layout_heuristic"]},
     backends = ["gpu"],
     shard_count = 25,
-    tags = ["no_rocm"],
+    tags = [
+        "no_rocm",
+    ],
     deps = CONVOLUTION_TEST_DEPS + [
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
@@ -1297,6 +1318,7 @@ xla_test(
 
 xla_test(
     name = "slice_test",
+    timeout = "long",
     srcs = ["slice_test.cc"],
     shard_count = 40,
     deps = [
@@ -1341,6 +1363,7 @@ xla_test(
     srcs = ["dynamic_ops_test.cc"],
     deps = [
         ":client_library_test_base",
+        ":hlo_test_base",
         ":literal_test_util",
         ":test_macros_header",
         ":xla_internal_test_main",
@@ -1491,6 +1514,7 @@ xla_test(
     srcs = ["select_and_scatter_test.cc"],
     tags = [
         "no_rocm",
+        "nozapfhahn",
         "optonly",
     ],
     deps = [
@@ -2132,7 +2156,7 @@ tf_cc_test(
         "//tensorflow/core:test_main",
         "//tensorflow/stream_executor",
         "@com_google_absl//absl/memory",
-        "@llvm-project//llvm:core",
+        "@llvm-project//llvm:Core",
     ],
 )
 
@@ -2531,6 +2555,9 @@ xla_test(
     tags = [
         "enable_for_xla_interpreter",
         "noasan",  # sometimes times out, http://b/78650012
+        "nomsan",  # sometimes times out, http://b/78650012
+        "notsan",  # sometimes times out, http://b/78650012
+        "optonly",
     ],
     deps = [
         ":test_macros_header",

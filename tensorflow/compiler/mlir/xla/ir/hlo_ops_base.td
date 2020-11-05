@@ -18,14 +18,83 @@ limitations under the License.
 
 include "mlir/IR/OpBase.td"
 
-def HLO_Int : IntOfWidths<[8, 16, 32, 64]>;
 def HLO_Pred : TypeAlias<I1, "pred (AKA boolean or 1-bit integer)">;
+
+// TODO(hinsu): Use signed integers instead of signless integer which is being
+// used for legacy reasons.
+def HLO_SInt : SignlessIntOfWidths<[8, 16, 32, 64]>;
+def HLO_UInt : UnsignedIntOfWidths<[8, 16, 32, 64]>;
+def HLO_Int : AnyTypeOf<[HLO_SInt, HLO_UInt]>;
+
+def HLO_Complex : Complex<AnyTypeOf<[F32, F64]>>;
 
 // The broadcasting dimensions correspond to a tuple that describes how a
 // smaller rank shape is broadcast into a larger rank shape. For example,
 // given a 2x3x4 cuboid and a 3x4 matrix, a broadcasting tuple (1,2) means
 // matching the matrix to dimensions 1 and 2 of the cuboid.
-def BroadcastDimAttr : OptionalAttr<I64ElementsAttr>;
+defvar BroadcastDimAttr = I64ElementsAttr;
+
+//===----------------------------------------------------------------------===//
+// XLA on tensors type definitions.
+//===----------------------------------------------------------------------===//
+
+// Token type.
+def HLO_Token : Type<CPred<"$_self.isa<TokenType>()">, "token">;
+
+// Any integer tensor types
+def HLO_IntTensor : TensorOf<[HLO_Int]>;
+
+// Any integer tensor type with rank 0 (i.e. representing a single integer).
+def HLO_ScalarIntTensor : ShapedContainerType<
+  [HLO_Int], And<[IsTensorTypePred, HasAnyRankOfPred<[0]>]>,
+  "a 0-dim integer tensor">;
+
+// Any floating-point tensor types
+def HLO_FpTensor : TensorOf<[AnyFloat]>;
+
+def HLO_PredTensor : TensorOf<[HLO_Pred]>;
+
+def HLO_Tensor : TensorOf<[AnyFloat, HLO_Pred, HLO_Int, HLO_Complex]>;
+
+def HLO_ComplexTensor : TensorOf<[HLO_Complex]>;
+
+def HLO_Tuple : NestedTupleOf<[HLO_Tensor, HLO_Token]>;
+
+def HLO_TensorOrTuple : AnyTypeOf<[HLO_Tensor, HLO_Tuple]>;
+
+def HLO_TensorOrTokenOrTuple : AnyTypeOf<[HLO_Tensor, HLO_Token, HLO_Tuple]>;
+
+def HLO_DimensionValue : AnyTypeOf<[Index, HLO_Pred, HLO_Int]>;
+
+// Dynamic representation of a shape vector as a tensor.
+def HLO_DimensionTensor : ShapedContainerType<
+    [HLO_DimensionValue],
+    And<[IsTensorTypePred, HasAnyRankOfPred<[1]>]>,
+    "a 1D tensor of dimensions">;
+
+// In general, static shaped tensor constraints should be avoided unless
+// it is for a legacy op which is only correct with static shapes.
+def HLO_StaticShapeTensor : StaticShapeTensorOf<[
+      AnyFloat, HLO_Pred, HLO_Int, HLO_Complex]>;
+
+//===----------------------------------------------------------------------===//
+// XLA on tensors combined type definitions.
+//===----------------------------------------------------------------------===//
+
+// Any integer or floating-point tensor types
+def HLO_IntOrFpTensor : TensorOf<[HLO_Int, AnyFloat]>;
+
+// Any integer or predicate tensor types
+def HLO_PredOrIntTensor : TensorOf<[HLO_Pred, HLO_Int]>;
+
+// Any floating-point or complex tensor types
+def HLO_FpOrComplexTensor : TensorOf<[AnyFloat, HLO_Complex]>;
+
+// Any int, floating-point or complex tensor types
+def HLO_IntFpOrComplexTensor : TensorOf<[HLO_Int, AnyFloat, HLO_Complex]>;
+
+// Any pred, int or floating-point tensor types
+def HLO_PredIntOrFpTensor : TensorOf<[HLO_Pred, HLO_Int, AnyFloat]>;
 
 //===----------------------------------------------------------------------===//
 // XLA nullary op definitions.
@@ -82,15 +151,6 @@ class BASE_HLO_ClzOp {
 
     See
     https://www.tensorflow.org/xla/operation_semantics#element-wise_unary_functions.
-  }];
-}
-
-class BASE_HLO_ComplexOp {
-  string summary = "Complex operator";
-
-  string description = [{
-    Performs element-wise conversion of a pair of real and imaginary values to
-    a complex value.
   }];
 }
 
@@ -335,6 +395,15 @@ class BASE_HLO_AddOp {
   }];
 }
 
+class BASE_HLO_ComplexOp {
+  string summary = "Complex operator";
+
+  string description = [{
+    Performs element-wise conversion of a pair of real and imaginary values to
+    a complex value.
+  }];
+}
+
 class BASE_HLO_DivOp {
   string summary = "Division operator";
 
@@ -459,7 +528,7 @@ class BASE_HLO_AndOp {
   string summary = "Logical and";
 
   string description = [{
-    Returns `lhs /\ rhs` element-wise.
+    Returns `logical_and(lhs, rhs)` element-wise.
 
     See
     https://www.tensorflow.org/xla/operation_semantics#element-wise_binary_arithmetic_operations.
@@ -470,7 +539,7 @@ class BASE_HLO_OrOp {
   string summary = "Logical or";
 
   string description = [{
-    Returns `lhs \/ rhs` element-wise.
+    Returns `logical_or(lhs, rhs)` element-wise.
 
     See
     https://www.tensorflow.org/xla/operation_semantics#element-wise_binary_arithmetic_operations.
@@ -481,7 +550,7 @@ class BASE_HLO_XorOp {
   string summary = "Logical xor";
 
   string description = [{
-    Returns `lhs xor rhs` element-wise.
+    Returns `logical_xor(lhs, rhs)` element-wise.
 
     See
     https://www.tensorflow.org/xla/operation_semantics#element-wise_binary_arithmetic_operations.
@@ -489,8 +558,40 @@ class BASE_HLO_XorOp {
 }
 
 //===----------------------------------------------------------------------===//
+// XLA control flow related op definitions.
+//===----------------------------------------------------------------------===//
+
+class BASE_HLO_CaseOp {
+  string summary = "Switch-Case operator";
+
+  string description = [{
+    Returns the result of executing `branches[index]`. If
+    `index` is < 0 or >= N, then `branches[N-1] is executed as
+    the default branch.
+
+    Each branch `branches[b]` must take in a single argument of same type as
+    `branch_operands[b]` and will be invoked with `branch_operands[b]`. The type
+    of the returned value of each branch must be the same.
+
+    Note that only one of the branches will be executed depending on the value
+    of index.
+    See https://www.tensorflow.org/xla/operation_semantics#conditional.
+  }];
+
+}
+
+//===----------------------------------------------------------------------===//
 // XLA parallelism related op definitions.
 //===----------------------------------------------------------------------===//
+
+// Represents a unique identifier for each Send/Recv instruction pair or
+// optionally for collective instructions (AllReduce, CollectivePermute,
+// AllToAll). Non-positive channel_id handle is equivalent to no channel id.
+class ChannelHandle<Dialect dialect> : StructAttr<"ChannelHandle", dialect, [
+                StructFieldAttr<"handle", I64Attr>,
+                StructFieldAttr<"type", I64Attr>]> {
+  let description = "two 64-bit integers 'handle' and 'type'";
+}
 
 class BASE_HLO_ReplicaIdOp {
   string summary = "ReplicaId operator";
@@ -703,8 +804,8 @@ class BASE_HLO_AllToAllOp {
     AllToAll is a collective operation that sends data from all cores to all
     cores. It has two phases:
     - The scatter phase. On each core, the operand is split into `split_count`
-      number of blocks along the `split_dimensions`, and the blocks are
-      scattered to all cores, e.g., the i-th block is send to the i-th core.
+      number of blocks along the `split_dimension`, and the blocks are
+      scattered to all cores, e.g., the i-th block is sent to the i-th core.
     - The gather phase. Each core concatenates the received blocks along the
       `concat_dimension`.
 
@@ -718,7 +819,7 @@ class BASE_HLO_AllToAllOp {
       will be concatenated in the same order of 1, 2, 3. Then, another AllToAll
       will be applied within replicas 4, 5, 0, and the concatenation order is
       also 4, 5, 0. If `replica_groups` is empty, all replicas belong to one
-      group, in the concatenation order of their appearance.
+      group, and the concatenation order is the numerical order (0, 1, 2, ...).
 
     Prerequisites:
     - The dimension size of the operand on the split_dimension is divisible by
@@ -997,6 +1098,15 @@ class BASE_HLO_ReshapeOp {
   }];
 }
 
+class ScatterDimensionNumbers<Dialect dialect> : StructAttr<
+    "ScatterDimensionNumbers", dialect, [
+      StructFieldAttr<"update_window_dims", I64ElementsAttr>,
+      StructFieldAttr<"inserted_window_dims", I64ElementsAttr>,
+      StructFieldAttr<"scatter_dims_to_operand_dims", I64ElementsAttr>,
+      StructFieldAttr<"index_vector_dim", I64Attr>]> {
+  let description = "Structure of dimension information for scatter";
+}
+
 class BASE_HLO_ScatterOp {
   string summary = "Scatter operator";
 
@@ -1163,6 +1273,47 @@ class BASE_HLO_RngNormalOp {
     The parameters furthermore have to be scalar valued.
 
     See https://www.tensorflow.org/xla/operation_semantics#rngnormal.
+  }];
+}
+
+class BASE_HLO_ReducePrecisionOp {
+  string summary = "Reduce precision operator";
+
+  string description = [{
+    Models the effect of converting floating - point values to a lower -
+    precision format(such as IEEE - FP16) and back to the original
+    format. The number of exponent and mantissa bits in the lower -
+    precision format can be specified arbitrarily,
+    although all bit sizes may not be supported on all hardware
+    implementations.
+
+    See https://www.tensorflow.org/xla/operation_semantics#reduceprecision.
+  }];
+}
+
+class BASE_HLO_InfeedOp {
+  string summary = "Infeed operator";
+
+  string description = [{
+    Reads a single data item from the implicit Infeed streaming interface of
+    the device, interpreting the data as the given shape and its layout, and
+    returns an LHLO op of the data. Multiple Infeed operations are allowed in a
+    computation, but there must be a total order among the Infeed operations.
+    For example, two Infeeds in the code below have a total order since there
+    is a dependency between the while loops.
+
+    See https://www.tensorflow.org/xla/operation_semantics#infeed
+  }];
+}
+
+class BASE_HLO_WhileOp {
+  string summary = "While operator";
+
+  string description = [{
+    Returns the result of executing a body function until the cond body returns
+    true.
+
+    See https://www.tensorflow.org/xla/operation_semantics#while.
   }];
 }
 

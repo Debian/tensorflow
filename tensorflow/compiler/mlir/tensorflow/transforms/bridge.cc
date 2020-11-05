@@ -17,14 +17,26 @@ limitations under the License.
 
 #include <memory>
 
-#include "mlir/IR/Module.h"  // TF:llvm-project
-#include "mlir/Pass/PassManager.h"  // TF:llvm-project
-#include "mlir/Transforms/Passes.h"  // TF:llvm-project
+#include "mlir/IR/Module.h"  // from @llvm-project
+#include "mlir/Pass/PassManager.h"  // from @llvm-project
+#include "mlir/Transforms/Passes.h"  // from @llvm-project
 #include "tensorflow/compiler/mlir/tensorflow/transforms/passes.h"
 #include "tensorflow/compiler/mlir/tensorflow/utils/bridge_logger.h"
 #include "tensorflow/compiler/mlir/tensorflow/utils/error_util.h"
 
 namespace mlir {
+namespace {
+// Add logger to bridge passmanager.
+void EnableLogging(PassManager *pm) {
+  // Print the whole module after each pass, which requires disabling
+  // multi-threading as well.
+  pm->getContext()->disableMultithreading();
+  pm->enableIRPrinting(std::make_unique<tensorflow::BridgeLoggerConfig>(
+      /*print_module_scope=*/true));
+  pm->enableTiming(std::make_unique<tensorflow::BridgeTimingConfig>());
+}
+}  // namespace
+
 namespace TFTPU {
 namespace {
 void AddGraphExportLoweringPasses(OpPassManager &pm) {
@@ -32,17 +44,17 @@ void AddGraphExportLoweringPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(CreateBreakUpIslandsPass());
   pm.addNestedPass<FuncOp>(TFDevice::CreateReplicateToIslandPass());
   pm.addNestedPass<FuncOp>(CreateBreakUpIslandsPass());
+  pm.addNestedPass<FuncOp>(TFDevice::CreateParallelExecuteToIslandsPass());
+  pm.addNestedPass<FuncOp>(CreateBreakUpIslandsPass());
   pm.addNestedPass<FuncOp>(TFDevice::CreateLaunchToDeviceAttributePass());
+  pm.addNestedPass<FuncOp>(CreateBreakUpIslandsPass());
 }
 
 tensorflow::Status RunTPUBridge(
     ModuleOp module, bool enable_logging,
     llvm::function_ref<void(OpPassManager &pm)> pipeline_builder) {
   PassManager bridge(module.getContext());
-
-  // Add logger to bridge passmanager.
-  if (enable_logging)
-    bridge.enableIRPrinting(std::make_unique<tensorflow::BridgeLoggerConfig>());
+  if (enable_logging) EnableLogging(&bridge);
 
   // Populate a passmanager with the list of passes that implement the bridge.
   pipeline_builder(bridge);
@@ -63,6 +75,8 @@ void CreateTPUBridgePipeline(OpPassManager &pm) {
   // Run island coarsening before shape inference to allow more exact shape
   // inference using constant folding within islands.
   pm.addNestedPass<FuncOp>(tf_executor::CreateTFExecutorIslandCoarseningPass());
+  // TODO(b/150462212): Move graph pruning before island coarsening.
+  pm.addNestedPass<FuncOp>(tf_executor::CreateTFExecutorGraphPruningPass());
   // Run shape inference so that tf_executor/tf_device ops created later will
   // likely to inherit more concrete types.
   pm.addPass(TF::CreateTFShapeInferencePass());
@@ -73,7 +87,8 @@ void CreateTPUBridgePipeline(OpPassManager &pm) {
   // because DecomposeResourceOpsPass uses pattern rewriter which hoists
   // changed constants out of tf_device.Launch.
   func_pm.addPass(TFDevice::CreateDecomposeResourceOpsPass());
-
+  pm.addNestedPass<FuncOp>(CreateTPUHostComputationExpansionPass());
+  pm.addPass(CreateTPUExtractHeadTailOutsideCompilationPass());
   // Run another shape inference pass because resource decomposition might have
   // created new partial types.
   pm.addPass(TF::CreateTFShapeInferencePass());
@@ -82,8 +97,10 @@ void CreateTPUBridgePipeline(OpPassManager &pm) {
   pm.addPass(TF::CreateResourceDeviceInferencePass());
   pm.addPass(TFDevice::CreateClusterOutliningPass());
   pm.addPass(CreateTPUDynamicPaddingMapperPass());
+  pm.addPass(CreateTPUShardingIdentificationPass());
   pm.addPass(TFDevice::CreateAnnotateParameterReplicationPass());
   pm.addPass(CreateTPURewritePass());
+  pm.addPass(createSymbolDCEPass());
   pm.addNestedPass<FuncOp>(TFDevice::CreateReplicateInvariantOpHoistingPass());
   pm.addNestedPass<FuncOp>(CreateTPUDynamicLayoutPass());
   pm.addNestedPass<FuncOp>(CreateTPUMergeVariablesWithExecutePass());
@@ -118,15 +135,7 @@ tensorflow::Status RunBridgeWithStandardPipeline(ModuleOp module,
                                                  bool enable_logging,
                                                  bool enable_inliner) {
   PassManager bridge(module.getContext());
-
-  // Add logger to bridge passmanager.
-  if (enable_logging) {
-    // Print the whole module after each pass, which requires disabling
-    // multi-threading as well.
-    bridge.disableMultithreading();
-    bridge.enableIRPrinting(std::make_unique<tensorflow::BridgeLoggerConfig>(
-        /* print_module_scope=*/true));
-  }
+  if (enable_logging) EnableLogging(&bridge);
 
   StandardPipelineOptions pipeline_options;
   pipeline_options.enable_inliner.setValue(enable_inliner);

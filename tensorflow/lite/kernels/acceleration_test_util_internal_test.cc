@@ -14,7 +14,9 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/lite/kernels/acceleration_test_util_internal.h"
 
+#include <functional>
 #include <optional>
+#include <string>
 #include <unordered_map>
 
 #include <gmock/gmock.h>
@@ -110,7 +112,7 @@ TEST_F(ReadAccelerationConfigTest, IgnoresCommentedLines) {
   EXPECT_TRUE(blacklist_.empty());
 }
 
-TEST_F(ReadAccelerationConfigTest, CommentCanHaveTralingBlanks) {
+TEST_F(ReadAccelerationConfigTest, CommentCanHaveTrailingBlanks) {
   ReadAccelerationConfig("  #key,value", consumer_);
 
   EXPECT_TRUE(whitelist_.empty());

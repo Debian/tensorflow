@@ -104,115 +104,6 @@ TEST_F(ArithmeticOptimizerTest, NoOp) {
   VerifyGraphsMatch(item.graph, output, __LINE__);
 }
 
-TEST_F(ArithmeticOptimizerTest, OpDedupping) {
-  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
-  Output c1 = ops::Const(s.WithOpName("c1"), {3.14, 2.7}, {1, 2});
-  Output c2 = ops::Const(s.WithOpName("c2"), {3.14, 2.7}, {1, 2});
-  Output div = ops::Div(s.WithOpName("div"), c1, c2);
-  GrapplerItem item;
-  TF_CHECK_OK(s.ToGraphDef(&item.graph));
-  item.fetch = {"div"};
-
-  auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
-  ASSERT_EQ(tensors_expected.size(), 1);
-
-  ArithmeticOptimizer optimizer;
-  GraphDef output;
-  OptimizeTwice(&optimizer, &item, &output);
-  NodeMap node_map(&output);
-  EXPECT_EQ(output.node_size(), 2);
-  const NodeDef* new_c1 = node_map.GetNode("c1");
-  ASSERT_NE(new_c1, nullptr);
-
-  const NodeDef* new_div = node_map.GetNode("div");
-  ASSERT_NE(new_div, nullptr);
-  ASSERT_EQ(new_div->input_size(), 2);
-  EXPECT_EQ(new_div->input(0), "c1");
-  EXPECT_EQ(new_div->input(1), "c1");
-
-  auto tensors = EvaluateNodes(output, item.fetch);
-  ASSERT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<double>(tensors[0], tensors_expected[0], 1e-6);
-}
-
-TEST_F(ArithmeticOptimizerTest, OpDeduppingAssertAndCheckNumerics) {
-  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
-  Output p = ops::Placeholder(s, DT_BOOL, ops::Placeholder::Shape({}));
-  Output c = ops::Const(s.WithOpName("c"), {3.14, 2.7}, {1, 2});
-  auto check1 = ops::CheckNumerics(s.WithOpName("check1"), c, "foo");
-  auto check2 = ops::CheckNumerics(s.WithOpName("check2"), c, "foo");
-  auto assert1 = ops::Assert(s.WithOpName("assert1"), p, {c});
-  auto assert2 = ops::Assert(s.WithOpName("assert2"), p, {c});
-  Output div = ops::Div(s.WithOpName("div").WithControlDependencies(
-                            {assert1.operation, assert2.operation}),
-                        check1, check2);
-  GrapplerItem item;
-  TF_CHECK_OK(s.ToGraphDef(&item.graph));
-  item.fetch = {"div"};
-  Tensor bool_t(DT_BOOL, TensorShape({}));
-  bool_t.scalar<bool>().setConstant(true);
-  auto tensors_expected =
-      EvaluateNodes(item.graph, item.fetch, {{"Placeholder", bool_t}});
-  ASSERT_EQ(tensors_expected.size(), 1);
-
-  ArithmeticOptimizer optimizer;
-  GraphDef output;
-
-  OptimizeTwice(&optimizer, &item, &output);
-  NodeMap node_map(&output);
-
-  EXPECT_EQ(output.node_size(), 6);
-  const NodeDef* new_div = node_map.GetNode("div");
-  ASSERT_NE(new_div, nullptr);
-  ASSERT_EQ(new_div->input_size(), 3);
-  EXPECT_EQ(new_div->input(0), "check1");
-  EXPECT_EQ(new_div->input(1), "check2");
-  EXPECT_EQ(new_div->input(2), "^assert1");
-
-  auto tensors = EvaluateNodes(output, item.fetch, {{"Placeholder", bool_t}});
-  EXPECT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<double>(tensors[0], tensors_expected[0], 1e-6);
-}
-
-TEST_F(ArithmeticOptimizerTest, OpDedupCommutative) {
-  tensorflow::Scope s = tensorflow::Scope::NewRootScope();
-  Output c1 = ops::Const(s.WithOpName("c1"), {1.0f, 2.0f}, {1, 2});
-  Output c2 = ops::Const(s.WithOpName("c2"), {3.0f, 4.0f}, {1, 2});
-  Output mul1 = ops::Mul(s.WithOpName("mul1"), c1, c2);
-  Output mul2 = ops::Mul(s.WithOpName("mul2"), c2, c1);
-  Output div1 = ops::Div(s.WithOpName("div1"), mul1, mul2);
-  GrapplerItem item;
-  TF_CHECK_OK(s.ToGraphDef(&item.graph));
-  item.fetch = {"div1"};
-  auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
-  ASSERT_EQ(tensors_expected.size(), 1);
-
-  ArithmeticOptimizer optimizer;
-  GraphDef output;
-  OptimizeTwice(&optimizer, &item, &output);
-  NodeMap node_map(&output);
-
-  EXPECT_EQ(output.node_size(), 4);
-  const NodeDef* new_c1 = node_map.GetNode("c1");
-  ASSERT_NE(new_c1, nullptr);
-  const NodeDef* new_c2 = node_map.GetNode("c2");
-  ASSERT_NE(new_c2, nullptr);
-  const NodeDef* new_mul1 = node_map.GetNode("mul1");
-  ASSERT_NE(new_mul1, nullptr);
-  ASSERT_EQ(new_mul1->input_size(), 2);
-  EXPECT_EQ(new_mul1->input(0), "c1");
-  EXPECT_EQ(new_mul1->input(1), "c2");
-  const NodeDef* new_div1 = node_map.GetNode("div1");
-  ASSERT_NE(new_div1, nullptr);
-  ASSERT_EQ(new_div1->input_size(), 2);
-  EXPECT_EQ(new_div1->input(0), "mul1");
-  EXPECT_EQ(new_div1->input(1), "mul1");
-
-  auto tensors = EvaluateNodes(output, item.fetch);
-  ASSERT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
-}
-
 TEST_F(ArithmeticOptimizerTest, ReplaceMulWithSquare) {
   tensorflow::Scope s = tensorflow::Scope::NewRootScope();
   Output c = ops::Const(s.WithOpName("c"), {1.0f, 2.0f}, {1, 2});
@@ -474,6 +365,7 @@ TEST_F(ArithmeticOptimizerTest, TrivialSumsRepeatedAdd) {
   Output id = ops::Identity(s.WithOpName("id"), add6);
 
   GrapplerItem item;
+  item.fetch = {"id"};
   TF_CHECK_OK(s.ToGraphDef(&item.graph));
 
   const std::vector<string> devices{
@@ -488,16 +380,16 @@ TEST_F(ArithmeticOptimizerTest, TrivialSumsRepeatedAdd) {
   DisableAddToAddNCombining(&optimizer);
 
   GraphDef output;
-  OptimizeTwice(&optimizer, &item, &output);
+  DedupAndOptimizeTwiceAndPrune(&optimizer, &item, &output);
 
   // We expect the following rewrite(s) to occur:
   //
   // Mul(p,
   //     Add_6(Add_4(Const(2), Const(2)),
-  //           Add_5(Const(2), Const(2))))
+  //           Add_5(Const(2), Const(2)))
   NodeMap node_map(&output);
 
-  EXPECT_EQ(output.node_size(), 17);
+  EXPECT_EQ(output.node_size(), 8);
 
   const NodeDef* id_node = node_map.GetNode("id");
   ASSERT_NE(id_node, nullptr);
@@ -507,8 +399,8 @@ TEST_F(ArithmeticOptimizerTest, TrivialSumsRepeatedAdd) {
   const NodeDef* mul_node = node_map.GetNode(HoistMulName("Add_6"));
   ASSERT_NE(mul_node, nullptr);
   ASSERT_EQ(mul_node->input_size(), 2);
-  EXPECT_EQ(mul_node->input(0), HoistAddName("Add_6"));
-  EXPECT_EQ(mul_node->input(1), "Placeholder");
+  EXPECT_EQ(mul_node->input(0), "Placeholder");
+  EXPECT_EQ(mul_node->input(1), HoistAddName("Add_6"));
 
   const NodeDef* add_6_node = node_map.GetNode(HoistAddName("Add_6"));
   ASSERT_NE(add_6_node, nullptr);
@@ -844,7 +736,7 @@ TEST_F(ArithmeticOptimizerTest, FoldTransposeIntoMatMul) {
     auto identity = ops::Identity(s.WithOpName("identity"), matmul);
 
     GrapplerItem item;
-    item.fetch = {"matmul"};
+    item.fetch = {"identity"};
     TF_CHECK_OK(s.ToGraphDef(&item.graph));
 
     auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
@@ -903,9 +795,10 @@ TEST_F(ArithmeticOptimizerTest, FoldConjugateTransposeIntoBatchMatMul) {
   Output trans_a = ops::ConjugateTranspose(s.WithOpName("trans_a"), a, perm);
   Output trans_b = ops::ConjugateTranspose(s.WithOpName("trans_b"), b, perm);
   Output matmul = ops::BatchMatMul(s.WithOpName("matmul"), trans_a, trans_b);
+  Output identity = ops::Identity(s.WithOpName("identity"), matmul);
 
   GrapplerItem item;
-  item.fetch = {"matmul"};
+  item.fetch = {"identity"};
   TF_CHECK_OK(s.ToGraphDef(&item.graph));
 
   auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
@@ -916,7 +809,7 @@ TEST_F(ArithmeticOptimizerTest, FoldConjugateTransposeIntoBatchMatMul) {
   OptimizeTwice(&optimizer, &item, &output);
 
   NodeMap node_map(&output);
-  EXPECT_EQ(output.node_size(), 11);
+  EXPECT_EQ(output.node_size(), 12);
 
   const string p = "ArithmeticOptimizer/FoldTransposeIntoMatMul";
   const string optimized_name = absl::StrCat(p, "_", "matmul");
@@ -4191,6 +4084,94 @@ TEST_F(ArithmeticOptimizerTest, SimplifyAggregationBFloat16) {
   auto tensors = EvaluateNodes(output, item.fetch);
   ASSERT_EQ(tensors.size(), 1);
   test::ExpectTensorEqual<bfloat16>(tensors[0], tensors_expected[0]);
+}
+
+TEST_F(ArithmeticOptimizerTest, SimplifyEmbeddingLookup) {
+  for (DataType unique_idx_type : {DT_INT32, DT_INT64}) {
+    tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+    Output embeddings = ops::Const(s.WithOpName("embeddings"),
+                                   {1.0f, 2.0f, 3.0f, 4.0f}, {2, 2});
+    Output segment_ids =
+        ops::Const(s.WithOpName("segment_ids"), {0, 1, 1, 2, 2, 2, 2});
+    Output indices = ops::Const(s.WithOpName("indices"), {0, 0, 1, 0, 1, 0, 1});
+    auto unique = ops::Unique(s.WithOpName("unique"), indices,
+                              /*attrs=*/{unique_idx_type});
+    Output ids = unique.y;
+    Output idx = unique.idx;
+    Output gathered_rows =
+        ops::Gather(s.WithOpName("gathered_rows"), embeddings, ids);
+    Output result = ops::SparseSegmentSum(s.WithOpName("result"), gathered_rows,
+                                          idx, segment_ids);
+    Output id = ops::Identity(s.WithOpName("id"), result);
+
+    GrapplerItem item;
+    TF_CHECK_OK(s.ToGraphDef(&item.graph));
+    item.fetch = {"id"};
+    auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
+    ASSERT_EQ(tensors_expected.size(), 1);
+
+    GraphDef output;
+    ArithmeticOptimizer optimizer;
+    EnableOnlySimplifyEmbeddingLookup(&optimizer);
+    OptimizeAndPrune(&optimizer, &item, &output);
+
+    for (const auto& node : output.node()) {
+      if (node.name() == "result") {
+        EXPECT_EQ(node.input(0), "embeddings");
+        EXPECT_EQ(node.input(1), "indices");
+      }
+      EXPECT_NE(node.op(), "Unique");
+      EXPECT_NE(node.op(), "Gather");
+    }
+
+    auto tensors = EvaluateNodes(output, item.fetch);
+    ASSERT_EQ(tensors.size(), 1);
+    test::ExpectTensorEqual<float>(tensors[0], tensors_expected[0]);
+  }
+}
+
+TEST_F(ArithmeticOptimizerTest, RemoveCastIntoSegmentReduction) {
+  for (DataType indices_type : {DT_INT32, DT_INT64}) {
+    for (DataType segment_ids_type : {DT_INT32, DT_INT64}) {
+      tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+      Output embeddings = ops::Const(s.WithOpName("embeddings"),
+                                     {1.0f, 2.0f, 3.0f, 4.0f}, {2, 2});
+      Output indices =
+          ops::Cast(s.WithOpName("cast_indices"),
+                    ops::Const(s.WithOpName("indices"), {0, 0, 1, 0, 1, 0, 1}),
+                    indices_type);
+      Output segment_ids = ops::Cast(
+          s.WithOpName("cast_segment_ids"),
+          ops::Const(s.WithOpName("segment_ids"), {0, 1, 1, 2, 2, 2, 2}),
+          segment_ids_type);
+      Output result = ops::SparseSegmentSum(s.WithOpName("result"), embeddings,
+                                            indices, segment_ids);
+      Output id = ops::Identity(s.WithOpName("id"), result);
+
+      GrapplerItem item;
+      TF_CHECK_OK(s.ToGraphDef(&item.graph));
+      item.fetch = {"id"};
+      auto tensors_expected = EvaluateNodes(item.graph, item.fetch);
+      ASSERT_EQ(tensors_expected.size(), 1);
+
+      GraphDef output;
+      ArithmeticOptimizer optimizer;
+      EnableOnlyRemoveCastIntoSegmentReduction(&optimizer);
+      OptimizeAndPrune(&optimizer, &item, &output);
+
+      for (const auto& node : output.node()) {
+        if (node.name() == "result") {
+          EXPECT_EQ(node.input(1), "indices");
+          EXPECT_EQ(node.input(2), "segment_ids");
+        }
+        EXPECT_NE(node.op(), "Cast");
+      }
+
+      auto tensors = EvaluateNodes(output, item.fetch);
+      ASSERT_EQ(tensors.size(), 1);
+      test::ExpectTensorEqual<float>(tensors[0], tensors_expected[0]);
+    }
+  }
 }
 
 }  // namespace grappler

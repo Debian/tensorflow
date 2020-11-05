@@ -28,9 +28,11 @@ from tensorflow.core.framework import types_pb2
 from tensorflow.python.eager import context
 from tensorflow.python.eager import execute
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import op_callbacks
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import tensor_util
+from tensorflow.python.profiler import trace
 from tensorflow.python.util.tf_export import tf_export
 
 
@@ -267,31 +269,11 @@ def _constant_impl(
   """Implementation of constant."""
   ctx = context.context()
   if ctx.executing_eagerly():
-    t = convert_to_eager_tensor(value, ctx, dtype)
-    if shape is None:
-      return t
-    shape = tensor_shape.as_shape(shape)
-    if shape == t.shape:
-      return t
-    if verify_shape:
-      raise TypeError("Expected Tensor's shape: %s, got %s." % (tuple(shape),
-                                                                tuple(t.shape)))
-    num_t = t.shape.num_elements()
-    # TODO(josh11b): Implement shape -> eager tensor conversion.
-    if num_t == shape.num_elements():
-      return _eager_reshape(t, shape.as_list(), ctx)
-    if num_t == 1:
-      if t.dtype == dtypes.bool:
-        # We don't have a Fill kernel for bool dtype on GPU. So we first run
-        # Fill on CPU and then copy to GPU if needed.
-        with ops.device("/device:CPU:0"):
-          x = _eager_fill(shape.as_list(), _eager_identity(t, ctx), ctx)
-        return _eager_identity(x, ctx)
-      else:
-        return _eager_fill(shape.as_list(), t, ctx)
-    raise TypeError("Eager execution of tf.constant with unsupported shape "
-                    "(value has %d elements, shape is %s with %d elements)." %
-                    (num_t, shape, shape.num_elements()))
+    if trace.enabled:
+      with trace.Trace("tf.constant"):
+        return _constant_eager_impl(ctx, value, dtype, shape, verify_shape)
+    return _constant_eager_impl(ctx, value, dtype, shape, verify_shape)
+
   g = ops.get_default_graph()
   tensor_value = attr_value_pb2.AttrValue()
   tensor_value.tensor.CopyFrom(
@@ -299,12 +281,47 @@ def _constant_impl(
           value, dtype=dtype, shape=shape, verify_shape=verify_shape,
           allow_broadcast=allow_broadcast))
   dtype_value = attr_value_pb2.AttrValue(type=tensor_value.tensor.dtype)
+  attrs = {"value": tensor_value, "dtype": dtype_value}
   const_tensor = g._create_op_internal(  # pylint: disable=protected-access
-      "Const", [], [dtype_value.type],
-      attrs={"value": tensor_value,
-             "dtype": dtype_value},
-      name=name).outputs[0]
+      "Const", [], [dtype_value.type], attrs=attrs, name=name).outputs[0]
+
+  if op_callbacks.should_invoke_op_callbacks():
+    # TODO(b/147670703): Once the special-op creation code paths
+    # are unified. Remove this `if` block.
+    callback_outputs = op_callbacks.invoke_op_callbacks(
+        "Const", tuple(), attrs, (const_tensor,), op_name=name, graph=g)
+    if callback_outputs is not None:
+      const_tensor, = callback_outputs
   return const_tensor
+
+
+def _constant_eager_impl(ctx, value, dtype, shape, verify_shape):
+  """Implementation of eager constant."""
+  t = convert_to_eager_tensor(value, ctx, dtype)
+  if shape is None:
+    return t
+  shape = tensor_shape.as_shape(shape)
+  if shape == t.shape:
+    return t
+  if verify_shape:
+    raise TypeError("Expected Tensor's shape: %s, got %s." %
+                    (tuple(shape), tuple(t.shape)))
+  num_t = t.shape.num_elements()
+  # TODO(josh11b): Implement shape -> eager tensor conversion.
+  if num_t == shape.num_elements():
+    return _eager_reshape(t, shape.as_list(), ctx)
+  if num_t == 1:
+    if t.dtype == dtypes.bool:
+      # We don't have a Fill kernel for bool dtype on GPU. So we first run
+      # Fill on CPU and then copy to GPU if needed.
+      with ops.device("/device:CPU:0"):
+        x = _eager_fill(shape.as_list(), _eager_identity(t, ctx), ctx)
+      return _eager_identity(x, ctx)
+    else:
+      return _eager_fill(shape.as_list(), t, ctx)
+  raise TypeError("Eager execution of tf.constant with unsupported shape "
+                  "(value has %d elements, shape is %s with %d elements)." %
+                  (num_t, shape, shape.num_elements()))
 
 
 def is_constant(tensor_or_op):

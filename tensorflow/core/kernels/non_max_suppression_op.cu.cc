@@ -19,35 +19,14 @@ limitations under the License.
 
 #include "absl/strings/str_cat.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
-#include "third_party/cub/device/device_radix_sort.cuh"
-#include "third_party/cub/device/device_segmented_radix_sort.cuh"
-#include "third_party/cub/device/device_select.cuh"
 #include "tensorflow/core/framework/numeric_types.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor_types.h"
+#include "tensorflow/core/kernels/gpu_prim.h"
 #include "tensorflow/core/kernels/non_max_suppression_op.h"
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 #include "tensorflow/stream_executor/stream_executor.h"
-
-#define TF_RETURN_IF_CUDA_ERROR(result)                   \
-  do {                                                    \
-    cudaError_t error(result);                            \
-    if (!SE_PREDICT_TRUE(error == cudaSuccess)) {         \
-      return errors::Internal("Cuda call failed with ",   \
-                              cudaGetErrorString(error)); \
-    }                                                     \
-  } while (0)
-
-#define TF_OP_REQUIRES_CUDA_SUCCESS(context, result)                   \
-  do {                                                                 \
-    cudaError_t error(result);                                         \
-    if (!SE_PREDICT_TRUE(error == cudaSuccess)) {                      \
-      context->SetStatus(errors::Internal("Cuda call failed with",     \
-                                          cudaGetErrorString(error))); \
-      return;                                                          \
-    }                                                                  \
-  } while (0)
 
 struct __align__(16) Box {
   float x1, y1, x2, y2;

@@ -49,12 +49,20 @@ struct MklPoolingParams {
   mkldnn::prop_kind prop_kind;
   MEMORY_FORMAT src_format;
   memory::desc src_md;
+#ifdef ENABLE_MKLDNN_V1
+  memory::desc diff_dst_md;
+#endif  // ENABLE_MKLDNN_V1
 
   MklPoolingParams(memory::dims src_dims, memory::dims dst_dims,
                    memory::dims filter_dims, memory::dims strides,
                    memory::dims padding_left, memory::dims padding_right,
                    mkldnn::algorithm alg_kind, mkldnn::prop_kind prop_kind,
+#ifdef ENABLE_MKLDNN_V1
+                   MEMORY_FORMAT src_format, memory::desc src_md,
+                   memory::desc diff_dst_md = memory::desc())
+#else
                    MEMORY_FORMAT src_format, memory::desc src_md)
+#endif  // ENABLE_MKLDNN_V1
       : src_dims(src_dims),
         dst_dims(dst_dims),
         filter_dims(filter_dims),
@@ -64,15 +72,21 @@ struct MklPoolingParams {
         alg_kind(alg_kind),
         prop_kind(prop_kind),
         src_format(src_format),
-        src_md(src_md) {}
+#ifdef ENABLE_MKLDNN_V1
+        src_md(src_md),
+        diff_dst_md(diff_dst_md) {
+  }
+#else
+        src_md(src_md) {
+  }
+#endif  // ENABLE_MKLDNN_V1
 };
 
 template <typename T>
 class MklPoolingFwdPrimitive : public MklPrimitive {
  public:
   explicit MklPoolingFwdPrimitive(const MklPoolingParams& fwdParams)
-      : cpu_engine_(ENGINE_CPU, 0) {
-    context_.fwd_stream.reset(new CPU_STREAM(cpu_engine_));
+      : MklPrimitive(engine(ENGINE_CPU, 0)) {
     if (context_.fwd == nullptr) Setup(fwdParams);
   }
 
@@ -82,7 +96,8 @@ class MklPoolingFwdPrimitive : public MklPrimitive {
   //   src_data:  input data buffer of src
   //   ws_data:   output data buffer of workspace
   //   dst_data:  output data buffer of dst
-  void Execute(const T* src_data, T* dst_data, void* ws_data = nullptr);
+  void Execute(const T* src_data, T* dst_data, void* ws_data,
+               std::shared_ptr<stream> fwd_stream);
 
   std::shared_ptr<PoolingFwdPd> GetPoolingFwdPd() const {
     return context_.fwd_pd;
@@ -144,12 +159,10 @@ class MklPoolingFwdPrimitive : public MklPrimitive {
           fwd_pd(nullptr),
           src_md(nullptr),
           dst_md(nullptr),
-          fwd(nullptr),
-          fwd_stream(nullptr) {}
+          fwd(nullptr) {}
   };
 
   struct PoolingFwdContext context_;
-  engine cpu_engine_;
 };
 
 template <typename T>
@@ -214,8 +227,7 @@ template <typename T>
 class MklPoolingBwdPrimitive : public MklPrimitive {
  public:
   explicit MklPoolingBwdPrimitive(const MklPoolingParams& bwdParams)
-      : cpu_engine_(ENGINE_CPU, 0) {
-    context_.bwd_stream.reset(new CPU_STREAM(cpu_engine_));
+      : MklPrimitive(engine(ENGINE_CPU, 0)) {
     if (context_.bwd == nullptr) Setup(bwdParams);
   }
 
@@ -225,8 +237,8 @@ class MklPoolingBwdPrimitive : public MklPrimitive {
   //   diff_dst_data:  input data buffer of diff_dst
   //   diff_src_data:  output data buffer of diff_src
   //   ws_data:        input data buffer of workspace
-  void Execute(const T* diff_dst_data, T* diff_src_data,
-               const void* ws_data = nullptr);
+  void Execute(const T* diff_dst_data, T* diff_src_data, const void* ws_data,
+               std::shared_ptr<stream> bwd_stream);
 
  public:
   std::shared_ptr<PoolingFwdPd> GetPoolingFwdPd() const {
@@ -300,12 +312,10 @@ class MklPoolingBwdPrimitive : public MklPrimitive {
           bwd_desc(nullptr),
           fwd_pd(nullptr),
           bwd_pd(nullptr),
-          bwd(nullptr),
-          bwd_stream(nullptr) {}
+          bwd(nullptr) {}
   };
 
   struct PoolingBwdContext context_;
-  engine cpu_engine_;
 };
 
 template <typename T>

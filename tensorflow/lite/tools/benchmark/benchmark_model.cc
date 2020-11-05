@@ -21,7 +21,7 @@ limitations under the License.
 #include "tensorflow/lite/profiling/memory_info.h"
 #include "tensorflow/lite/profiling/time.h"
 #include "tensorflow/lite/tools/benchmark/benchmark_utils.h"
-#include "tensorflow/lite/tools/benchmark/logging.h"
+#include "tensorflow/lite/tools/logging.h"
 
 namespace tflite {
 namespace benchmark {
@@ -34,6 +34,7 @@ BenchmarkParams BenchmarkModel::DefaultParams() {
   params.AddParam("max_secs", BenchmarkParam::Create<float>(150.0f));
   params.AddParam("run_delay", BenchmarkParam::Create<float>(-1.0f));
   params.AddParam("num_threads", BenchmarkParam::Create<int32_t>(1));
+  params.AddParam("use_caching", BenchmarkParam::Create<bool>(false));
   params.AddParam("benchmark_name", BenchmarkParam::Create<std::string>(""));
   params.AddParam("output_prefix", BenchmarkParam::Create<std::string>(""));
   params.AddParam("warmup_runs", BenchmarkParam::Create<int32_t>(1));
@@ -47,10 +48,22 @@ void BenchmarkLoggingListener::OnBenchmarkEnd(const BenchmarkResults& results) {
   auto inference_us = results.inference_time_us();
   auto init_us = results.startup_latency_us();
   auto warmup_us = results.warmup_time_us();
-  TFLITE_LOG(INFO) << "Average inference timings in us: "
-                   << "Warmup: " << warmup_us.avg() << ", "
+  auto init_mem_usage = results.init_mem_usage();
+  auto overall_mem_usage = results.overall_mem_usage();
+  TFLITE_LOG(INFO) << "Inference timings in us: "
                    << "Init: " << init_us << ", "
-                   << "Inference: " << inference_us.avg();
+                   << "First inference: " << warmup_us.first() << ", "
+                   << "Warmup (avg): " << warmup_us.avg() << ", "
+                   << "Inference (avg): " << inference_us.avg();
+
+  if (!init_mem_usage.IsSupported()) return;
+  TFLITE_LOG(INFO)
+      << "Note: as the benchmark tool itself affects memory footprint, the "
+         "following is only APPROXIMATE to the actual memory footprint of the "
+         "model at runtime. Take the information at your discretion.";
+  TFLITE_LOG(INFO) << "Peak memory footprint (MB): init="
+                   << init_mem_usage.max_rss_kb / 1024.0
+                   << " overall=" << overall_mem_usage.max_rss_kb / 1024.0;
 }
 
 std::vector<Flag> BenchmarkModel::GetFlags() {
@@ -70,6 +83,11 @@ std::vector<Flag> BenchmarkModel::GetFlags() {
           "the end of the run but will not start the next run."),
       CreateFlag<float>("run_delay", &params_, "delay between runs in seconds"),
       CreateFlag<int32_t>("num_threads", &params_, "number of threads"),
+      CreateFlag<bool>(
+          "use_caching", &params_,
+          "Enable caching of prepacked weights matrices in matrix "
+          "multiplication routines. Currently implies the use of the Ruy "
+          "library."),
       CreateFlag<std::string>("benchmark_name", &params_, "benchmark name"),
       CreateFlag<std::string>("output_prefix", &params_,
                               "benchmark output prefix"),
@@ -95,6 +113,8 @@ void BenchmarkModel::LogParams() {
   TFLITE_LOG(INFO) << "Inter-run delay (seconds): ["
                    << params_.Get<float>("run_delay") << "]";
   TFLITE_LOG(INFO) << "Num threads: [" << params_.Get<int32_t>("num_threads")
+                   << "]";
+  TFLITE_LOG(INFO) << "Use caching: [" << params_.Get<bool>("use_caching")
                    << "]";
   TFLITE_LOG(INFO) << "Benchmark name: ["
                    << params_.Get<std::string>("benchmark_name") << "]";
@@ -193,18 +213,10 @@ TfLiteStatus BenchmarkModel::Run() {
           params_.Get<float>("max_secs"), REGULAR, &status);
   const auto overall_mem_usage =
       profiling::memory::GetMemoryUsage() - start_mem_usage;
+
   listeners_.OnBenchmarkEnd({model_size_mb, startup_latency_us, input_bytes,
                              warmup_time_us, inference_time_us, init_mem_usage,
                              overall_mem_usage});
-
-  TFLITE_LOG(INFO)
-      << "Note: as the benchmark tool itself affects memory footprint, the "
-         "following is only APPROXIMATE to the actual memory footprint of the "
-         "model at runtime. Take the information at your discretion.";
-  TFLITE_LOG(INFO) << "Peak memory footprint (MB): init="
-                   << init_mem_usage.max_rss_kb / 1024.0
-                   << " overall=" << overall_mem_usage.max_rss_kb / 1024.0;
-
   return status;
 }
 
@@ -217,6 +229,13 @@ TfLiteStatus BenchmarkModel::ParseFlags(int* argc, char** argv) {
     TFLITE_LOG(ERROR) << usage;
     return kTfLiteError;
   }
+
+  std::string unconsumed_args =
+      Flags::ArgsToString(*argc, const_cast<const char**>(argv));
+  if (!unconsumed_args.empty()) {
+    TFLITE_LOG(WARN) << "Unconsumed cmdline flags: " << unconsumed_args;
+  }
+
   return kTfLiteOk;
 }
 

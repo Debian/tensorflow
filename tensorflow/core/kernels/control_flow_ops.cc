@@ -109,15 +109,19 @@ TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_GPU_REF_SWITCH);
 TF_CALL_QUANTIZED_TYPES(REGISTER_GPU_REF_SWITCH);
 REGISTER_GPU_SWITCH(uint64);
 TF_CALL_variant(REGISTER_GPU_SWITCH);
+TF_CALL_uint32(REGISTER_GPU_SWITCH);
+TF_CALL_uint32(REGISTER_GPU_REF_SWITCH);
+TF_CALL_bool(REGISTER_GPU_SWITCH);
+TF_CALL_bool(REGISTER_GPU_REF_SWITCH);
 
 #undef REGISTER_CPU_SWITCH
 #undef REGISTER_CPU_REF_SWITCH
 #undef REGISTER_GPU_SWITCH
 #undef REGISTER_GPU_REF_SWITCH
 
-// Special GPU kernels for int32 and string.
-// TODO(b/25387198): Also enable int32 in device memory. This kernel
-// registration requires all int32 inputs and outputs to be in host memory.
+// Special GPU kernels for int32, string & resource handles. Requiring all
+// inputs and outputs to be in host memory.
+// TODO(b/25387198): Also enable int32 in device memory.
 #define REGISTER_GPU_HOST_KERNEL(type)                    \
   REGISTER_KERNEL_BUILDER(Name("Switch")                  \
                               .Device(DEVICE_GPU)         \
@@ -147,8 +151,6 @@ TF_CALL_variant(REGISTER_GPU_SWITCH);
 
 REGISTER_GPU_HOST_KERNEL(int32);
 REGISTER_GPU_HOST_REF_KERNEL(int32);
-REGISTER_GPU_HOST_KERNEL(bool);
-REGISTER_GPU_HOST_REF_KERNEL(bool);
 REGISTER_GPU_HOST_KERNEL(tstring);
 REGISTER_GPU_HOST_REF_KERNEL(tstring);
 REGISTER_GPU_HOST_KERNEL(ResourceHandle);
@@ -272,10 +274,14 @@ void MergeOp::Compute(OpKernelContext* context) {
       } else {
         context->set_output(0, context->input(i));
       }
-      Tensor* value_index = nullptr;
-      OP_REQUIRES_OK(
-          context, context->allocate_output(1, TensorShape({}), &value_index));
-      value_index->scalar<int32>()() = i;
+      // The value_index output is typically used only in gradient calculations,
+      // so we can avoid allocating in many inference workloads.
+      if (context->output_required(1)) {
+        Tensor* value_index = nullptr;
+        OP_REQUIRES_OK(context, context->allocate_output(1, TensorShape({}),
+                                                         &value_index));
+        value_index->scalar<int32>()() = i;
+      }
     }
   }
 }

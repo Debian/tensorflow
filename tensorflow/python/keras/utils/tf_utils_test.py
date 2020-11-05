@@ -18,18 +18,25 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl.testing import parameterized
+
 from tensorflow.python import keras
 from tensorflow.python.eager import context
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import sparse_tensor
-from tensorflow.python.framework import test_util
+from tensorflow.python.keras import combinations
 from tensorflow.python.keras.utils import tf_utils
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
+try:
+  import attr  # pylint:disable=g-import-not-at-top
+except ImportError:
+  attr = None
 
-@test_util.run_all_in_graph_and_eager_modes
-class TestIsSymbolicTensor(test.TestCase):
+
+@combinations.generate(combinations.combine(mode=['graph', 'eager']))
+class TestIsSymbolicTensor(test.TestCase, parameterized.TestCase):
 
   def test_default_behavior(self):
     if context.executing_eagerly():
@@ -154,6 +161,25 @@ class ConvertInnerNodeDataTest(test.TestCase):
     data = tf_utils.convert_inner_node_data(((['l', 2, 3], ['l', 5, 6])),
                                             wrap=True)
     self.assertTrue(all(isinstance(ele, tf_utils.ListWrapper) for ele in data))
+
+
+class AttrsTest(test.TestCase):
+
+  def test_map_structure_with_atomic_accept_attr(self):
+    if attr is None:
+      self.skipTest('attr module is unavailable.')
+
+    @attr.s(frozen=True)
+    class Foo(object):
+
+      bar = attr.ib()
+
+    self.assertEqual(
+        Foo(2),
+        tf_utils.map_structure_with_atomic(
+            is_atomic_fn=lambda x: isinstance(x, int),
+            map_fn=lambda x: x + 1,
+            nested=Foo(1)))
 
 
 if __name__ == '__main__':

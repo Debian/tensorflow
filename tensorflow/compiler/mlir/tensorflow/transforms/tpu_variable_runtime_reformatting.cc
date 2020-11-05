@@ -26,20 +26,19 @@ limitations under the License.
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"  // TF:llvm-project
-#include "mlir/IR/Attributes.h"  // TF:llvm-project
-#include "mlir/IR/Builders.h"  // TF:llvm-project
-#include "mlir/IR/Function.h"  // TF:llvm-project
-#include "mlir/IR/Location.h"  // TF:llvm-project
-#include "mlir/IR/MLIRContext.h"  // TF:llvm-project
-#include "mlir/IR/Operation.h"  // TF:llvm-project
-#include "mlir/IR/TypeUtilities.h"  // TF:llvm-project
-#include "mlir/IR/Types.h"  // TF:llvm-project
-#include "mlir/IR/Value.h"  // TF:llvm-project
-#include "mlir/Pass/Pass.h"  // TF:llvm-project
-#include "mlir/Pass/PassRegistry.h"  // TF:llvm-project
-#include "mlir/Support/STLExtras.h"  // TF:llvm-project
-#include "mlir/Transforms/RegionUtils.h"  // TF:llvm-project
+#include "mlir/Dialect/StandardOps/IR/Ops.h"  // from @llvm-project
+#include "mlir/IR/Attributes.h"  // from @llvm-project
+#include "mlir/IR/Builders.h"  // from @llvm-project
+#include "mlir/IR/Function.h"  // from @llvm-project
+#include "mlir/IR/Location.h"  // from @llvm-project
+#include "mlir/IR/MLIRContext.h"  // from @llvm-project
+#include "mlir/IR/Operation.h"  // from @llvm-project
+#include "mlir/IR/TypeUtilities.h"  // from @llvm-project
+#include "mlir/IR/Types.h"  // from @llvm-project
+#include "mlir/IR/Value.h"  // from @llvm-project
+#include "mlir/Pass/Pass.h"  // from @llvm-project
+#include "mlir/Pass/PassRegistry.h"  // from @llvm-project
+#include "mlir/Transforms/RegionUtils.h"  // from @llvm-project
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_device.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_executor.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
@@ -116,8 +115,9 @@ std::string GetRandomStateVariableName() {
 //    tf.TPUReshardVariablesOp(%rvar, %default_format, %rstate)
 //  }
 struct TPUVariableRuntimeReformattingPass
-    : public ModulePass<TPUVariableRuntimeReformattingPass> {
-  void runOnModule() override;
+    : public PassWrapper<TPUVariableRuntimeReformattingPass,
+                         OperationPass<ModuleOp>> {
+  void runOnOperation() override;
 };
 
 // Returns the earlier value of which `v` is an identity. If `skipped` is
@@ -229,7 +229,7 @@ AnnotateCompileOpAndGetExecuteArgToWhileArgsMapping(
     mapping.emplace_back(it->second, std::move(while_args));
   }
   // Sort the mapping according to execute operand order.
-  llvm::sort(mapping);
+  llvm::sort(mapping, llvm::less_first());
   // Populate the `retval_index_for_sharding` field of the argument metadate.
   for (auto entry : llvm::enumerate(execute.device_var_reads_indices())) {
     int64_t arg_index = entry.value().cast<IntegerAttr>().getInt();
@@ -261,7 +261,6 @@ tf_device::ReplicateOp AddInputsToReplicateOp(
   // placed in logical core 0.
   // TODO(b/148913020): Remove this constraint once model parallelism is
   // supported.
-  assert(devices.size() == 1);
   assert(devices.find(tensorflow::GetDeviceAliasForLogicalCore(0))
              ->getSecond()
              .size() == num_replicas);
@@ -318,7 +317,7 @@ TF::WhileOp AddStateVarsToWhileOp(TF::WhileOp while_op, FuncOp body,
     new_body_return_vals.push_back(inner_arg);
     new_while_operands.push_back(state_var.resource());
   }
-  OpBuilder builder(&body.front());
+  OpBuilder builder = OpBuilder::atBlockEnd(&body.front());
   // Update return values.
   builder.create<ReturnOp>(body_return.getLoc(), new_body_return_vals);
   body_return.erase();
@@ -346,11 +345,9 @@ TF::WhileOp AddStateVarsToWhileOp(TF::WhileOp while_op, FuncOp body,
   if (new_while_op.output_shapes().size() != 0) {
     auto new_output_shapes = llvm::to_vector<4>(new_while_op.output_shapes());
     // VarHandleOp is a scalar shape resource.
-    tensorflow::TensorShapeProto scalar;
-    scalar.set_unknown_rank(false);
     for (int64_t i = 0; i < state_vars.size(); ++i) {
-      new_output_shapes.push_back(builder.getStringAttr(
-          tensorflow::mangling_util::MangleShape(scalar)));
+      new_output_shapes.push_back(
+          mlir::TF::ShapeAttr::get(builder.getContext(), ArrayRef<int64_t>()));
     }
     new_while_op.setAttr("output_shapes",
                          builder.getArrayAttr(new_output_shapes));
@@ -371,9 +368,6 @@ llvm::SmallVector<TF::VarHandleOp, 4> CreateStateVars(
 
   // TODO(b/148913020): Remove this constraint once model parallelism is
   // supported.
-  assert(devices.size() == 1 &&
-         "As model parallelism is not supported yet, tf_device.replicate "
-         "`devices` attribute should have one dictionary element.");
   const auto& device_list =
       devices.find(tensorflow::GetDeviceAliasForLogicalCore(0))->getSecond();
 
@@ -442,8 +436,7 @@ void HandleReplicateOp(TF::WhileOp while_op, tf_device::ReplicateOp replicate,
   if (!compile) return;
   auto compile_launch = llvm::dyn_cast<tf_device::LaunchOp>(compile);
   if (!compile_launch || !compile_launch.WrapsSingleOp() ||
-      compile_launch.GetBody().front().getName().getStringRef() !=
-          "tf._TPUCompileMlir")
+      !llvm::isa<TF::_TPUCompileMlirOp>(compile_launch.GetBody().front()))
     return;
 
   auto module = while_op.getParentOfType<ModuleOp>();
@@ -556,8 +549,8 @@ void HandleReplicateOp(TF::WhileOp while_op, tf_device::ReplicateOp replicate,
   builder.create<tf_device::ReturnOp>(while_op.getLoc(), ArrayRef<Value>{});
 }
 
-void TPUVariableRuntimeReformattingPass::runOnModule() {
-  auto module = getModule();
+void TPUVariableRuntimeReformattingPass::runOnOperation() {
+  auto module = getOperation();
   module.walk([&](TF::WhileOp while_op) {
     auto body = llvm::cast<FuncOp>(module.lookupSymbol(while_op.body()));
     tf_device::ReplicateOp replicate;
@@ -570,13 +563,17 @@ void TPUVariableRuntimeReformattingPass::runOnModule() {
       replicate = nullptr;
       return WalkResult::interrupt();
     });
-    if (replicate) HandleReplicateOp(while_op, replicate, &getContext());
+    // Model parallelism is not supported, and can be detected when a
+    // `tf_device.parallel_execute` op in the `tf_device.replicate` is present.
+    if (replicate &&
+        replicate.GetBody().getOps<tf_device::ParallelExecuteOp>().empty())
+      HandleReplicateOp(while_op, replicate, &getContext());
   });
 }
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> CreateTPUVariableReformattingPass() {
+std::unique_ptr<OperationPass<ModuleOp>> CreateTPUVariableReformattingPass() {
   return std::make_unique<TPUVariableRuntimeReformattingPass>();
 }
 

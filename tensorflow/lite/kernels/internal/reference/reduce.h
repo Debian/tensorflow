@@ -15,8 +15,11 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_REDUCE_H_
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_REDUCE_H_
 
-#include "tensorflow/lite/experimental/ruy/profiler/instrumentation.h"
+#include "ruy/profiler/instrumentation.h"  // from @ruy
 #include "tensorflow/lite/kernels/internal/common.h"
+#include "tensorflow/lite/kernels/internal/cppmath.h"
+#include "tensorflow/lite/kernels/internal/max.h"
+#include "tensorflow/lite/kernels/internal/min.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 
@@ -67,6 +70,9 @@ inline bool ResolveAxis(const int num_dims, const int* axis,
     // eg: For num_dims=3, [0, 1, 2] is the same as [-3, -2, -1]  */
     int current = axis[idx] < 0 ? (axis[idx] + num_dims) : axis[idx];
     TFLITE_DCHECK(current >= 0 && current < num_dims);
+    if (current < 0 || current >= num_dims) {
+      return false;
+    }
     bool is_dup = false;
     for (int j = 0; j < *out_num_axis; ++j) {
       if (out_axis[j] == current) {
@@ -371,7 +377,7 @@ inline bool QuantizedMeanOrSum(const T* input_data, int32 input_zero_point,
           -input_zero_point * scale * num_elements_in_axis + 0.5f;
       for (size_t idx = 0; idx < num_outputs; ++idx) {
         const U value =
-            static_cast<U>(std::round(temp_sum[idx] * scale + bias)) +
+            static_cast<U>(TfLiteRound(temp_sum[idx] * scale + bias)) +
             output_zero_point;
         output_data[idx] = static_cast<T>(value);
       }
@@ -380,11 +386,11 @@ inline bool QuantizedMeanOrSum(const T* input_data, int32 input_zero_point,
       for (size_t idx = 0; idx < num_outputs; ++idx) {
         float float_mean = static_cast<float>(temp_sum[idx]) /
                            static_cast<float>(num_elements_in_axis);
-        float result =
-            std::min(std::round(float_mean * scale + bias) + output_zero_point,
-                     static_cast<float>(std::numeric_limits<T>::max()));
-        result =
-            std::max(result, static_cast<float>(std::numeric_limits<T>::min()));
+        float result = TfLiteMin(
+            TfLiteRound(float_mean * scale + bias) + output_zero_point,
+            static_cast<float>(std::numeric_limits<T>::max()));
+        result = TfLiteMax(result,
+                           static_cast<float>(std::numeric_limits<T>::min()));
         output_data[idx] = static_cast<T>(result);
       }
     }

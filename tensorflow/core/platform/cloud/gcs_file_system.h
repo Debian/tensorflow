@@ -122,7 +122,8 @@ class GcsFileSystem : public FileSystem {
                 size_t matching_paths_cache_max_entries,
                 RetryConfig retry_config, TimeoutConfig timeouts,
                 const std::unordered_set<string>& allowed_locations,
-                std::pair<const string, const string>* additional_header);
+                std::pair<const string, const string>* additional_header,
+                bool compose_append);
 
   Status NewRandomAccessFile(
       const string& fname, std::unique_ptr<RandomAccessFile>* result) override;
@@ -187,6 +188,8 @@ class GcsFileSystem : public FileSystem {
   std::unordered_set<string> allowed_locations() const {
     return allowed_locations_;
   }
+
+  bool compose_append() const { return compose_append_; }
   string additional_header_name() const {
     return additional_header_ ? additional_header_->first : "";
   }
@@ -263,6 +266,19 @@ class GcsFileSystem : public FileSystem {
   /// Loads file contents from GCS for a given filename, offset, and length.
   virtual Status LoadBufferFromGCS(const string& fname, size_t offset, size_t n,
                                    char* buffer, size_t* bytes_transferred);
+
+  Status ParseGcsPathForScheme(StringPiece fname, string scheme,
+                               bool empty_object_ok, string* bucket,
+                               string* object);
+
+  /// \brief Splits a GCS path to a bucket and an object.
+  ///
+  /// For example, "gs://bucket-name/path/to/file.txt" gets split into
+  /// "bucket-name" and "path/to/file.txt".
+  /// If fname only contains the bucket and empty_object_ok = true, the returned
+  /// object is empty.
+  virtual Status ParseGcsPath(StringPiece fname, bool empty_object_ok,
+                              string* bucket, string* object);
 
   std::shared_ptr<ComputeEngineMetadataClient> compute_engine_metadata_client_;
 
@@ -360,6 +376,7 @@ class GcsFileSystem : public FileSystem {
   using BucketLocationCache = ExpiringLRUCache<string>;
   std::unique_ptr<BucketLocationCache> bucket_location_cache_;
   std::unordered_set<string> allowed_locations_;
+  bool compose_append_;
 
   TimeoutConfig timeouts_;
 
