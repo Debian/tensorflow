@@ -1,66 +1,65 @@
 Source: tensorflow
-Section: science
-Homepage: https://tensorflow.org/
-Priority: optional
-Standards-Version: 4.5.0
-Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
-Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
 Maintainer: Debian Deep Learning Team <debian-science-maintainers@lists.alioth.debian.org>
 Uploaders: Michael R. Crusoe <crusoe@debian.org>,
            Andreas Tille <tille@debian.org>
-Build-Depends:
- debhelper-compat (= 13),
- dh-python,
- android-libboringssl-dev,
- libcurl4-nss-dev,
- libdouble-conversion-dev,
- libfarmhash-dev,
- libgemmlowp-dev,
- libgif-dev,
- libgrpc++-dev (>= 1.23~),
- libgrpc-dev (>= 1.23~),
- libgtest-dev,
- libhighwayhash-dev,
- libhwloc-dev,
- libicu-dev,
- libjpeg62-turbo-dev,
- libjsoncpp-dev,
- liblmdb-dev,
- libmkldnn-dev [amd64],
- libnsync-dev,
- libpng-dev,
- libprotobuf-dev (>= 3.8~),
- libprotoc-dev (>= 3.8~),
- libre2-dev,
- libsnappy-dev,
- libsqlite3-dev,
- libssl-dev,
- libsuperlu-dev,
- bazel-bootstrap,
- protobuf-compiler (>= 3.8.0~),
- protobuf-compiler-grpc (>= 1.23~),
- python3,
- python3-all-dev,
- python3-future,
- python3-keras,
- python3-keras-applications,
- python3-keras-preprocessing,
- python3-mock,
- python3-numpy,
- python3-setuptools,
- python3-tqdm,
- python3-wheel,
- swig,
- zlib1g-dev,
- nasm
+Section: science
+Priority: optional
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               android-libboringssl-dev,
+               libcurl4-nss-dev,
+               libdouble-conversion-dev,
+               libfarmhash-dev,
+               libgemmlowp-dev,
+               libgif-dev,
+               libgrpc++-dev (>= 1.23~),
+               libgrpc-dev (>= 1.23~),
+               libgtest-dev,
+               libhighwayhash-dev,
+               libhwloc-dev,
+               libicu-dev,
+               libjpeg62-turbo-dev,
+               libjsoncpp-dev,
+               liblmdb-dev,
+               libmkldnn-dev [amd64],
+               libnsync-dev,
+               libpng-dev,
+               libprotobuf-dev (>= 3.8~),
+               libprotoc-dev (>= 3.8~),
+               libre2-dev,
+               libsnappy-dev,
+               libsqlite3-dev,
+               libssl-dev,
+               libsuperlu-dev,
+               bazel-bootstrap,
+               protobuf-compiler (>= 3.8.0~),
+               protobuf-compiler-grpc (>= 1.23~),
+               python3,
+               python3-all-dev,
+               python3-future,
+               python3-keras,
+               python3-keras-applications,
+               python3-keras-preprocessing,
+               python3-mock,
+               python3-numpy,
+               python3-setuptools,
+               python3-tqdm,
+               python3-wheel,
+               swig,
+               zlib1g-dev,
+               nasm
+Standards-Version: 4.5.0
+Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
+Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
+Homepage: https://tensorflow.org/
 
 # MISSING features: tensorflow lite, tensorflow extended, tensorflow.js
-
 Package: libtensorflow-framework2
-Section: libs
 Architecture: any
 Multi-Arch: same
-Depends: ${misc:Depends}, ${shlibs:Depends},
+Section: libs
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
 # I copied some detail about this shared object from tensorflow/BUILD
 Description: Computation using data flow graphs for scalable machine learning
  TensorFlow is an open source software library for numerical computation
@@ -91,11 +90,12 @@ Description: Computation using data flow graphs for scalable machine learning
  libraries are language agnostic.
 
 Package: libtensorflow2
-Section: libs
 Architecture: any
 Multi-Arch: same
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2 (= ${binary:Version}),
+Section: libs
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         libtensorflow-framework2 (= ${binary:Version})
 Description: Computation using data flow graphs for scalable machine learning (C)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -108,11 +108,12 @@ Description: Computation using data flow graphs for scalable machine learning (C
  C API for TensorFlow (i.e. symbols named "*TF_*" or "*TFE_*").
 
 Package: libtensorflow-cc2
-Section: libs
 Architecture: any
 Multi-Arch: same
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2 (= ${binary:Version}),
+Section: libs
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         libtensorflow-framework2 (= ${binary:Version})
 Description: Computation using data flow graphs for scalable machine learning (C++)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -125,13 +126,14 @@ Description: Computation using data flow graphs for scalable machine learning (C
  C++ API for TensorFlow (i.e. *tensorflow* *TF_* *TFE_* *pywrap_xla*).
 
 Package: libtensorflow-dev
-Section: libdevel
 Architecture: any
 Multi-Arch: same
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2 (= ${binary:Version}),
- libtensorflow2 (= ${binary:Version}),
- libtensorflow-cc2 (= ${binary:Version}),
+Section: libdevel
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         libtensorflow-framework2 (= ${binary:Version}),
+         libtensorflow2 (= ${binary:Version}),
+         libtensorflow-cc2 (= ${binary:Version})
 Description: Computation using data flow graphs for scalable machine learning (dev)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
@@ -145,8 +147,9 @@ Description: Computation using data flow graphs for scalable machine learning (d
 Package: python3-tensorflow
 Architecture: any
 Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends},
- libtensorflow-framework2 (= ${binary:Version}),
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         libtensorflow-framework2 (= ${binary:Version})
 Description: Computation using data flow graphs for scalable machine learning (Py3)
  TensorFlow is an open source software library for numerical computation
  using data flow graphs. The graph nodes represent mathematical operations,
