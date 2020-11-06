@@ -49,8 +49,8 @@ Build-Depends: debhelper-compat (= 13),
                zlib1g-dev,
                nasm
 Standards-Version: 4.5.0
-Vcs-Browser: https://salsa.debian.org/science-team/tensorflow
-Vcs-Git: https://salsa.debian.org/science-team/tensorflow.git
+Vcs-Browser: https://salsa.debian.org/deeplearning-team/tensorflow
+Vcs-Git: https://salsa.debian.org/deeplearning-team/tensorflow.git
 Homepage: https://tensorflow.org/
 
 # MISSING features: tensorflow lite, tensorflow extended, tensorflow.js
