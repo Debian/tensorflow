@@ -6,3 +6,4 @@
 #version_info.cc
 skip_deps
 boringssl
+bazelversion.patch
