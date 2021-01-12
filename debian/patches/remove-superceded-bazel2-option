@@ -1,0 +1,48 @@
+Description: <short summary of the patch>
+ TODO: Put a short summary on the line above and replace this paragraph
+ with a longer explanation of this change. Complete the meta-information
+ with other relevant fields (see below for details). To make it easier, the
+ information below has been extracted from the changelog. Adjust it or drop
+ it.
+ .
+ tensorflow (2.3.1-1) UNRELEASED; urgency=medium
+ .
+   [ Michael R. Crusoe ]
+   * Restart packaging using bazel-bootstrap
+ .
+   [ Andreas Tille ]
+   * New upstream version 2.3.1
+   * Move package to Debian Deep Learning Team
+   * Uncomment python3-tensorflow
+   * New upstream version
+   * Standards-Version: 4.5.0 (routine-update)
+   * debhelper-compat 13 (routine-update)
+   * cme fix dpkg-control
+Author: Andreas Tille <tille@debian.org>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: <vendor|upstream|other>, <url of original patch>
+Bug: <url in upstream bugtracker>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: <no|not-needed|url proving that it has been forwarded>
+Reviewed-By: <name and email of someone who approved the patch>
+Last-Update: 2021-01-08
+
+--- tensorflow-2.3.1.orig/.bazelrc
++++ tensorflow-2.3.1/.bazelrc
+@@ -240,10 +240,6 @@ build --define=grpc_no_ares=true
+ # archives in -whole_archive -no_whole_archive.
+ build --noincompatible_remove_legacy_whole_archive
+ 
+-# These are bazel 2.0's incompatible flags. Tensorflow needs to use bazel 2.0.0
+-# to use cc_shared_library, as part of the Tensorflow Build Improvements RFC:
+-# https://github.com/tensorflow/community/pull/179
+-build --noincompatible_prohibit_aapt1
+ 
+ # Modular TF build options
+ build:dynamic_kernels --define=dynamic_loaded_kernels=true

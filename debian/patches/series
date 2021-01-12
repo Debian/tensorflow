@@ -7,3 +7,4 @@
 skip_deps
 boringssl
 bazelversion.patch
+remove-superceded-bazel2-option
